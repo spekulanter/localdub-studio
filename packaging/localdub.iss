@@ -125,6 +125,22 @@ begin
   Result := ToolOnPath('ollama') or FileExists(ExpandConstant('{localappdata}\Programs\Ollama\ollama.exe'));
 end;
 
+procedure ShowProgress(const Caption, Detail: String);
+begin
+  { The progress page is only for the interactive wizard; silent setups never touch it. }
+  if not WizardSilent then
+  begin
+    ProgressPage.SetText(Caption, Detail);
+    ProgressPage.Show;
+  end;
+end;
+
+procedure HideProgress;
+begin
+  if not WizardSilent then
+    ProgressPage.Hide;
+end;
+
 procedure InstallWithWinget(const Title, Id, Source: String);
 var
   Code: Integer;
@@ -142,13 +158,12 @@ begin
   end;
   if MsgBox(Title + ' is needed and was not found.' + #13#10#13#10 + 'Install it now with winget (package ' + Id + ' from ' + Source + ')?', mbConfirmation, MB_YESNO) = IDYES then
   begin
-    ProgressPage.SetText('Installing ' + Title + ' with winget...', 'This can take a minute.');
-    ProgressPage.Show;
+    ShowProgress('Installing ' + Title + ' with winget...', 'This can take a minute.');
     try
       if not Exec(ExpandConstant('{cmd}'), '/S /C "winget install --id ' + Id + ' -e --accept-source-agreements --accept-package-agreements >> "' + ExpandConstant('{app}\install.log') + '" 2>&1"', '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
         Problems := Problems + #13#10 + '- ' + Title + ' could not be installed automatically (see install.log).';
     finally
-      ProgressPage.Hide;
+      HideProgress;
     end;
   end
   else
@@ -159,14 +174,15 @@ procedure RunStep(const Caption, Detail, CommandLine: String);
 var
   Code: Integer;
 begin
-  ProgressPage.SetText(Caption, Detail);
-  ProgressPage.Show;
+  Log('Step: ' + Caption);
+  ShowProgress(Caption, Detail);
   try
     if not RunHidden(CommandLine + ' >> "' + ExpandConstant('{app}\install.log') + '" 2>&1', Code) or (Code <> 0) then
       Problems := Problems + #13#10 + '- Step failed: ' + Caption + ' (exit code ' + IntToStr(Code) + ').';
   finally
-    ProgressPage.Hide;
+    HideProgress;
   end;
+  Log('Step finished: ' + Caption);
 end;
 
 procedure InitializeWizard;
@@ -186,8 +202,11 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   Uv, Extra, Fetch: String;
 begin
+  if CurStep = ssDone then
+    Log('Setup is done');
   if CurStep <> ssPostInstall then
     Exit;
+  Log('Post-install started');
   Problems := '';
   Uv := '"' + ExpandConstant('{app}\tools\uv.exe') + '"';
 
@@ -217,7 +236,8 @@ begin
     RunStep('Downloading the translation model {#OllamaModel}...', 'About 3.3 GB from the Ollama registry.',
       '"' + OllamaExe + '" pull {#OllamaModel}');
 
-  if Problems <> '' then
+  Log('Post-install finished; problems: [' + Problems + ']');
+  if (Problems <> '') and (not WizardSilent) then
     MsgBox('Setup finished, but some steps need attention:' + #13#10 + Problems + #13#10#13#10 + 'Details: ' + ExpandConstant('{app}\install.log') + #13#10 + 'You can repeat a step later; see docs in the install folder.', mbInformation, MB_OK);
 end;
 

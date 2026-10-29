@@ -68,7 +68,7 @@ jobs:
           }
           if (-not $p.HasExited) {
             Get-Content C:\ld-setup.log -Tail 40 -ErrorAction SilentlyContinue
-            Get-Process | Where-Object { $_.Name -match 'uv|python|cmd|winget' } | Format-Table Name, Id, StartTime
+            Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'uv|python|cmd|winget|Setup|setup|tmp' } | Select-Object ProcessId, ParentProcessId, Name, CommandLine | Format-List | Out-Host
             Stop-Process -Id $p.Id -Force
             throw 'The installer did not finish within 20 minutes'
           }
