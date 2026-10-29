@@ -1,0 +1,105 @@
+name: Build installer
+
+# Manual runs build and test the installer and keep it as a workflow artifact.
+# Pushing a tag like v0.1.0 also publishes it as a GitHub pre-release.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # only used to create the release on tags
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Tools (uv, FFmpeg, Inno Setup)
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check uv==0.12.23
+          choco install ffmpeg innosetup -y --no-progress
+          uv --version
+
+      - name: Python checks
+        shell: pwsh
+        run: |
+          uv sync --frozen
+          uv run ruff check .
+          uv run mypy localdub
+          uv run pytest -q
+
+      - name: Frontend
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+      - name: Build installer and ZIP
+        shell: pwsh
+        run: uv run python packaging/build_release.py --skip-frontend
+
+      - name: Smoke test - silent install, start the server, uninstall
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release -Filter 'LocalDub-Studio-*-Setup.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'The installer was not built' }
+          $dir = 'C:\LDTest'
+          $p = Start-Process -FilePath $setup.FullName -Wait -PassThru -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$dir",
+            '/COMPONENTS=core', '/TASKS=', '/LOG=C:\ld-setup.log')
+          Get-Content C:\ld-setup.log -Tail 30
+          if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
+          foreach ($f in '.venv\Scripts\localdub-app.exe', '.venv\Scripts\python.exe', 'frontend\dist\index.html', 'tools\uv.exe', 'docs\LICENSES.md') {
+            if (-not (Test-Path (Join-Path $dir $f))) { throw "Missing after install: $f" }
+          }
+          & "$dir\.venv\Scripts\python.exe" -c "import localdub, fastapi, webview, sherpa_onnx; print('imports ok')"
+          $env:LOCALDUB_DATA_DIR = 'C:\ld-data'
+          $srv = Start-Process -FilePath "$dir\.venv\Scripts\localdub.exe" -ArgumentList 'serve' -PassThru -WindowStyle Hidden -WorkingDirectory $dir
+          $ok = $false
+          for ($i = 0; $i -lt 40 -and -not $ok; $i++) {
+            Start-Sleep -Seconds 2
+            try { $ok = (Invoke-WebRequest 'http://127.0.0.1:8765/api/options' -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200 } catch {}
+          }
+          if (-not $ok) { throw 'The installed server did not start' }
+          $page = Invoke-WebRequest 'http://127.0.0.1:8765/' -UseBasicParsing
+          if ($page.Content -notmatch 'LocalDub Studio') { throw 'The web UI is not served' }
+          Stop-Process -Id $srv.Id -Force
+          $u = Start-Process -FilePath "$dir\unins000.exe" -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          if ($u.ExitCode -ne 0) { throw "Uninstaller exit code $($u.ExitCode)" }
+          Start-Sleep -Seconds 3
+          if (Test-Path "$dir\.venv") { throw 'The uninstaller left the virtual environment behind' }
+          Write-Host 'Install, start and uninstall OK'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LocalDub-Studio-windows
+          path: release/*
+          if-no-files-found: error
+
+      - name: Publish pre-release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @"
+          Unsigned Windows installer (Windows SmartScreen will warn: More info, then Run anyway).
+          Requires Windows 10/11 64-bit and an NVIDIA GPU with 8 GB or more is recommended.
+          The installer downloads Python, libraries and AI models during setup (several GB).
+          Verify the download against the .sha256 files. See docs/INSTALL.md and docs/QUALITY.md
+          for what has and has not been tested.
+          "@
+          gh release create $env:GITHUB_REF_NAME release/*.exe release/*.zip release/*.sha256 `
+            --title "LocalDub Studio $env:GITHUB_REF_NAME" --notes $notes --prerelease

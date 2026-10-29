@@ -46,3 +46,9 @@ cd frontend; npm test; npm run build
 npm run dev                     # UI on :5173, proxies /api to the server on :8765
 ```
 The server listens on `127.0.0.1` only. Agents working from WSL: see [AGENTS.md](AGENTS.md).
+
+## Licence
+The LocalDub Studio code is MIT-licensed ([LICENSE](LICENSE)). The AI models it downloads have their
+own licences and restrictions (Supertonic 3 is OpenRAIL-M and requires disclosing AI-generated
+audio; others in [docs/LICENSES.md](docs/LICENSES.md)). FFmpeg and Ollama are installed separately
+and are not part of this repository or the installer.
