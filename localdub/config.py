@@ -20,6 +20,12 @@ class Settings(BaseSettings):
 
     models_dir: Path = REPO_ROOT / "models"
     work_dir: Path = REPO_ROOT / "work"
+    # API server: project database, uploads and per-project work directories.
+    data_dir: Path = REPO_ROOT / "data"
+    api_host: str = "127.0.0.1"  # local only; never bind a public address by default
+    api_port: int = 8765
+    max_upload_mb: int = 4096
+    max_job_attempts: int = 3
 
     # ASR
     asr_model: str = "large-v3"

@@ -17,6 +17,9 @@ dependencies = [
     "pydantic-settings==2.16.2",
     "numpy>=2.0,<2.6",
     "soundfile==0.14.0",
+    "fastapi==0.162.0",
+    "uvicorn==0.54.0",
+    "python-multipart==0.0.32",
 ]
 
 [dependency-groups]
@@ -28,6 +31,7 @@ dev = [
 
 [project.scripts]
 localdub-m0 = "localdub.cli:main"
+localdub = "localdub.cli:main"
 
 [build-system]
 requires = ["hatchling"]

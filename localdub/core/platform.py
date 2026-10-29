@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 
 log = logging.getLogger(__name__)
@@ -49,3 +50,34 @@ def disable_power_throttling() -> bool:
     if not ok:
         log.warning("Could not disable power throttling (error %d)", ctypes.get_last_error())
     return ok
+
+
+def pid_alive(pid: int) -> bool:
+    """True if a process with this id exists (Windows: never signals the process)."""
+    if pid <= 0:
+        return False
+    if sys.platform != "win32":
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
+    import ctypes
+    from ctypes import wintypes
+
+    synchronize, still_active = 0x00100000, 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    handle = kernel32.OpenProcess(0x1000 | synchronize, False, pid)  # QUERY_LIMITED_INFORMATION
+    if not handle:
+        return False
+    try:
+        code = wintypes.DWORD()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        return bool(ok) and code.value == still_active
+    finally:
+        kernel32.CloseHandle(handle)

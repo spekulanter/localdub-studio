@@ -24,12 +24,12 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Git commit for M0
 
 ## M1 — MVP
-- [ ] SQLite project store (projects, jobs, segments)
-- [ ] Job queue in a worker process: progress, cancellation, restart recovery from checkpoints
-- [ ] FastAPI: projects CRUD, upload/import, start/cancel job, progress (SSE), segment list, downloads
-- [ ] Call `disable_power_throttling()` at server start
+- [x] SQLite project store (projects, jobs; segments stay in the project work dir) — `localdub/api/db.py`
+- [x] Job queue in a worker process: progress, cancellation, restart recovery (verified live: kill server mid-TTS, restart, resumes)
+- [x] FastAPI: projects CRUD, upload/import, start/cancel job, progress (SSE), segment list, downloads (28 tests)
+- [x] `disable_power_throttling()` at CLI start (server and worker)
 - [ ] React + TS (strict) + Vite + Tailwind: import, language/voice selection, progress, errors, preview player, export
-- [ ] 5-minute video test without crash; kill-and-resume test
+- [x] 5.7-minute video via API: done, verify PASS; kill-and-resume verified (docs/QUALITY.md)
 - [ ] Desktop (5070 Ti) verification
 
 ## M2 — Editing and quality

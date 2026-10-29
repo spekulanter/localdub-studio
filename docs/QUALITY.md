@@ -104,3 +104,20 @@ track; `--drop-original-track` (or `LOCALDUB_KEEP_ORIGINAL_TRACK=false`) omits t
 original from the MP4. Tested on the role-play clip: the mixed track equals the dub sample for
 sample, the MP4 has one audio stream (`slk`), verify PASS (back-transcription 0.990). Changing
 either option re-runs only `assemble` and `export`.
+
+## M1 backend acceptance (2026-10-29, laptop RTX 5060 8 GB)
+Run through the HTTP API (`localdub serve`) with the real worker process.
+
+| Test | Result |
+|---|---|
+| Upload 50 s clip, progress over SSE, download MP4/SRT | done in 36 s; verify PASS, back-transcription 1.000 |
+| **5.7-minute video** (342.7 s, the three samples repeated, 720p) | done in **186 s** (RTF 0.54), no crash; verify PASS: duration delta 0.000 s, video stream identical, 68 valid cues, similarity 0.976 |
+| Resources during the 5.7-min run | peak VRAM **4.2 GB** (one model at a time), peak worker RSS 3.1 GB |
+| Kill the server process during TTS | worker exited by itself within ~1 s ("Server gone"); on restart the job was re-queued, skipped probe/extract/asr/translate, finished (attempts=2) |
+| Cancel during TTS | worker killed, status `cancelled`, no leftover python/ffmpeg process, Ollama model unloaded, VRAM 0 MiB; the next job resumed from checkpoints |
+| Fit on the 5.7-min video | ok 40 / stretched 14 / shifted 7 / overflow 7 of 68 (10 %) |
+
+The 5-minute clip repeats the same three recordings, so it stresses duration, memory and stability,
+not translation variety. Not yet tested: the desktop RTX 5070 Ti, a job killed *during ASR or
+translation* (those stages restart from the beginning, by design), and several queued jobs
+back to back on real media (covered only by unit tests with a fake worker).

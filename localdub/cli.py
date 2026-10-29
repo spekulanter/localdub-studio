@@ -35,6 +35,15 @@ def cmd_env(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
+    import uvicorn
+
+    from localdub.api.app import create_app
+
+    uvicorn.run(create_app(settings), host=settings.api_host, port=settings.api_port)
+    return 0
+
+
 def cmd_run(args: argparse.Namespace, settings: Settings) -> int:
     if args.asr_model:
         settings.asr_model = args.asr_model
@@ -114,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--from-stage", choices=STAGES, help="force re-running from this stage")
     run.add_argument("--to-stage", choices=STAGES, help="stop after this stage")
 
+    sub.add_parser("serve", help="start the local web UI and API")
+
     ver = sub.add_parser("verify", help="objective checks of a finished work directory")
     ver.add_argument("input", type=Path, help="the source video")
     ver.add_argument("--workdir", type=Path)
@@ -132,6 +143,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_env(args, settings)
     if args.cmd == "verify":
         return cmd_verify(args, settings)
+    if args.cmd == "serve":
+        return cmd_serve(args, settings)
     return cmd_run(args, settings)
 
 
