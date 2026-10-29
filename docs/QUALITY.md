@@ -121,3 +121,18 @@ The 5-minute clip repeats the same three recordings, so it stresses duration, me
 not translation variety. Not yet tested: the desktop RTX 5070 Ti, a job killed *during ASR or
 translation* (those stages restart from the beginning, by design), and several queued jobs
 back to back on real media (covered only by unit tests with a fake worker).
+
+### Frontend (2026-10-29)
+Built with React 19, TypeScript 5.9 (strict), Vite 8 and Tailwind 4. Verified: `tsc` strict, 10
+vitest tests (upload form, progress/cancel/retry, segments table, restart-stage logic), and a
+headless-Edge screenshot of the new-dub and finished-project pages with real data from the 5.7-min
+run. Live API check of "Apply and re-render": switching to muted audio re-ran only assemble and
+export in 1.6 s, leaving one `slk` audio track.
+
+**Not verified:** a real click-through in a browser (file chooser, drag-and-drop, SSE in the browser,
+video playback of the dub). The API behind them is covered by tests and live runs; the UI wiring is
+covered by component tests only.
+
+Also fixed after reading the 5.7-min dialogue: slash gender forms from the LLM ("stretol/a",
+"rád/a") are now reduced to the masculine form before TTS. The speaker's gender is still guessed;
+a per-project "speaker gender" option is a candidate for M2.

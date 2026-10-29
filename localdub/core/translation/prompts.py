@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
@@ -142,6 +143,14 @@ def strip_foreign_script(text: str) -> str:
     return " ".join(words)
 
 
+_GENDER_ALT = re.compile(r"(?<=\w)/(?:a|á|ka|ná|la|ená)\b")
+
+
+def drop_gender_alternatives(text: str) -> str:
+    """'rád/a' -> 'rád': a slash form cannot be spoken, so keep the masculine form."""
+    return _GENDER_ALT.sub("", text)
+
+
 def clean_translation(text: str) -> str:
     t = text.strip()
     for prefix in ("Slovak:", "SK:", "Translation:", "Preklad:"):
@@ -149,4 +158,4 @@ def clean_translation(text: str) -> str:
             t = t[len(prefix) :].strip()
     if len(t) >= 2 and t[0] == t[-1] and t[0] in "\"'“”„":
         t = t[1:-1].strip()
-    return normalize_punctuation(" ".join(t.split()))
+    return normalize_punctuation(drop_gender_alternatives(" ".join(t.split())))

@@ -112,3 +112,12 @@ def test_foreign_script_detection_and_strip():
     assert not has_foreign_script("Ďakujem, že ste prišli.")
     assert has_foreign_script("piť зга́зирован nápoje")
     assert strip_foreign_script("piť зга́зирован nápoje") == "piť nápoje"
+
+
+def test_gender_alternatives_keep_masculine_form():
+    from localdub.core.translation.prompts import clean_translation
+
+    assert clean_translation("Čo ma tu náhodou stretol/a?") == "Čo ma tu náhodou stretol?"
+    assert clean_translation("Akú kuchyňu máš rád/a?") == "Akú kuchyňu máš rád?"
+    assert clean_translation("Cena je 5 EUR/hod a viac.") == "Cena je 5 EUR/hod a viac."
+    assert clean_translation("on/ona sú tu") == "on/ona sú tu"

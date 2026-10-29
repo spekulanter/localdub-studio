@@ -28,7 +28,7 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Job queue in a worker process: progress, cancellation, restart recovery (verified live: kill server mid-TTS, restart, resumes)
 - [x] FastAPI: projects CRUD, upload/import, start/cancel job, progress (SSE), segment list, downloads (28 tests)
 - [x] `disable_power_throttling()` at CLI start (server and worker)
-- [ ] React + TS (strict) + Vite + Tailwind: import, language/voice selection, progress, errors, preview player, export
+- [x] React + TS (strict) + Vite + Tailwind: import, language/voice/model/original-audio selection, live progress, errors with log, preview, export, re-render (10 component/unit tests; not yet driven by a real browser session)
 - [x] 5.7-minute video via API: done, verify PASS; kill-and-resume verified (docs/QUALITY.md)
 - [ ] Desktop (5070 Ti) verification
 
