@@ -98,3 +98,17 @@ def test_translategemma_plain_mode_and_json_parsing():
     )
     assert "format" not in bodies[0]
     assert OllamaTranslator
+
+
+def test_clean_translation_normalizes_typographic_quotes():
+    from localdub.core.translation.prompts import clean_translation
+
+    assert clean_translation("Povedal „ahoj“ a odišiel…") == 'Povedal "ahoj" a odišiel...'
+
+
+def test_foreign_script_detection_and_strip():
+    from localdub.core.translation.prompts import has_foreign_script, strip_foreign_script
+
+    assert not has_foreign_script("Ďakujem, že ste prišli.")
+    assert has_foreign_script("piť зга́зирован nápoje")
+    assert strip_foreign_script("piť зга́зирован nápoje") == "piť nápoje"

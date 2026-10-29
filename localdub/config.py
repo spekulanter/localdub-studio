@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     translation_context_before: int = 2
     translation_context_after: int = 1
     # Slovak speech rate used to derive a per-segment character budget.
-    chars_per_second: float = 14.0
+    chars_per_second: float = 17.0  # measured Supertonic sk rate: ~16 cps at 1.05x, ~19 at 1.25x
 
     # TTS
     tts_model: str = "supertonic-3"

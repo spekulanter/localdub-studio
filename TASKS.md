@@ -11,17 +11,17 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Supertonic 3 Slovak synthesis, all diacritics, 10 voices
 - [x] Windows EcoQoS throttling found and fixed (`core/platform.py`)
 - [x] Supertonic ONNX threads fixed at 4 (auto was 2.5x slower)
-- [~] Ollama EN→SK translation (code + mocked tests done; needs Ollama installed and models pulled)
-- [ ] Translation model comparison: translategemma:4b vs qwen3:8b on 10 sample segments
-- [~] Pipeline stages probe→extract→asr→translate→tts→assemble→export with checkpoints
-- [~] Integration test: synthetic video in a Unicode path, stream copy, duration, restart
-- [~] End-to-end run: PASS on the synthetic Unicode-path clip with manual SK translation (docs/QUALITY.md); real 30–60 s clip + Ollama still needed
+- [x] Ollama EN→SK translation (translategemma:4b default; guards for script leaks, shortening)
+- [x] Translation model comparison (docs/translation_benchmark.md): translategemma:4b is the default
+- [x] Pipeline stages probe→extract→asr→translate→tts→assemble→export with checkpoints
+- [x] Integration test: synthetic video in a Unicode path, stream copy, duration, restart
+- [x] End-to-end run on 3 real 44–53 s clips: verify PASS (docs/QUALITY.md)
 - [x] Objective verification (`localdub-m0 verify`): duration, stream hash, SRT, non-silent clips, back-transcription 0.993
-- [~] Retry check: passes on the synthetic clip; repeat on real data
+- [x] Retry check: only the stages after the edit re-run (synthetic clip, and `--from-stage translate` on real clips)
 - [ ] Human listening check of the output (user)
 - [x] docs/LICENSES.md (worker-drafted; reviewed)
 - [x] docs/QUALITY.md with measured limitations (updated as data arrives)
-- [~] Git commit for M0: partial commit done; final commit after Ollama + real clip
+- [x] Git commit for M0
 
 ## M1 — MVP
 - [ ] SQLite project store (projects, jobs, segments)

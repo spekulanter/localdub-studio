@@ -261,7 +261,7 @@ def _intelligibility_check(
             ff.convert_audio(workdir / "dub.wav", temp_path, sample_rate=16000)
             result = asr.transcribe(temp_path, language="sk")
         recognized = _normalized_text(" ".join(word.text for word in result.words))
-        ratio = SequenceMatcher(None, target, recognized).ratio()
+        ratio = SequenceMatcher(None, target, recognized, autojunk=False).ratio()
         return Check(
             name="intelligibility",
             passed=ratio >= 0.6,

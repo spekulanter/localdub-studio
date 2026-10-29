@@ -58,6 +58,7 @@ Re-synthesizing the same text gives slightly different lengths (3.40 s vs 3.37 s
 output is not bit-reproducible; checkpoints, not re-synthesis, keep runs stable.
 
 ## Ollama translation
-Pending: Ollama is not installed yet. Candidates are `translategemma:4b` (3.3 GB, fits 8 GB VRAM),
-`qwen3:8b` (about 5 GB) and `translategemma:12b` (8.1 GB: only partly on the laptop GPU, fine on
-the desktop).
+Ollama is installed natively on Windows and listens on `127.0.0.1:11434`. WSL2 is not used.
+Pulled: `translategemma:4b` (3.3 GB) and `qwen3:8b` (5.2 GB). Default: translategemma:4b
+(see docs/QUALITY.md). A model is unloaded (`keep_alive: 0`) after the translate stage, so it never
+shares VRAM with Whisper. The first call after load takes 40–120 s (model load from disk).

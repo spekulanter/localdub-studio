@@ -18,8 +18,10 @@ from localdub.core.translation.prompts import (
     char_budget,
     clean_translation,
     generic_messages,
+    has_foreign_script,
     profile_for_model,
     shorten_messages,
+    strip_foreign_script,
     translategemma_messages,
 )
 
@@ -151,11 +153,12 @@ class OllamaTranslator:
         before: list[ContextLine],
         after: list[ContextLine],
     ) -> str:
+        budget = char_budget(duration_s, self.chars_per_second)
         if self.profile is PromptProfile.TRANSLATEGEMMA:
             msgs = translategemma_messages(text, source_lang=source_lang, target_lang=target_lang)
-            return self._chat(msgs, json_mode=False)
+            out = self._guard_script(msgs, json_mode=False)
+            return self._shorten_if_needed(msgs, out, budget)
 
-        budget = char_budget(duration_s, self.chars_per_second)
         msgs = generic_messages(
             text,
             source_lang=source_lang,
@@ -165,12 +168,28 @@ class OllamaTranslator:
             before=before,
             after=after,
         )
-        out = self._chat(msgs, json_mode=True)
+        out = self._guard_script(msgs, json_mode=True)
+        return self._shorten_if_needed(msgs, out, budget)
+
+    def _guard_script(self, msgs: list[dict[str, str]], json_mode: bool) -> str:
+        """Retry once if the model leaks a non-Latin script; then drop the offending words."""
+        out = self._chat(msgs, json_mode=json_mode)
+        for _ in range(2):
+            if not has_foreign_script(out):
+                return out
+            log.warning("Non-Latin characters in translation, retrying: %s", out)
+            out = self._chat(msgs, json_mode=json_mode)
+        if has_foreign_script(out):
+            log.warning("Dropping words with non-Latin characters: %s", out)
+            out = strip_foreign_script(out)
+        return out
+
+    def _shorten_if_needed(self, msgs: list[dict[str, str]], out: str, budget: int) -> str:
         if len(out) > budget * self.budget_tolerance:
             shorter = self._chat(shorten_messages(msgs, out, budget), json_mode=True)
-            if shorter and len(shorter) < len(out):
-                log.debug("Shortened segment %d -> %d chars", len(out), len(shorter))
-                out = shorter
+            if shorter and len(shorter) < len(out) and not has_foreign_script(shorter):
+                log.info("Shortened %d -> %d chars (budget %d)", len(out), len(shorter), budget)
+                return shorter
         return out
 
     def translate_segments(

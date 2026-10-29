@@ -144,3 +144,26 @@ def test_verify_fails_for_low_intelligibility(tmp_path: Path) -> None:
     similarity = next(check for check in report.checks if check.name == "intelligibility")
     assert not similarity.passed
     assert asr.closed
+
+
+def test_intelligibility_long_text_is_not_hit_by_autojunk(tmp_path):
+    from types import SimpleNamespace
+
+    from localdub.verify import _intelligibility_check
+
+    text = "Dobrý deň, ako sa máte? Ďakujem, mám sa výborne. " * 12
+    (tmp_path / "dub.wav").write_bytes(b"")
+
+    class FakeFF:
+        def convert_audio(self, src, dst, **kw):
+            dst.write_bytes(b"")
+
+    class FakeASR:
+        def transcribe(self, path, language=None):
+            return SimpleNamespace(words=[SimpleNamespace(text=w) for w in text.split()])
+
+        def close(self):
+            pass
+
+    check = _intelligibility_check(tmp_path, [{"translated_text": text}], FakeFF(), FakeASR())
+    assert check.passed and check.value > 0.99

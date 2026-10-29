@@ -28,6 +28,7 @@ from localdub.core.media.ffmpeg import FFmpeg, MediaError, MediaInfo
 from localdub.core.timeline.fit import available_windows, decide, place
 from localdub.core.timeline.models import DialogueSegment, FitStatus, Transcript
 from localdub.core.translation.base import TranslationProvider
+from localdub.core.translation.prompts import normalize_punctuation
 from localdub.core.tts.base import TTSProvider
 
 log = logging.getLogger(__name__)
@@ -313,7 +314,11 @@ class Pipeline:
             sr = tts.sample_rate
             for n, (seg, window) in enumerate(zip(segs, windows, strict=True), start=1):
                 self.on_progress("tts", f"{n}/{len(segs)}")
-                text = seg.translated_text.strip()
+                text = normalize_punctuation(seg.translated_text).strip()
+                bad = tts.unsupported_chars(text) if text else []
+                if bad:
+                    log.warning("seg %s: removing characters unsupported by TTS: %s", seg.id, bad)
+                    text = " ".join("".join(c for c in text if c not in bad).split())
                 if not text:
                     seg.fit_status, seg.audio_path = FitStatus.OK, None
                     continue

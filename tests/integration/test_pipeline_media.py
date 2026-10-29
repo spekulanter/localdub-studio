@@ -59,6 +59,9 @@ class FakeTTS:
     sample_rate = 44100
     local_only = True
 
+    def unsupported_chars(self, text: str) -> list[str]:
+        return []
+
     def list_voices(self) -> list[str]:
         return ["F1", "M1"]
 

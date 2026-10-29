@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -107,6 +108,40 @@ def translategemma_messages(
     return [{"role": "user", "content": prompt}]
 
 
+_PUNCT_MAP = str.maketrans(
+    {
+        "„": '"',
+        "“": '"',
+        "”": '"',
+        "«": '"',
+        "»": '"',
+        "‘": "'",
+        "’": "'",
+        "‚": "'",
+        "–": "-",
+        "—": "-",
+        "…": "...",
+        "\u00a0": " ",
+    }
+)
+
+
+def normalize_punctuation(text: str) -> str:
+    """Map typographic punctuation to plain ASCII that every TTS engine accepts."""
+    return text.translate(_PUNCT_MAP)
+
+
+def has_foreign_script(text: str) -> bool:
+    """True if the text contains letters outside Latin scripts (e.g. a Cyrillic LLM glitch)."""
+    return any(c.isalpha() and not unicodedata.name(c, "").startswith("LATIN") for c in text)
+
+
+def strip_foreign_script(text: str) -> str:
+    """Drop whole words that contain non-Latin letters."""
+    words = [w for w in text.split() if not has_foreign_script(w)]
+    return " ".join(words)
+
+
 def clean_translation(text: str) -> str:
     t = text.strip()
     for prefix in ("Slovak:", "SK:", "Translation:", "Preklad:"):
@@ -114,4 +149,4 @@ def clean_translation(text: str) -> str:
             t = t[len(prefix) :].strip()
     if len(t) >= 2 and t[0] == t[-1] and t[0] in "\"'“”„":
         t = t[1:-1].strip()
-    return " ".join(t.split())
+    return normalize_punctuation(" ".join(t.split()))
