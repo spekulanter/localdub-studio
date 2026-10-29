@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -21,7 +22,7 @@ import soundfile as sf
 from localdub.config import Settings
 from localdub.core.asr.base import ASRProvider
 from localdub.core.asr.segmentation import group_words
-from localdub.core.audio.assemble import build_timeline, normalize_rms, trim_silence
+from localdub.core.audio.assemble import build_timeline, db_to_gain, normalize_rms, trim_silence
 from localdub.core.audio.mix import voice_over_mix
 from localdub.core.diarize.base import Diarizer
 from localdub.core.diarize.pitch import load_speaker_genders
@@ -238,6 +239,12 @@ class Pipeline:
                 {
                     "duck": [s.duck_db, s.duck_ramp_s],
                     "original": s.original_audio,
+                    "loudness": [
+                        s.match_original_loudness,
+                        s.loudness_target_range_lufs,
+                        s.loudness_max_adjust_db,
+                        s.max_mix_lufs,
+                    ],
                     "target": s.dub_target_dbfs,
                     "gap": s.segment_gap_s,
                 },
@@ -488,6 +495,42 @@ class Pipeline:
         save_segments(out, segs)
         return [out]
 
+    def _dub_loudness_gain(self, dub: np.ndarray, sr: int) -> float:
+        """dB to add to the dub so its loudness matches the original audio (0 when disabled)."""
+        if not self.s.match_original_loudness:
+            return 0.0
+        with tempfile.TemporaryDirectory(prefix="localdub-loud-") as tmp:
+            dub_path = Path(tmp) / "dub.wav"
+            sf.write(dub_path, dub, sr, subtype="PCM_16")
+            dub_lufs = self.ff.measure_lufs(dub_path)
+        orig_lufs = self.ff.measure_lufs(self.p("audio_orig.wav"))
+        if dub_lufs is None or orig_lufs is None:
+            return 0.0
+        lo, hi = self.s.loudness_target_range_lufs
+        target = min(max(orig_lufs, lo), hi)
+        gain = min(
+            max(target - dub_lufs, -self.s.loudness_max_adjust_db), self.s.loudness_max_adjust_db
+        )
+        log.info(
+            "Loudness: original %.1f LUFS, dub %.1f LUFS, target %.1f -> %+.1f dB",
+            orig_lufs, dub_lufs, target, gain,
+        )  # fmt: skip
+        return round(gain, 2)
+
+    def _cap_mix_loudness(self, mix: np.ndarray, sr: int) -> np.ndarray:
+        """Turn the mix down if it is louder than max_mix_lufs (keeps the dub/original balance)."""
+        with tempfile.TemporaryDirectory(prefix="localdub-mix-") as tmp:
+            path = Path(tmp) / "mix.wav"
+            sf.write(path, mix, sr, subtype="PCM_16")
+            lufs = self.ff.measure_lufs(path)
+        if lufs is None or lufs <= self.s.max_mix_lufs:
+            return mix
+        gain_db = self.s.max_mix_lufs - lufs
+        log.info(
+            "Mix loudness %.1f LUFS exceeds %.1f: %+.1f dB", lufs, self.s.max_mix_lufs, gain_db
+        )
+        return (mix * db_to_gain(gain_db)).astype(np.float32)
+
     def _assemble(self) -> list[Path]:
         segs = load_segments(self.p("tts.json"))
         duration = self.info().duration
@@ -516,6 +559,15 @@ class Pipeline:
         dub = build_timeline(
             [(pl.start, c) for pl, c in zip(placements, clips, strict=True)], duration, sr
         )
+        dub_gain_db = self._dub_loudness_gain(dub, sr)
+        if dub_gain_db:
+            n_dub = dub.size
+            with tempfile.TemporaryDirectory(prefix="localdub-gain-") as tmp:
+                before, after = Path(tmp) / "in.wav", Path(tmp) / "out.wav"
+                sf.write(before, dub, sr, subtype="PCM_16")
+                self.ff.gain_with_limiter(before, after, dub_gain_db)  # limiter: no clipping
+                louder = sf.read(str(after), dtype="float32")[0].reshape(-1)
+            dub = np.pad(louder, (0, max(n_dub - louder.size, 0)))[:n_dub].astype(np.float32)
         original, orig_sr = sf.read(str(self.p("audio_orig.wav")), dtype="float32", always_2d=True)
         if orig_sr != sr:
             raise PipelineError("assemble", f"Original audio has {orig_sr} Hz, expected {sr}")
@@ -534,6 +586,7 @@ class Pipeline:
             mute_original=self.s.original_audio == "mute",
         )
 
+        mix = self._cap_mix_loudness(mix, sr)
         dub_path, mix_path = self.p("dub.wav"), self.p("mix.wav")
         sf.write(dub_path, dub, sr, subtype="PCM_16")
         sf.write(mix_path, mix, sr, subtype="PCM_16")

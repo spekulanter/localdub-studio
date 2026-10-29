@@ -158,3 +158,21 @@ audio) plus a 10-14 s model load.
   whether the split is right. Treat diarization as experimental until tested on real multi-speaker
   video with a known speaker count.
 - Synthetic TTS voices are far more distinct than real people, so 10/10 is an upper bound.
+
+## Loudness matching (M2 mixing, 2026-10-29)
+The dub used to sit 2-5 LU below the original speech (it was normalised to a fixed -18 dBFS RMS).
+Now the dub is raised or lowered (max ±8 dB, through an FFmpeg look-ahead limiter at 0.95 so it
+never clips) to the integrated loudness of the original audio (clamped to -23...-14 LUFS), and the
+final mix is turned down to at most -14 LUFS. Measured with EBU R128 (`ebur128`) on the three real
+clips:
+
+| Clip | Original | Dub before -> after | Mix before -> after |
+|---|---|---|---|
+| Role play | -13.7 LUFS | -18.8 -> -14.4 | -15.7 -> -14.0 |
+| Interview | -16.4 LUFS | -18.7 -> -16.4 | -15.6 -> -14.0 |
+| Cuisine vlog | -17.9 LUFS | -18.7 -> -17.9 | -15.8 -> -15.0 |
+
+All three still pass `verify` (back-transcription 1.000 / 0.991 / 0.974). Loudness is measured over
+the whole programme including music, so a very music-heavy original raises the dub target; the
+clamp limits that. Turn it off with `LOCALDUB_MATCH_ORIGINAL_LOUDNESS=false`. Whether it *sounds*
+better is a listening judgement that has not been made by a human.

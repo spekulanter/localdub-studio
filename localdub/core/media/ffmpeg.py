@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -106,6 +107,24 @@ class FFmpeg:
 
     def run(self, args: Sequence[str | Path]) -> None:
         run_tool([self.ffmpeg, "-hide_banner", "-nostdin", "-loglevel", "error", "-y", *args])
+
+    def gain_with_limiter(self, src: Path, dst: Path, gain_db: float, limit: float = 0.95) -> None:
+        """Apply `gain_db`, then a look-ahead limiter so peaks never exceed `limit` (linear)."""
+        flt = f"volume={gain_db:.2f}dB,alimiter=limit={limit}:attack=5:release=60:level=disabled"
+        self.run(["-i", src, "-af", flt, "-c:a", "pcm_s16le", dst])
+
+    def measure_lufs(self, path: Path) -> float | None:
+        """Integrated loudness (EBU R128, LUFS) of an audio file, or None for silence."""
+        proc = run_tool(
+            [self.ffmpeg, "-hide_banner", "-nostdin", "-nostats", "-i", path,
+             "-af", "ebur128=peak=true", "-f", "null", "-"]
+        )  # fmt: skip
+        summary = proc.stderr.rsplit("Summary:", 1)[-1]
+        match = re.search(r"^\s*I:\s*(-?\d+(?:\.\d+)?)\s*LUFS", summary, re.MULTILINE)
+        if match is None:
+            return None
+        value = float(match.group(1))
+        return value if value > -69 else None
 
     def probe_raw(self, path: Path) -> dict[str, Any]:
         out = run_tool(

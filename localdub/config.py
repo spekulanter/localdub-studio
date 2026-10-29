@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     duck_db: float = -14.0
     duck_ramp_s: float = 0.15
     dub_target_dbfs: float = -18.0
+    # Raise or lower the whole dub so its integrated loudness (LUFS) is close to the original
+    # audio's, within these bounds. Keeps the dub as audible as the speech it replaces.
+    match_original_loudness: bool = True
+    loudness_target_range_lufs: tuple[float, float] = (-23.0, -14.0)
+    loudness_max_adjust_db: float = 8.0
+    # The final mix is turned down (never up) if it is louder than this.
+    max_mix_lufs: float = -14.0
     output_audio_bitrate: str = "192k"
 
     languages: dict[str, str] = Field(default_factory=lambda: {"en": "English", "sk": "Slovak"})
