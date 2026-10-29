@@ -222,6 +222,7 @@ class Pipeline:
             "assemble": (
                 {
                     "duck": [s.duck_db, s.duck_ramp_s],
+                    "original": s.original_audio,
                     "target": s.dub_target_dbfs,
                     "gap": s.segment_gap_s,
                 },
@@ -229,7 +230,11 @@ class Pipeline:
                 self._assemble,
             ),
             "export": (
-                {"bitrate": s.output_audio_bitrate, "lang": self.target_lang},
+                {
+                    "bitrate": s.output_audio_bitrate,
+                    "lang": self.target_lang,
+                    "keep_original_track": s.keep_original_track,
+                },
                 [self.p("segments.json"), self.p("mix.wav"), self.input],
                 self._export,
             ),
@@ -405,7 +410,15 @@ class Pipeline:
         regions = [
             (pl.start, pl.start + c.size / sr) for pl, c in zip(placements, clips, strict=True)
         ]
-        mix = voice_over_mix(original, dub, regions, sr, self.s.duck_db, self.s.duck_ramp_s)
+        mix = voice_over_mix(
+            original,
+            dub,
+            regions,
+            sr,
+            self.s.duck_db,
+            self.s.duck_ramp_s,
+            mute_original=self.s.original_audio == "mute",
+        )
 
         dub_path, mix_path = self.p("dub.wav"), self.p("mix.wav")
         sf.write(dub_path, dub, sr, subtype="PCM_16")
@@ -455,6 +468,7 @@ class Pipeline:
                 duration=info.duration,
                 info=info,
                 audio_bitrate=self.s.output_audio_bitrate,
+                keep_original_audio=self.s.keep_original_track,
                 dub_language="slk" if self.target_lang == "sk" else self.target_lang,
                 # Supertonic's OpenRAIL-M licence requires disclosing machine-generated content.
                 comment=(

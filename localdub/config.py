@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,6 +51,11 @@ class Settings(BaseSettings):
     sample_rate: int = 48000
 
     # Voice-over mix
+    # "duck": original audio stays audible at duck_db under the dub (keeps music and effects).
+    # "mute": the mix contains only the dub; the original is silent in the dubbed track.
+    original_audio: Literal["duck", "mute"] = "duck"
+    # Also store the untouched original audio as a second (non-default) track in the MP4.
+    keep_original_track: bool = True
     duck_db: float = -14.0
     duck_ramp_s: float = 0.15
     dub_target_dbfs: float = -18.0

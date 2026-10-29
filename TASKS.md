@@ -38,7 +38,8 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [ ] Manual timing adjustment
 - [ ] Voice presets per segment or speaker
 - [ ] Optional diarization (WhisperX + pyannote; PyTorch cu128+)
-- [ ] Mixing: loudness normalization (EBU R128), smarter ducking
+- [x] Original audio: duck (default) or mute, optional drop of the original track (M0, CLI/env)
+- [ ] Mixing: loudness normalization (EBU R128), smarter ducking; UI toggle in M1 settings
 
 ## M3 — Experimental
 - [ ] Voice conversion (OpenVoice V2)

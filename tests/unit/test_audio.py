@@ -44,3 +44,13 @@ def test_duck_envelope_and_mix_shapes_padding_and_peak():
     stereo = voice_over_mix(np.ones((100, 2), np.float32), np.ones(20, np.float32), [], 100)
     assert mono.shape == (100,) and stereo.shape == (100, 2)
     assert np.max(np.abs(mono)) <= 0.99 and np.max(np.abs(stereo)) <= 0.99
+
+
+def test_mute_original_returns_dub_only_in_every_channel():
+    original = np.full((100, 2), 0.5, np.float32)
+    dub = np.full(100, 0.1, np.float32)
+    out = voice_over_mix(original, dub, [(0.0, 1.0)], 100, mute_original=True)
+    assert out.shape == (100, 2)
+    assert np.allclose(out, 0.1)
+    mono = voice_over_mix(np.full(100, 0.5, np.float32), dub, [], 100, mute_original=True)
+    assert np.allclose(mono, 0.1)

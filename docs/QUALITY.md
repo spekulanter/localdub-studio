@@ -82,7 +82,8 @@ or nonsensical ones. Ratings by Claude, not by a native speaker: please check th
 column in the benchmark file.
 
 ## Known limitations (by design in M0)
-- Voice-over mix: the original audio is ducked by 14 dB, not removed. There is no
+- Voice-over mix: by default the original audio is ducked by 14 dB, not removed (`--original-audio
+  mute` makes the dubbed track dub-only, which also removes music and effects). There is no
   dialogue/background separation yet (M3, experimental).
 - One voice for all speakers; no diarization (M2).
 - Supertonic is not bit-deterministic. Re-synthesis changes a clip's length by about 1–2 %.
@@ -96,3 +97,10 @@ column in the benchmark file.
 - Clips with music, noise or several speakers. All three real clips have one speaker.
 - Subjective naturalness of the Slovak voice and the mix. This needs the user's listening check.
 - Long videos (5 min+), desktop RTX 5070 Ti: these belong to M1.
+
+## Original-audio options (verified 2026-10-29)
+`localdub-m0 run ... --original-audio mute` (or `LOCALDUB_ORIGINAL_AUDIO=mute`) writes a dub-only
+track; `--drop-original-track` (or `LOCALDUB_KEEP_ORIGINAL_TRACK=false`) omits the untouched
+original from the MP4. Tested on the role-play clip: the mixed track equals the dub sample for
+sample, the MP4 has one audio stream (`slk`), verify PASS (back-transcription 0.990). Changing
+either option re-runs only `assemble` and `export`.

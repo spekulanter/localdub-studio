@@ -40,6 +40,10 @@ def cmd_run(args: argparse.Namespace, settings: Settings) -> int:
         settings.asr_model = args.asr_model
     if args.llm:
         settings.translation_model = args.llm
+    if args.original_audio:
+        settings.original_audio = args.original_audio
+    if args.drop_original_track:
+        settings.keep_original_track = False
     workdir = args.workdir or settings.work_dir / args.input.stem
     _setup_logging(args.verbose, workdir / "pipeline.log")
     pipe = Pipeline(
@@ -97,6 +101,16 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--voice", help="Supertonic voice, e.g. F1..F5, M1..M5")
     run.add_argument("--llm", help="Ollama model for translation")
     run.add_argument("--asr-model", help="faster-whisper model, e.g. large-v3, medium")
+    run.add_argument(
+        "--original-audio",
+        choices=["duck", "mute"],
+        help="duck: original stays quietly under the dub (default); mute: dub only",
+    )
+    run.add_argument(
+        "--drop-original-track",
+        action="store_true",
+        help="do not store the untouched original audio as a second track in the MP4",
+    )
     run.add_argument("--from-stage", choices=STAGES, help="force re-running from this stage")
     run.add_argument("--to-stage", choices=STAGES, help="stop after this stage")
 

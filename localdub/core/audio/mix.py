@@ -41,16 +41,27 @@ def voice_over_mix(
     sample_rate: int,
     duck_db: float = -14.0,
     ramp_s: float = 0.15,
+    mute_original: bool = False,
 ) -> npt.NDArray[np.float32]:
-    """original: (n,) or (n, channels); dub: (n,) mono. Returns the shape of `original`."""
+    """original: (n,) or (n, channels); dub: (n,) mono. Returns the shape of `original`.
+
+    With `mute_original` the result is the dub alone (copied to every channel).
+    """
     n = original.shape[0]
     if dub.size != n:
         dub = np.pad(dub, (0, max(n - dub.size, 0)))[:n]
-    env = duck_envelope(n, regions, sample_rate, duck_db, ramp_s)
-    if original.ndim == 2:
-        out = original * env[:, None] + dub[:, None]
+    if mute_original:
+        out = (
+            np.broadcast_to(dub[:, None], original.shape).copy()
+            if original.ndim == 2
+            else dub.copy()
+        )
     else:
-        out = original * env + dub
+        env = duck_envelope(n, regions, sample_rate, duck_db, ramp_s)
+        if original.ndim == 2:
+            out = original * env[:, None] + dub[:, None]
+        else:
+            out = original * env + dub
     peak = float(np.max(np.abs(out))) if out.size else 0.0
     if peak > 0.99:
         out *= 0.99 / peak
