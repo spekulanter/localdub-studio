@@ -57,12 +57,21 @@ def fetch_separation(settings: Settings, say: Say) -> None:
     say("  ready")
 
 
+def fetch_voice_cloning(settings: Settings, say: Say) -> None:
+    from localdub.core.voice.openvoice_converter import OpenVoiceConverter
+
+    say("Voice cloning model OpenVoice V2 converter (about 130 MB)...")
+    OpenVoiceConverter(settings.models_dir, device="cpu").close()
+    say("  ready")
+
+
 def fetch_models(
-    settings: Settings, *, diarization: bool = False, separation: bool = False, say: Say = print
+    settings: Settings, *, diarization: bool = False, experimental: bool = False, say: Say = print
 ) -> None:
     fetch_whisper(settings, say)
     fetch_supertonic(settings, say)
     if diarization:
         fetch_diarization(settings, say)
-    if separation:
+    if experimental:
         fetch_separation(settings, say)
+        fetch_voice_cloning(settings, say)

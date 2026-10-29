@@ -45,7 +45,9 @@ delete your data and the models. uv, FFmpeg and Ollama are left installed.
 ## What has and has not been tested
 Tested on the developer's Windows 11 machine (RTX 5060 Laptop): the installer script from an
 unzipped package into a fresh folder (prerequisites already present, models shared), a full dubbing
-job from the installed copy, the start script, the uninstall script, and extraction of `Setup.exe`.
+job from the installed copy, the start script, the uninstall script, an install with
+`-WithExperimental -WithDiarization` (PyTorch with CUDA available afterwards) and extraction of
+`Setup.exe`.
 **Not tested:** a clean Windows without uv/FFmpeg/Ollama (the `winget` prompts), a machine without an
 NVIDIA GPU, the interactive `Setup.exe` run end to end, Windows 10, and a different GPU than the
 RTX 5060 (the desktop RTX 5070 Ti is untested).
