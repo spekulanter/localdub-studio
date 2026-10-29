@@ -38,7 +38,17 @@ from localdub.core.tts.base import TTSProvider, default_speaker_voices
 
 log = logging.getLogger(__name__)
 
-STAGES = ["probe", "extract", "asr", "diarize", "translate", "tts", "assemble", "export"]
+STAGES = [
+    "probe",
+    "extract",
+    "asr",
+    "diarize",
+    "translate",
+    "tts",
+    "separate",
+    "assemble",
+    "export",
+]
 
 ProgressFn = Callable[[str, str], None]
 
@@ -235,6 +245,11 @@ class Pipeline:
                 [self.p("translation.json"), self.p("probe.json"), self.p("edits.json")],
                 self._tts,
             ),
+            "separate": (
+                {"enabled": s.original_audio == "background"},
+                [self.p("audio_orig.wav")],
+                self._separate,
+            ),
             "assemble": (
                 {
                     "duck": [s.duck_db, s.duck_ramp_s],
@@ -248,7 +263,11 @@ class Pipeline:
                     "target": s.dub_target_dbfs,
                     "gap": s.segment_gap_s,
                 },
-                [self.p("tts.json"), self.p("audio_orig.wav")],
+                [
+                    self.p("tts.json"),
+                    self.p("audio_orig.wav"),
+                    *([self.p("background.wav")] if s.original_audio == "background" else []),
+                ],
                 self._assemble,
             ),
             "export": (
@@ -495,6 +514,37 @@ class Pipeline:
         save_segments(out, segs)
         return [out]
 
+    def _separate(self) -> list[Path]:
+        """Optional: split the original audio into dialogue and background (Demucs, GPU)."""
+        out_bg, out_voc = self.p("background.wav"), self.p("vocals.wav")
+        if self.s.original_audio != "background":
+            out_bg.unlink(missing_ok=True)
+            out_voc.unlink(missing_ok=True)
+            return []
+        from localdub.core.separation.demucs_separator import DemucsSeparator, SeparationUnavailable
+
+        try:
+            separator = DemucsSeparator(self.s.models_dir)
+        except SeparationUnavailable as exc:
+            raise PipelineError("separate", str(exc)) from exc
+        try:
+            src = self.p("separate_in.wav")
+            self.ff.run(["-i", self.p("audio_orig.wav"), "-ar", str(separator.sample_rate),
+                         "-c:a", "pcm_s16le", src])  # fmt: skip
+            stems = separator.separate(src)
+        finally:
+            separator.close()
+        for name, data, dst in (
+            ("background", stems.background, out_bg),
+            ("vocals", stems.vocals, out_voc),
+        ):
+            raw = self.p(f"separate_{name}.wav")
+            sf.write(raw, data, stems.sample_rate, subtype="FLOAT")
+            self.ff.run(["-i", raw, "-ar", str(self.s.sample_rate), "-c:a", "pcm_s16le", dst])
+            raw.unlink()
+        src.unlink()
+        return [out_bg, out_voc]
+
     def _dub_loudness_gain(self, dub: np.ndarray, sr: int) -> float:
         """dB to add to the dub so its loudness matches the original audio (0 when disabled)."""
         if not self.s.match_original_loudness:
@@ -568,7 +618,12 @@ class Pipeline:
                 self.ff.gain_with_limiter(before, after, dub_gain_db)  # limiter: no clipping
                 louder = sf.read(str(after), dtype="float32")[0].reshape(-1)
             dub = np.pad(louder, (0, max(n_dub - louder.size, 0)))[:n_dub].astype(np.float32)
-        original, orig_sr = sf.read(str(self.p("audio_orig.wav")), dtype="float32", always_2d=True)
+        background_mode = self.s.original_audio == "background"
+        original, orig_sr = sf.read(
+            str(self.p("background.wav" if background_mode else "audio_orig.wav")),
+            dtype="float32",
+            always_2d=True,
+        )
         if orig_sr != sr:
             raise PipelineError("assemble", f"Original audio has {orig_sr} Hz, expected {sr}")
         n = dub.size
@@ -581,7 +636,7 @@ class Pipeline:
             dub,
             regions,
             sr,
-            self.s.duck_db,
+            self.s.background_duck_db if background_mode else self.s.duck_db,
             self.s.duck_ramp_s,
             mute_original=self.s.original_audio == "mute",
         )

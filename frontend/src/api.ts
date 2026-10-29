@@ -1,6 +1,6 @@
 export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
-export type Stage = "probe" | "extract" | "asr" | "diarize" | "translate" | "tts" | "assemble" | "export";
-export type OriginalAudio = "duck" | "mute";
+export type Stage = "probe" | "extract" | "asr" | "diarize" | "translate" | "tts" | "separate" | "assemble" | "export";
+export type OriginalAudio = "duck" | "mute" | "background";
 
 export interface Job {
   id: number;
@@ -42,6 +42,7 @@ export interface Options {
   default_llm: string;
   stages: Stage[];
   max_upload_mb: number;
+  separation_available: boolean;
 }
 
 export interface Health {

@@ -15,6 +15,7 @@ const options: Options = {
   default_llm: "translategemma:4b",
   stages: ["probe", "extract", "asr", "translate", "tts", "assemble", "export"],
   max_upload_mb: 1,
+  separation_available: false,
 };
 const health: Health = { ok: true, ollama: { reachable: true, error: null, models: ["translategemma:4b", "qwen3:8b"] } };
 
@@ -130,5 +131,21 @@ describe("DialogueEditor", () => {
   it("explains the empty state", () => {
     renderEditor(null);
     expect(screen.getByText(/appears here/)).toBeTruthy();
+  });
+});
+
+describe("original voice options", () => {
+  it("disables speech removal when the optional packages are missing and explains how to enable it", () => {
+    render(<NewProject options={options} health={health} onCreated={vi.fn()} />);
+    expect((screen.getByLabelText(/Remove the speech/) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText(/uv sync --extra separation/)).toBeTruthy();
+  });
+
+  it("enables it when available", () => {
+    render(<NewProject options={{ ...options, separation_available: true }} health={health} onCreated={vi.fn()} />);
+    const radio = screen.getByLabelText(/Remove the speech/) as HTMLInputElement;
+    expect(radio.disabled).toBe(false);
+    fireEvent.click(radio);
+    expect(screen.getByText(/downloads an 80 MB model/)).toBeTruthy();
   });
 });

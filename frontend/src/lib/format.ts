@@ -14,6 +14,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
   diarize: "Identifying speakers",
   translate: "Translating to Slovak",
   tts: "Generating Slovak voice",
+  separate: "Separating dialogue from music",
   assemble: "Mixing audio",
   export: "Writing MP4 and subtitles",
 };
@@ -52,7 +53,10 @@ export function restartStage(before: Tunable, after: Tunable): Stage | null {
   if (before.diarize !== after.diarize || (after.diarize && before.num_speakers !== after.num_speakers)) return "diarize";
   if (before.llm_model !== after.llm_model) return "translate";
   if (before.voice !== after.voice) return "tts";
-  if (before.original_audio !== after.original_audio) return "assemble";
+  if (before.original_audio !== after.original_audio) {
+    // Entering or leaving "background" needs (or discards) the Demucs split.
+    return before.original_audio === "background" || after.original_audio === "background" ? "separate" : "assemble";
+  }
   if (before.keep_original_track !== after.keep_original_track) return "export";
   return null;
 }
@@ -60,4 +64,5 @@ export function restartStage(before: Tunable, after: Tunable): Stage | null {
 export const ORIGINAL_AUDIO_LABELS: Record<OriginalAudio, string> = {
   duck: "Keep quietly under the dub",
   mute: "Mute completely (dub only)",
+  background: "Remove the speech, keep music and effects",
 };

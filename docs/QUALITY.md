@@ -176,3 +176,20 @@ All three still pass `verify` (back-transcription 1.000 / 0.991 / 0.974). Loudne
 the whole programme including music, so a very music-heavy original raises the dub target; the
 clamp limits that. Turn it off with `LOCALDUB_MATCH_ORIGINAL_LOUDNESS=false`. Whether it *sounds*
 better is a listening judgement that has not been made by a human.
+
+## Dialogue/background separation (experimental, 2026-10-29)
+`original_audio = background`: Demucs (`htdemucs`, GPU) splits the original audio, the speech stem
+is dropped, the background (drums + bass + other) stays 3 dB under the dub. RTX 5060 laptop: model
+load 6-13 s, 23 s for 43 s of audio (RTF 0.5), peak VRAM 0.58 GB, 9.6 MB left after `close()`.
+
+Measured on the cuisine vlog (the only sample with background music, -29.3 LUFS background stem):
+- Whisper transcribes **120 words** from the speech stem and **0 words** from the background stem.
+- Regressing the final mix on {original speech, background, dub}: original speech weight
+  duck mode -13.0 dB, mute mode 0, **background mode -94 dB (none)**; background -2.7 dB (as
+  configured); dub 1.0; 2 % unexplained.
+- The role-play clip has no music: its background stem is -61 LUFS (silence), so "background" mode
+  there equals "mute". That is correct, not a failure.
+
+Limits (not tested): singing, music with vocals, speech over loud music, mono sources, long videos
+(memory use grows with `split` chunks but was only measured on 43 s), tracks where dialogue and
+effects overlap. A first-use download of about 80 MB and 3 GB of PyTorch is required.

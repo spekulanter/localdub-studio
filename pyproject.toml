@@ -23,6 +23,14 @@ dependencies = [
     "sherpa-onnx==2.0.1",
 ]
 
+[project.optional-dependencies]
+# Optional, experimental: dialogue/background separation (and voice conversion). PyTorch is large
+# (about 3 GB with CUDA), so it is not part of the default install: `uv sync --extra separation`.
+separation = [
+    "demucs==4.1.0",
+    "torch==2.9.1",
+]
+
 [dependency-groups]
 dev = [
     "pytest==9.2.0",
@@ -33,6 +41,18 @@ dev = [
 [project.scripts]
 localdub-m0 = "localdub.cli:main"
 localdub = "localdub.cli:main"
+
+[tool.uv]
+# Windows-only product: resolving for macOS/Linux would pull incompatible pins (demucs on macOS).
+environments = ["sys_platform == 'win32'"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128", extra = "separation", marker = "sys_platform == 'win32'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

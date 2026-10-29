@@ -44,7 +44,7 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 
 ## M3 — Experimental
 - [ ] Voice conversion (OpenVoice V2)
-- [ ] Dialogue/background separation (e.g. Demucs) → replace-dialogue mode
-- [ ] Speaker → voice mapping
+- [~] Dialogue/background separation (Demucs, optional extra) → "background" original-audio mode: speech removed measurably (-94 dB in mix); tested on one clip with music
+- [x] Speaker → voice mapping (done in M2: per-speaker and per-line voices, gender-aware defaults)
 - [ ] Batch processing
 - [ ] Tauri packaging (FFmpeg GPL obligations; see docs/LICENSES.md)

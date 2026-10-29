@@ -59,7 +59,7 @@ class ProjectOut(BaseModel):
     source_lang: str
     voice: str
     llm_model: str
-    original_audio: Literal["duck", "mute"]
+    original_audio: Literal["duck", "mute", "background"]
     keep_original_track: bool
     diarize: bool = False
     num_speakers: int | None = None
@@ -72,7 +72,7 @@ class ProjectPatch(BaseModel):
     name: str | None = None
     voice: str | None = None
     llm_model: str | None = None
-    original_audio: Literal["duck", "mute"] | None = None
+    original_audio: Literal["duck", "mute", "background"] | None = None
     keep_original_track: bool | None = None
     diarize: bool | None = None
     num_speakers: int | None = None
@@ -80,7 +80,17 @@ class ProjectPatch(BaseModel):
 
 class JobRequest(BaseModel):
     from_stage: (
-        Literal["probe", "extract", "asr", "diarize", "translate", "tts", "assemble", "export"]
+        Literal[
+            "probe",
+            "extract",
+            "asr",
+            "diarize",
+            "translate",
+            "tts",
+            "separate",
+            "assemble",
+            "export",
+        ]
         | None
     ) = None
 
@@ -102,6 +112,13 @@ class SpeakerVoices(BaseModel):
 class PreviewRequest(BaseModel):
     text: str | None = None
     voice: str | None = None
+
+
+def separation_available() -> bool:
+    """True when the optional PyTorch + Demucs packages are installed."""
+    import importlib.util
+
+    return all(importlib.util.find_spec(m) is not None for m in ("torch", "demucs"))
 
 
 def safe_filename(name: str, fallback: str = "video.mp4") -> str:
@@ -192,6 +209,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             "default_llm": settings.translation_model,
             "stages": STAGES,
             "max_upload_mb": settings.max_upload_mb,
+            "separation_available": separation_available(),
         }
 
     # ----- projects ----------------------------------------------------------------------
@@ -206,7 +224,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         source_lang: Annotated[str, Form()] = "en",
         voice: Annotated[str, Form()] = "",
         llm_model: Annotated[str, Form()] = "",
-        original_audio: Annotated[Literal["duck", "mute"], Form()] = "duck",
+        original_audio: Annotated[Literal["duck", "mute", "background"], Form()] = "duck",
         keep_original_track: Annotated[bool, Form()] = True,
         diarize: Annotated[bool, Form()] = False,
         num_speakers: Annotated[int | None, Form(ge=1, le=10)] = None,

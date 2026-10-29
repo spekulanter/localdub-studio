@@ -27,12 +27,13 @@ log = logging.getLogger("localdub.worker")
 STAGE_WEIGHTS = {
     "probe": 0.01,
     "extract": 0.02,
-    "asr": 0.2,
+    "asr": 0.18,
     "diarize": 0.04,
-    "translate": 0.15,
-    "tts": 0.46,
+    "translate": 0.14,
+    "tts": 0.37,
+    "separate": 0.10,
     "assemble": 0.04,
-    "export": 0.08,
+    "export": 0.10,
 }
 
 
@@ -58,7 +59,8 @@ def progress_fraction(stage: str, state: str) -> float:
 def project_settings(base: Settings, project: dict[str, object]) -> Settings:
     s = base.model_copy()
     s.translation_model = str(project["llm_model"])
-    s.original_audio = "mute" if project["original_audio"] == "mute" else "duck"
+    mode = project["original_audio"]
+    s.original_audio = mode if mode in ("mute", "background") else "duck"
     s.keep_original_track = bool(project["keep_original_track"])
     s.diarization_enabled = bool(project["diarize"])
     num = project["num_speakers"]

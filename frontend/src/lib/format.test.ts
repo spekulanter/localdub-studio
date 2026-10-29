@@ -16,6 +16,8 @@ describe("restartStage", () => {
   it("returns the earliest affected stage", () => {
     expect(restartStage(base, base)).toBeNull();
     expect(restartStage(base, { ...base, original_audio: "mute" })).toBe("assemble");
+    expect(restartStage(base, { ...base, original_audio: "background" })).toBe("separate");
+    expect(restartStage({ ...base, original_audio: "background" }, { ...base, original_audio: "mute" })).toBe("separate");
     expect(restartStage(base, { ...base, keep_original_track: false })).toBe("export");
     expect(restartStage(base, { ...base, voice: "M1", original_audio: "mute" })).toBe("tts");
     expect(restartStage(base, { ...base, llm_model: "x", voice: "M1" })).toBe("translate");

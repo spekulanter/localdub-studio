@@ -375,3 +375,29 @@ class TestEditsAndCache:
         self.pipe.run()
         seg1 = json.loads((self.wd / "segments.json").read_text("utf-8"))["segments"][0]
         assert seg1["start"] == 2.0 and seg1["end"] == 3.5 and seg1["placed_start"] >= 2.0
+
+
+class TestSeparateStage:
+    """The separate stage is a no-op unless the 'background' mode is chosen."""
+
+    def test_disabled_by_default_and_outputs_nothing(
+        self, video_path, tmp_path, settings, providers
+    ):
+        pipe = Pipeline(video_path, tmp_path / "wd", settings, providers=providers)
+        result = pipe.run()
+        assert result["separate"] == "ran"
+        assert not (pipe.wd / "background.wav").exists()
+        assert pipe.run()["separate"] == "skipped"
+
+    def test_background_mode_without_torch_fails_with_install_hint(
+        self, video_path, tmp_path, settings, providers, monkeypatch
+    ):
+        import sys
+
+        from localdub.pipeline import PipelineError
+
+        monkeypatch.setitem(sys.modules, "torch", None)  # simulate a missing optional package
+        s = settings.model_copy(update={"original_audio": "background"})
+        pipe = Pipeline(video_path, tmp_path / "wd2", s, providers=providers)
+        with pytest.raises(PipelineError, match="uv sync --extra separation"):
+            pipe.run()

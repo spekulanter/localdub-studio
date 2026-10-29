@@ -63,10 +63,30 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
         <span className="mb-1 block font-medium">Original voice</span>
         {(Object.keys(ORIGINAL_AUDIO_LABELS) as OriginalAudio[]).map((k) => (
           <label key={k} className="flex items-center gap-2 py-0.5">
-            <input type="radio" name="original_audio" checked={value.original_audio === k} onChange={() => set("original_audio", k)} />
+            <input
+              type="radio"
+              name="original_audio"
+              checked={value.original_audio === k}
+              disabled={k === "background" && !options.separation_available && value.original_audio !== k}
+              onChange={() => set("original_audio", k)}
+            />
             {ORIGINAL_AUDIO_LABELS[k]}
+            {k === "background" && (
+              <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">experimental</span>
+            )}
           </label>
         ))}
+        {!options.separation_available && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Speech removal needs an optional download of about 3 GB: run <code>uv sync --extra separation</code> and restart.
+          </p>
+        )}
+        {value.original_audio === "background" && options.separation_available && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Uses the GPU for about half the video length and downloads an 80 MB model on first use. Singing and
+            speech mixed into music may not separate cleanly.
+          </p>
+        )}
         <label className="mt-1 flex items-center gap-2 py-0.5">
           <input type="checkbox" checked={value.keep_original_track} onChange={(e) => set("keep_original_track", e.target.checked)} />
           Also keep the untouched original as a 2nd audio track
