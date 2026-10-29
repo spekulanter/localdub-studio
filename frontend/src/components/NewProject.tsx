@@ -11,7 +11,8 @@ interface Props {
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 
 export function NewProject({ options, health, onCreated }: Props) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [progress, setProgress] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>({
     source_lang: "en",
     voice: options.default_voice,
@@ -26,26 +27,40 @@ export function NewProject({ options, health, onCreated }: Props) {
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
-  const tooBig = file !== null && file.size > options.max_upload_mb * 1024 * 1024;
+  const limit = options.max_upload_mb * 1024 * 1024;
+  const tooBig = files.filter((f) => f.size > limit);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!file || tooBig) return;
+    if (files.length === 0 || tooBig.length > 0) return;
     setBusy(true);
     setError(null);
-    const form = new FormData();
-    form.set("file", file);
-    form.set("source_lang", settings.source_lang);
-    form.set("voice", settings.voice);
-    form.set("llm_model", settings.llm_model);
-    form.set("original_audio", settings.original_audio);
-    form.set("keep_original_track", String(settings.keep_original_track));
-    form.set("diarize", String(settings.diarize));
-    if (settings.diarize && settings.num_speakers) form.set("num_speakers", String(settings.num_speakers));
-    try {
-      onCreated(await api.createProject(form));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    const failures: string[] = [];
+    let first: Project | null = null;
+    for (const [i, file] of files.entries()) {
+      setProgress(files.length > 1 ? `Uploading ${i + 1} of ${files.length}: ${file.name}` : null);
+      const form = new FormData();
+      form.set("file", file);
+      form.set("source_lang", settings.source_lang);
+      form.set("voice", settings.voice);
+      form.set("llm_model", settings.llm_model);
+      form.set("original_audio", settings.original_audio);
+      form.set("keep_original_track", String(settings.keep_original_track));
+      form.set("diarize", String(settings.diarize));
+      if (settings.diarize && settings.num_speakers) form.set("num_speakers", String(settings.num_speakers));
+      try {
+        const created = await api.createProject(form);
+        first ??= created;
+      } catch (err) {
+        failures.push(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    setProgress(null);
+    if (first) {
+      if (failures.length > 0) window.alert(`Some files were not added:\n${failures.join("\n")}`);
+      onCreated(first);
+    } else {
+      setError(failures.join("\n"));
       setBusy(false);
     }
   }
@@ -62,25 +77,37 @@ export function NewProject({ options, health, onCreated }: Props) {
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          const f = e.dataTransfer.files[0];
-          if (f) setFile(f);
+          if (e.dataTransfer.files.length > 0) setFiles(Array.from(e.dataTransfer.files));
         }}
         className={`flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center ${
           dragging ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950" : "border-slate-300 dark:border-slate-700"
         }`}
       >
-        {file ? (
-          <p className="text-sm">
-            <strong>{file.name}</strong> · {(file.size / 1e6).toFixed(1)} MB
-          </p>
+        {files.length > 0 ? (
+          <div className="text-sm">
+            {files.length === 1 ? (
+              <p>
+                <strong>{files[0]?.name}</strong> · {((files[0]?.size ?? 0) / 1e6).toFixed(1)} MB
+              </p>
+            ) : (
+              <>
+                <p className="font-medium">{files.length} videos — they are dubbed one after another</p>
+                <ul className="mt-1 max-h-28 overflow-auto text-xs text-slate-500">
+                  {files.map((f) => (
+                    <li key={f.name + f.size}>{f.name}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         ) : (
-          <p className="text-sm text-slate-500">Drop an MP4 here, or</p>
+          <p className="text-sm text-slate-500">Drop one or more MP4 files here, or</p>
         )}
         <button type="button" className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700" onClick={() => input.current?.click()}>
-          {file ? "Choose another file" : "Choose a video"}
+          {files.length > 0 ? "Choose other files" : "Choose videos"}
         </button>
-        <input ref={input} type="file" accept={ACCEPT} className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="Video file" />
-        {tooBig && <p className="text-sm text-red-600">This file is larger than {options.max_upload_mb} MB.</p>}
+        <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => setFiles(Array.from(e.target.files ?? []))} aria-label="Video file" />
+        {tooBig.length > 0 && <p className="text-sm text-red-600">{tooBig.map((f) => f.name).join(", ")} is larger than {options.max_upload_mb} MB.</p>}
       </div>
 
       <OptionFields options={options} health={health} value={settings} onChange={setSettings} disabled={busy} />
@@ -91,8 +118,8 @@ export function NewProject({ options, health, onCreated }: Props) {
         </p>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={!file || tooBig || busy} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-          {busy ? "Uploading…" : "Upload and start dubbing"}
+        <button type="submit" disabled={files.length === 0 || tooBig.length > 0 || busy} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {busy ? (progress ?? "Uploading…") : files.length > 1 ? `Upload and dub ${files.length} videos` : "Upload and start dubbing"}
         </button>
         <span className="text-xs text-slate-500">The video is copied into this app's local data folder and never leaves your computer.</span>
       </div>

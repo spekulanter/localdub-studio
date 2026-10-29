@@ -124,6 +124,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--to-stage", choices=STAGES, help="stop after this stage")
 
     sub.add_parser("serve", help="start the local web UI and API")
+    fetch = sub.add_parser("fetch-models", help="download the model files ahead of the first job")
+    fetch.add_argument("--diarization", action="store_true", help="also speaker-detection models")
+    fetch.add_argument(
+        "--separation", action="store_true", help="also the Demucs model (needs the extra)"
+    )
 
     ver = sub.add_parser("verify", help="objective checks of a finished work directory")
     ver.add_argument("input", type=Path, help="the source video")
@@ -143,6 +148,11 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_env(args, settings)
     if args.cmd == "verify":
         return cmd_verify(args, settings)
+    if args.cmd == "fetch-models":
+        from localdub.core.model_fetch import fetch_models
+
+        fetch_models(settings, diarization=args.diarization, separation=args.separation)
+        return 0
     if args.cmd == "serve":
         return cmd_serve(args, settings)
     return cmd_run(args, settings)

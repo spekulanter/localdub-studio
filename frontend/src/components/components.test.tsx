@@ -50,6 +50,26 @@ describe("NewProject", () => {
   });
 });
 
+describe("NewProject batch", () => {
+  it("lists several chosen videos and uploads them one after another", async () => {
+    const posted: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      posted.push(((init?.body as FormData).get("file") as File).name);
+      return new Response(JSON.stringify({ id: posted.length, name: "x" }), { status: 201 });
+    }));
+    const onCreated = vi.fn();
+    render(<NewProject options={options} health={health} onCreated={onCreated} />);
+    const a = new File([new Uint8Array(5)], "a.mp4", { type: "video/mp4" });
+    const b = new File([new Uint8Array(5)], "b ľ.mp4", { type: "video/mp4" });
+    fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [a, b] } });
+    expect(screen.getByText(/dubbed one after another/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /dub 2 videos/i }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledOnce());
+    expect(posted).toEqual(["a.mp4", "b ľ.mp4"]);
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("ProgressPanel", () => {
   it("shows percent, stage and a cancel button while running", () => {
     const onCancel = vi.fn();

@@ -11,7 +11,11 @@ measured quality and limits: [docs/QUALITY.md](docs/QUALITY.md), licences: [docs
 - [Ollama](https://ollama.com) with a translation model: `ollama pull translategemma:4b`
 - Node.js 20+ (only to build the web UI)
 
-## First run
+## Install (Windows)
+See [docs/INSTALL.md](docs/INSTALL.md): download the setup, run it, start *LocalDub Studio* from the Start menu.
+Build the setup yourself with `uv run python packaging/build_release.py`.
+
+## First run from a source checkout
 ```powershell
 uv sync
 uv run localdub-m0 env          # environment report: GPU, FFmpeg, Ollama, models

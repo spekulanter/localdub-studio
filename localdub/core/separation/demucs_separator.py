@@ -1,8 +1,8 @@
 """Dialogue/background separation with Demucs (htdemucs). Experimental, optional, needs PyTorch.
 
-Install with `uv sync --extra separation`. The model weights (about 80 MB) are downloaded from the
-Demucs release CDN on first use; Demucs checks them against the checksum embedded in the file name.
-Code and weights are MIT-licensed (facebookresearch/demucs).
+Install with `uv sync --extra separation`. The model weights (about 80 MB, safetensors) are
+downloaded on first use from the Hugging Face repository `adefossez/HTDemucs` (the `main` branch:
+the revision is not pinned by Demucs 4.1.0). Code is MIT-licensed (facebookresearch/demucs).
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class DemucsSeparator:
     MODEL = "htdemucs"
 
     def __init__(self, models_dir: Path, device: str | None = None) -> None:
-        os.environ.setdefault("TORCH_HOME", str(models_dir / "torch"))
+        os.environ.setdefault("TORCH_HOME", str(models_dir / "torch"))  # unused by 4.1.0 (HF cache)
         try:
             import torch
             from demucs.pretrained import get_model

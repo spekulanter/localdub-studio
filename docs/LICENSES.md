@@ -170,7 +170,7 @@ measured on the samples in docs/QUALITY.md.
 | Component | Source | Licence | Status |
 |---|---|---|---|
 | Demucs 4.1.0 (code) | PyPI, facebookresearch/demucs | MIT (PyPI metadata) | verified from package metadata |
-| `htdemucs` weights (about 80 MB) | `dl.fbaipublicfiles.com/demucs/hybrid_transformer/` via `demucs.pretrained`; integrity: Demucs checks the checksum embedded in the file name | MIT per the Demucs repository; **the weights' licence was not separately confirmed** | UNVERIFIED for redistribution |
+| `htdemucs` weights (about 80 MB, safetensors) | Hugging Face `adefossez/HTDemucs`, `main` branch, fetched by `demucs.pretrained` (revision **not pinned**, no checksum check by us) | MIT per the Demucs repository; **the weights' licence on that model card was not checked** | UNVERIFIED |
 | PyTorch 2.9.1 + CUDA 12.8 | download.pytorch.org/whl/cu128 | BSD-3-Clause-style (PyTorch) | NVIDIA CUDA runtime libraries inside the wheels are under NVIDIA's licence; check before redistributing an installer |
 
-Installed only by `uv sync --extra separation` (about 3 GB). Weights go to `models/torch/`.
+Installed only by `uv sync --extra separation` (about 3 GB). Weights go to the Hugging Face cache (`~/.cache/huggingface`).
