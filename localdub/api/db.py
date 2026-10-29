@@ -148,6 +148,13 @@ class Database:
             ).fetchone()
         return dict(row) if row else None
 
+    def any_active(self) -> bool:
+        with self.tx() as c:
+            row = c.execute(
+                "SELECT 1 FROM jobs WHERE status IN ('queued','running') LIMIT 1"
+            ).fetchone()
+        return row is not None
+
     def next_queued(self) -> Row | None:
         with self.tx() as c:
             row = c.execute(

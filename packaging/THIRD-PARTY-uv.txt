@@ -1,0 +1,4 @@
+This installer includes uv (https://github.com/astral-sh/uv), a Python package manager by Astral,
+used to install the program's libraries. uv is dual-licensed under the MIT License and the
+Apache License 2.0; the full texts are at https://github.com/astral-sh/uv/blob/main/LICENSE-MIT and
+https://github.com/astral-sh/uv/blob/main/LICENSE-APACHE.

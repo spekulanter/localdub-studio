@@ -123,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--from-stage", choices=STAGES, help="force re-running from this stage")
     run.add_argument("--to-stage", choices=STAGES, help="stop after this stage")
 
-    sub.add_parser("serve", help="start the local web UI and API")
+    sub.add_parser("serve", help="start the local web UI and API (no window)")
+    sub.add_parser("app", help="open LocalDub Studio in its own window")
     fetch = sub.add_parser("fetch-models", help="download the model files ahead of the first job")
     fetch.add_argument("--diarization", action="store_true", help="also speaker-detection models")
     fetch.add_argument(
@@ -155,6 +156,10 @@ def main(argv: list[str] | None = None) -> int:
 
         fetch_models(settings, diarization=args.diarization, experimental=args.experimental)
         return 0
+    if args.cmd == "app":
+        from localdub.desktop import run_app
+
+        return run_app(settings)
     if args.cmd == "serve":
         return cmd_serve(args, settings)
     return cmd_run(args, settings)

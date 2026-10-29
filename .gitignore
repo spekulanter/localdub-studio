@@ -16,3 +16,4 @@ samples/*
 node_modules/
 dist/
 release/
+packaging/tools/

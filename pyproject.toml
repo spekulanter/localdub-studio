@@ -21,6 +21,7 @@ dependencies = [
     "uvicorn==0.54.0",
     "python-multipart==0.0.32",
     "sherpa-onnx==2.0.1",
+    "pywebview==6.2.1",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +42,9 @@ dev = [
 [project.scripts]
 localdub-m0 = "localdub.cli:main"
 localdub = "localdub.cli:main"
+
+[project.gui-scripts]
+localdub-app = "localdub.desktop:main"
 
 [tool.uv]
 # Windows-only product: resolving for macOS/Linux would pull incompatible pins (demucs on macOS).

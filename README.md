@@ -12,7 +12,7 @@ measured quality and limits: [docs/QUALITY.md](docs/QUALITY.md), licences: [docs
 - Node.js 20+ (only to build the web UI)
 
 ## Install (Windows)
-See [docs/INSTALL.md](docs/INSTALL.md): download the setup, run it, start *LocalDub Studio* from the Start menu.
+See [docs/INSTALL.md](docs/INSTALL.md): run the setup wizard, then start *LocalDub Studio* from the Start menu (it opens in its own window).
 Build the setup yourself with `uv run python packaging/build_release.py`.
 
 ## First run from a source checkout
@@ -20,7 +20,8 @@ Build the setup yourself with `uv run python packaging/build_release.py`.
 uv sync
 uv run localdub-m0 env          # environment report: GPU, FFmpeg, Ollama, models
 cd frontend; npm install; npm run build; cd ..
-uv run localdub serve           # then open http://127.0.0.1:8765
+uv run localdub-app             # opens the program in its own window
+# or: uv run localdub serve    # browser version at http://127.0.0.1:8765
 ```
 Model weights (Whisper large-v3, Supertonic 3) download from Hugging Face on first use into
 `models/`. Projects, uploads and results are stored in `data/` (git-ignored).

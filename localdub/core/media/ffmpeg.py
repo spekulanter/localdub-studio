@@ -59,12 +59,42 @@ class MediaInfo(BaseModel):
         return [s for s in self.streams if s.codec_type == "audio"]
 
 
+def _which_fresh(name: str) -> str | None:
+    """Look in the *current* system and user PATH from the registry (Windows).
+
+    A program started from a shortcut inherits Explorer's environment, which does not contain
+    tools installed after the user logged in (e.g. FFmpeg just installed with winget). Also checks
+    winget's link folder.
+    """
+    if sys.platform != "win32":
+        return None
+    import os
+    import winreg
+
+    dirs: list[str] = []
+    for hive, sub in (
+        (
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+        ),
+        (winreg.HKEY_CURRENT_USER, "Environment"),
+    ):
+        try:
+            with winreg.OpenKey(hive, sub) as key:
+                value, _ = winreg.QueryValueEx(key, "Path")
+            dirs += os.path.expandvars(str(value)).split(os.pathsep)
+        except OSError:
+            continue
+    dirs.append(os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links"))
+    return shutil.which(name, path=os.pathsep.join(d for d in dirs if d))
+
+
 def find_tool(name: str, configured: Path | None = None) -> Path:
     if configured is not None:
         if not configured.is_file():
             raise MediaError(f"Configured {name} not found at {configured}")
         return configured
-    found = shutil.which(name)
+    found = shutil.which(name) or _which_fresh(name)
     if not found:
         raise MediaError(
             f"{name} not found on PATH. Install FFmpeg (e.g. `winget install Gyan.FFmpeg`) "

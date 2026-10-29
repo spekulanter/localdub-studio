@@ -47,4 +47,5 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [~] Dialogue/background separation (Demucs, optional extra) → "background" original-audio mode: speech removed measurably (-94 dB in mix); tested on one clip with music
 - [x] Speaker → voice mapping (done in M2: per-speaker and per-line voices, gender-aware defaults)
 - [x] Batch processing: several videos in one upload, queued and dubbed one after another (UI test; real multi-job queue only tested with a fake worker)
-- [~] Windows installer: online installer scripts + IExpress Setup.exe instead of Tauri (docs/INSTALL.md); clean-machine and interactive Setup.exe run untested
+- [x] Desktop window (pywebview/WebView2, icon, close-confirm while a job runs, browser fallback): run and screenshot-verified
+- [~] Windows installer: Inno Setup wizard script written (packaging/localdub.iss) but NOT compiled/tested (Inno Setup not installed); PowerShell installer + ZIP tested

@@ -1,15 +1,18 @@
-"""Build the Windows release: a ZIP with the app, built UI and installer scripts, plus a
-self-extracting Setup.exe made with Windows' own IExpress.
+"""Build the Windows release into release/:
 
-    uv run python packaging/build_release.py [--skip-frontend] [--no-sfx]
+* LocalDub-Studio-<version>-Setup.exe: the graphical installer (needs Inno Setup 6)
+* LocalDub-Studio-<version>-win64.zip: the same app with PowerShell install scripts (no Inno needed)
 
-Output goes to release/. The files are unsigned, so Windows SmartScreen will warn on first run.
+    uv run python packaging/build_release.py [--skip-frontend] [--no-installer]
+
+The files are unsigned, so Windows SmartScreen will warn on first run.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -75,76 +78,56 @@ def build_zip(ver: str) -> Path:
     return zip_path
 
 
-SED = """[Version]
-Class=IEXPRESS
-SEDVersion=3
-[Options]
-PackagePurpose=InstallApp
-ShowInstallProgramWindow=0
-HideExtractAnimation=1
-UseLongFileName=1
-InsertLicense=0
-RebootMode=N
-TargetName={target}
-FriendlyName=LocalDub Studio Setup
-AppLaunched=cmd /c setup.cmd
-PostInstallCmd=<None>
-AdminQuietInstCmd=
-UserQuietInstCmd=
-SourceFiles=SourceFiles
-[Strings]
-FILE0="{zipname}"
-FILE1="setup.cmd"
-[SourceFiles]
-SourceFiles0={outdir}
-[SourceFiles0]
-%FILE0%=
-%FILE1%=
-"""
-
-# noqa below: batch lines cannot be wrapped
-SETUP_CMD = """@echo off
-title LocalDub Studio setup
-set "D=%TEMP%\\LocalDubSetup"
-if exist "%D%" rmdir /s /q "%D%"
-powershell.exe -NoProfile -Command "Expand-Archive -LiteralPath '%~dp0{zipname}' -DestinationPath '%D%' -Force"
-for /d %%F in ("%D%\\LocalDub-Studio-*") do powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%%F\\install.ps1"
-echo.
-pause
-"""  # noqa: E501
+def find_iscc() -> Path | None:
+    """The Inno Setup compiler, if installed (winget: JRSoftware.InnoSetup)."""
+    candidates = [
+        shutil.which("ISCC"),
+        r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+        r"C:\Program Files\Inno Setup 6\ISCC.exe",
+        str(Path.home() / r"AppData\Local\Programs\Inno Setup 6\ISCC.exe"),
+    ]
+    for c in candidates:
+        if c and Path(c).is_file():
+            return Path(c)
+    return None
 
 
-def build_sfx(ver: str, zip_path: Path) -> Path | None:
-    iexpress = Path(r"C:\Windows\System32\iexpress.exe")
-    if not iexpress.is_file():
-        print("IExpress not found: skipping Setup.exe")
+def build_installer(ver: str) -> Path | None:
+    iscc = find_iscc()
+    if iscc is None:
+        print(
+            "Inno Setup not found: skipping the graphical installer.\n"
+            "Install it with: winget install --id JRSoftware.InnoSetup -e"
+        )
         return None
+    uv = shutil.which("uv")
+    if uv is None:
+        raise SystemExit("uv.exe not found on PATH (it is bundled into the installer)")
+    tools = ROOT / "packaging" / "tools"
+    tools.mkdir(exist_ok=True)
+    shutil.copy2(uv, tools / "uv.exe")
+    OUT.mkdir(exist_ok=True)
+    subprocess.run(  # noqa: S603
+        [str(iscc), f"/DAppVersion={ver}", str(ROOT / "packaging" / "localdub.iss")], check=True
+    )
     target = OUT / f"LocalDub-Studio-{ver}-Setup.exe"
-    work = OUT / "_sfx"
-    work.mkdir(exist_ok=True)
-    (work / "setup.cmd").write_text(SETUP_CMD.format(zipname=zip_path.name), encoding="ascii")
-    (work / zip_path.name).write_bytes(zip_path.read_bytes())
-    sed = work / "setup.sed"
-    sed.write_text(SED.format(target=target, zipname=zip_path.name, outdir=work), encoding="ascii")
-    target.unlink(missing_ok=True)
-    subprocess.run([str(iexpress), "/N", "/Q", str(sed)], check=True)  # noqa: S603
     return target if target.is_file() else None
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-frontend", action="store_true")
-    ap.add_argument("--no-sfx", action="store_true")
+    ap.add_argument("--no-installer", action="store_true", help="only build the ZIP")
     args = ap.parse_args()
     ver = version()
     if not args.skip_frontend:
         build_frontend()
     zip_path = build_zip(ver)
     outputs = [zip_path]
-    if not args.no_sfx:
-        sfx = build_sfx(ver, zip_path)
-        if sfx:
-            outputs.append(sfx)
+    if not args.no_installer:
+        setup = build_installer(ver)
+        if setup:
+            outputs.append(setup)
     for p in outputs:
         digest = sha256(p)
         (p.parent / f"{p.name}.sha256").write_text(f"{digest}  {p.name}\n", encoding="utf-8")

@@ -1,0 +1,23 @@
+LocalDub Studio dubs English videos into Slovak entirely on your computer.
+Your videos are never uploaded anywhere.
+
+This setup will:
+
+  * copy the program (about 100 MB) to the folder you choose
+  * download Python 3.12 and the program's libraries (about 2.5 GB, takes a few minutes)
+  * optionally download the speech and voice models (about 3.4 GB) from Hugging Face
+  * optionally install FFmpeg and Ollama with winget (you are asked first)
+  * optionally download the translation model translategemma:4b with Ollama (about 3.3 GB)
+
+Needed on your computer:
+
+  * Windows 10 or 11 (64-bit) with the Microsoft Edge WebView2 runtime (included in Windows 11)
+  * an NVIDIA graphics card with 8 GB or more of memory is strongly recommended;
+    without it dubbing runs on the processor and is much slower
+  * an internet connection during setup (afterwards the program works offline)
+
+Optional features marked "experimental" (speaker detection, speech removal, voice cloning) are
+not production quality. Voice cloning must only be used with voices you may imitate.
+
+Files created by LocalDub Studio carry an "AI-generated" note in their metadata.
+Third-party components and their licences are listed in docs\LICENSES.md in the install folder.
