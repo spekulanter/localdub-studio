@@ -6,6 +6,7 @@ so any stage can be retried independently. See ARCHITECTURE.md for the file layo
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import time
@@ -25,6 +26,7 @@ from localdub.core.audio.mix import voice_over_mix
 from localdub.core.export.srt import write_srt
 from localdub.core.jobs.checkpoints import CheckpointStore, atomic_write_json, fingerprint
 from localdub.core.media.ffmpeg import FFmpeg, MediaError, MediaInfo
+from localdub.core.timeline.edits import apply_edits, ensure_edits_file, load_edits
 from localdub.core.timeline.fit import available_windows, decide, place
 from localdub.core.timeline.models import DialogueSegment, FitStatus, Transcript
 from localdub.core.translation.base import TranslationProvider
@@ -151,6 +153,7 @@ class Pipeline:
         if from_stage is not None:
             self.store.invalidate(STAGES[STAGES.index(from_stage) :])
         last = STAGES.index(to_stage) if to_stage else len(STAGES) - 1
+        ensure_edits_file(self.p("edits.json"))
         result: dict[str, str] = {}
         for stage in STAGES[: last + 1]:
             params, inputs, fn = self._spec(stage)
@@ -216,7 +219,7 @@ class Pipeline:
                     "gap": s.segment_gap_s,
                     "sr": s.sample_rate,
                 },
-                [self.p("translation.json"), self.p("probe.json")],
+                [self.p("translation.json"), self.p("probe.json"), self.p("edits.json")],
                 self._tts,
             ),
             "assemble": (
@@ -306,28 +309,67 @@ class Pipeline:
                 log.warning("FFmpeg lacks the rubberband filter; using atempo for time-stretching")
         return self._rubberband
 
+    def _tts_key(self, text: str, voice: str, window: float) -> str:
+        """Everything that changes a clip: if this is unchanged the cached clip is reused."""
+        s = self.s
+        payload = [
+            text, voice, self.target_lang, s.tts_model, s.tts_steps, s.tts_base_speed,
+            s.max_speed, round(window, 2), s.sample_rate, self._uses_rubberband(),
+        ]  # fmt: skip
+        return hashlib.sha256(json.dumps(payload, ensure_ascii=False).encode()).hexdigest()[:20]
+
     def _tts(self) -> list[Path]:
         segs = load_segments(self.p("translation.json"))
+        report = apply_edits(segs, load_edits(self.p("edits.json")))
+        if report["stale"]:
+            log.warning(
+                "Ignoring edits for segments whose source text changed: %s", report["stale"]
+            )
         duration = self.info().duration
         windows = available_windows(segs, duration, self.s.segment_gap_s)
         raw_dir, clip_dir = self.p("tts/raw"), self.p("tts/clips")
         raw_dir.mkdir(parents=True, exist_ok=True)
         clip_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = self.p("tts/cache.json")
+        cache: dict[str, dict[str, Any]] = {}
+        if cache_path.is_file():
+            try:
+                cache = json.loads(cache_path.read_text(encoding="utf-8"))
+            except ValueError:
+                cache = {}
         base = self.s.tts_base_speed
-        tts = self.providers.tts()
+        tts: TTSProvider | None = None  # loaded lazily: an all-cached run never loads the model
+        reused = 0
         try:
-            sr = tts.sample_rate
             for n, (seg, window) in enumerate(zip(segs, windows, strict=True), start=1):
                 self.on_progress("tts", f"{n}/{len(segs)}")
+                voice = seg.voice_id or self.voice
                 text = normalize_punctuation(seg.translated_text).strip()
-                bad = tts.unsupported_chars(text) if text else []
-                if bad:
-                    log.warning("seg %s: removing characters unsupported by TTS: %s", seg.id, bad)
-                    text = " ".join("".join(c for c in text if c not in bad).split())
+                key = self._tts_key(text, voice, window)
+                hit = cache.get(str(seg.id))
+                if text and hit and hit["key"] == key and (self.wd / hit["audio_path"]).is_file():
+                    seg.audio_path = hit["audio_path"]
+                    seg.audio_duration = hit["audio_duration"]
+                    seg.tts_speed = hit["tts_speed"]
+                    seg.stretch_ratio = hit["stretch_ratio"]
+                    seg.fit_status = FitStatus(hit["fit_status"])
+                    seg.voice_id = voice
+                    reused += 1
+                    continue
+                if tts is None:
+                    tts = self.providers.tts()
+                if text:
+                    bad = tts.unsupported_chars(text)
+                    if bad:
+                        log.warning(
+                            "seg %s: removing characters unsupported by TTS: %s", seg.id, bad
+                        )
+                        text = " ".join("".join(c for c in text if c not in bad).split())
                 if not text:
                     seg.fit_status, seg.audio_path = FitStatus.OK, None
+                    cache.pop(str(seg.id), None)
                     continue
-                voice = seg.voice_id or self.voice
+                sr = tts.sample_rate
                 wav = trim_silence(
                     tts.synthesize(text, voice=voice, lang=self.target_lang, speed=base), sr
                 )
@@ -364,12 +406,23 @@ class Pipeline:
                     if seg.stretch_ratio > 1.001
                     else FitStatus.OK
                 )
+                cache[str(seg.id)] = {
+                    "key": key,
+                    "audio_path": seg.audio_path,
+                    "audio_duration": seg.audio_duration,
+                    "tts_speed": seg.tts_speed,
+                    "stretch_ratio": seg.stretch_ratio,
+                    "fit_status": seg.fit_status.value,
+                }
                 log.info(
                     "seg %d: %.2fs in %.2fs window, x%.3f -> %s",
                     seg.id, final, window, seg.stretch_ratio, seg.fit_status.value,
                 )  # fmt: skip
         finally:
-            tts.close()
+            if tts is not None:
+                tts.close()
+        atomic_write_json(cache_path, cache)
+        log.info("TTS: %d clips reused from cache, %d synthesised", reused, len(segs) - reused)
         out = self.p("tts.json")
         save_segments(out, segs)
         return [out]

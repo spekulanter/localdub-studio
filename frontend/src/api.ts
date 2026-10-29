@@ -47,6 +47,8 @@ export interface Health {
   ollama: { reachable: boolean; error: string | null; models: string[] };
 }
 
+export type ReviewStatus = "pending" | "edited" | "approved";
+
 export interface SegmentRow {
   id: number;
   start: number;
@@ -54,11 +56,34 @@ export interface SegmentRow {
   source_text: string;
   translated_text: string;
   fit_status: string | null;
+  speaker_id: string;
+  voice_id: string | null;
+  review_status: ReviewStatus;
+  edited: boolean;
+  stale_edit: boolean;
+  has_audio: boolean;
 }
 
 export interface SegmentsResponse {
   stage: string | null;
   segments: SegmentRow[];
+  edits_pending: boolean;
+  speaker_voices: Record<string, string>;
+}
+
+/** Fields sent in a segment PATCH. A key set to null clears that edit. */
+export interface SegmentPatch {
+  translated_text?: string | null;
+  voice_id?: string | null;
+  start?: number | null;
+  end?: number | null;
+  review_status?: ReviewStatus | null;
+}
+
+export interface Preview {
+  url: string;
+  duration: number;
+  window: number;
 }
 
 export class ApiError extends Error {
@@ -108,6 +133,33 @@ export const api = {
   jobLog: (jobId: number, tail = 40) =>
     request<{ lines: string[] }>(`/api/jobs/${jobId}/log?tail=${tail}`),
   segments: (projectId: number) => request<SegmentsResponse>(`/api/projects/${projectId}/segments`),
+  patchSegment: (projectId: number, id: number, patch: SegmentPatch) =>
+    request<SegmentRow>(`/api/projects/${projectId}/segments/${id}`, json("PATCH", patch)),
+  revertSegment: (projectId: number, id: number) =>
+    request<void>(`/api/projects/${projectId}/segments/${id}/edit`, { method: "DELETE" }),
+  setSpeakerVoices: (projectId: number, voices: Record<string, string>) =>
+    request<SegmentsResponse>(`/api/projects/${projectId}/speakers`, json("PUT", { voices })),
+  segmentAudioUrl: (projectId: number, id: number, version: string | number = 0) =>
+    `/api/projects/${projectId}/segments/${id}/audio?v=${version}`,
+  /** Synthesise the (possibly unsaved) text with a voice and return a playable blob URL. */
+  async previewSegment(projectId: number, id: number, body: { text?: string; voice?: string }): Promise<Preview> {
+    const res = await fetch(`/api/projects/${projectId}/segments/${id}/preview`, json("POST", body));
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const b = (await res.json()) as { detail?: unknown };
+        if (typeof b.detail === "string") detail = b.detail;
+      } catch {
+        /* not JSON */
+      }
+      throw new ApiError(res.status, detail);
+    }
+    return {
+      url: URL.createObjectURL(await res.blob()),
+      duration: Number(res.headers.get("X-Audio-Duration")),
+      window: Number(res.headers.get("X-Window")),
+    };
+  },
   fileUrl: (projectId: number, kind: "video" | "srt" | "srt_en", inline = false) =>
     `/api/projects/${projectId}/files/${kind}${inline ? "?inline=true" : ""}`,
   sourceUrl: (projectId: number) => `/api/projects/${projectId}/source`,

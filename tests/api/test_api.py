@@ -103,7 +103,8 @@ def test_patch_blocked_while_job_active_and_allowed_after_cancel(
 
 def test_segments_use_most_advanced_file(client: TestClient, sample_mp4: Path, settings: Settings):
     p = upload(client, sample_mp4, start="false").json()
-    assert client.get(f"/api/projects/{p['id']}/segments").json() == {"stage": None, "segments": []}
+    empty = client.get(f"/api/projects/{p['id']}/segments").json()
+    assert empty["stage"] is None and empty["segments"] == [] and empty["edits_pending"] is False
     wd = settings.data_dir / "projects" / str(p["id"]) / "work"
     wd.mkdir(parents=True)
     seg = {
@@ -120,9 +121,11 @@ def test_segments_use_most_advanced_file(client: TestClient, sample_mp4: Path, s
     (wd / "translation.json").write_text(json.dumps({"segments": [seg]}))
     got = client.get(f"/api/projects/{p['id']}/segments").json()
     assert got["stage"] == "translation"
-    assert got["segments"][0] == {
-        k: seg[k] for k in ("id", "start", "end", "source_text", "translated_text", "fit_status")
+    first = got["segments"][0]
+    assert {k: first[k] for k in ("id", "start", "end", "source_text", "translated_text")} == {
+        k: seg[k] for k in ("id", "start", "end", "source_text", "translated_text")
     }
+    assert first["fit_status"] is None  # timing is only meaningful once speech exists
 
 
 def test_downloads_only_serve_known_outputs(

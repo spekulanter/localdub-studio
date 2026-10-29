@@ -298,3 +298,80 @@ class TestUnsupportedCodec:
                 duration=10.0,
                 info=fake_info,
             )
+
+
+# ---------------------------------------------------------------------------
+# Edits and per-segment TTS cache
+# ---------------------------------------------------------------------------
+
+
+class CountingTTS(FakeTTS):
+    calls: list[tuple[str, str]] = []
+
+    def synthesize(self, text, *, voice, lang, speed=1.0):
+        CountingTTS.calls.append((text, voice))
+        return super().synthesize(text, voice=voice, lang=lang, speed=speed)
+
+
+class TestEditsAndCache:
+    @pytest.fixture(autouse=True)
+    def _setup(self, video_path, tmp_path, settings):
+        CountingTTS.calls = []
+        self.wd = tmp_path / "wd"
+        self.providers = Providers(asr=FakeASR, translator=FakeTranslator, tts=CountingTTS)
+        self.pipe = Pipeline(video_path, self.wd, settings, providers=self.providers)
+        self.pipe.run()
+        self.first_calls = len(CountingTTS.calls)
+        CountingTTS.calls = []
+
+    def _edit(self, segments: dict[int, dict]):
+        from localdub.core.timeline.edits import Edits, SegmentEdit, save_edits, source_hash
+
+        src = {
+            s["id"]: s["source_text"]
+            for s in json.loads((self.wd / "asr.json").read_text("utf-8"))["segments"]
+        }
+        save_edits(
+            self.wd / "edits.json",
+            Edits(
+                segments={
+                    i: SegmentEdit(source_hash=source_hash(src[i]), **kw)
+                    for i, kw in segments.items()
+                }
+            ),
+        )
+
+    def test_unchanged_rerun_skips_everything(self):
+        result = self.pipe.run()
+        assert set(result.values()) == {"skipped"}
+
+    def test_forced_tts_rerun_reuses_all_clips_without_loading_model(self):
+        self.pipe.run(from_stage="tts")
+        assert CountingTTS.calls == []
+
+    def test_editing_one_line_resynthesises_only_that_line(self):
+        self._edit({2: {"translated_text": "Ako sa dnes máte, priatelia?"}})
+        result = self.pipe.run()
+        assert result["translate"] == "skipped" and result["tts"] == "ran"
+        texts = {t for t, _ in CountingTTS.calls}
+        assert "Ako sa dnes máte, priatelia?" in texts
+        assert len(CountingTTS.calls) <= 2  # the edited line (+ a speed-up retry if it overflowed)
+        assert all(t == "Ako sa dnes máte, priatelia?" for t in texts)
+        srt = self.pipe.output_srt.read_text(encoding="utf-8")
+        assert "Ako sa dnes máte, priatelia?" in srt and "Ahoj tam." in srt
+
+    def test_voice_edit_changes_only_that_segment_voice(self):
+        self._edit({1: {"voice_id": "M1"}})
+        self.pipe.run()
+        assert CountingTTS.calls and all(v == "M1" for _, v in CountingTTS.calls)
+        voices = {
+            s["id"]: s["voice_id"]
+            for s in json.loads((self.wd / "segments.json").read_text("utf-8"))["segments"]
+        }
+        assert voices[1] == "M1" and voices[2] == "F1"
+
+    def test_timing_edit_moves_the_segment(self):
+        self._edit({1: {"start": 2.0, "end": 3.5}})
+        self.pipe.run()
+        seg1 = json.loads((self.wd / "segments.json").read_text("utf-8"))["segments"][0]
+        assert seg1["start"] == 2.0 and seg1["end"] == 3.5 and seg1["placed_start"] >= 2.0

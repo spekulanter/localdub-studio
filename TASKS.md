@@ -33,10 +33,10 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [ ] Desktop (5070 Ti) verification
 
 ## M2 — Editing and quality
-- [ ] Editable transcript and translation; mark segments edited/approved
-- [ ] Per-segment audio preview; regenerate selected segments only
-- [ ] Manual timing adjustment
-- [ ] Voice presets per segment or speaker
+- [x] Editable translation per segment; edited/approved marks (edits.json overlay, stale-edit detection)
+- [x] Per-segment audio preview (rendered clip + try-unsaved-text); only changed segments are re-synthesised (clip cache; 1 edited line = 4.4 s)
+- [x] Manual timing adjustment (start/end, overlap and range validation)
+- [x] Voice per segment and per speaker (speaker→voice map)
 - [ ] Optional diarization (WhisperX + pyannote; PyTorch cu128+)
 - [x] Original audio: duck (default) or mute, optional drop of the original track (M0, CLI/env)
 - [ ] Mixing: loudness normalization (EBU R128), smarter ducking; UI toggle in M1 settings

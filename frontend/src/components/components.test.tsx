@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Health, Job, Options } from "../api";
+import type { Health, Job, Options, SegmentRow, SegmentsResponse } from "../api";
 import { NewProject } from "./NewProject";
 import { ProgressPanel } from "./ProgressPanel";
-import { SegmentsTable } from "./SegmentsTable";
+import { DialogueEditor } from "./DialogueEditor";
 
 afterEach(cleanup);
 
@@ -70,26 +70,65 @@ describe("ProgressPanel", () => {
   });
 });
 
-describe("SegmentsTable", () => {
-  it("renders rows with timing chips and counts tight segments", () => {
-    render(
-      <SegmentsTable
-        data={{
-          stage: "segments",
-          segments: [
-            { id: 1, start: 0, end: 2, source_text: "Hello", translated_text: "Ahoj", fit_status: "ok" },
-            { id: 2, start: 3, end: 5, source_text: "Bye", translated_text: "Dovidenia a ešte dlho", fit_status: "overflow" },
-          ],
-        }}
-      />,
-    );
-    expect(screen.getByText("Ahoj")).toBeTruthy();
+const segment = (over: Partial<SegmentRow>): SegmentRow => ({
+  id: 1, start: 0, end: 2, source_text: "Hello", translated_text: "Ahoj", fit_status: "ok", speaker_id: "S1",
+  voice_id: null, review_status: "pending", edited: false, stale_edit: false, has_audio: false, ...over,
+});
+const data = (segments: SegmentRow[], pending = false): SegmentsResponse => ({
+  stage: "segments", segments, edits_pending: pending, speaker_voices: {},
+});
+
+describe("DialogueEditor", () => {
+  const renderEditor = (d: SegmentsResponse | null, editable = true, onRerender = vi.fn()) =>
+    render(<DialogueEditor projectId={1} data={d} options={options} editable={editable} renderVersion={0} onChange={vi.fn()} onRerender={onRerender} busy={false} />);
+
+  it("renders rows with timing chips and counts tight and edited lines", () => {
+    renderEditor(data([segment({}), segment({ id: 2, translated_text: "Dovidenia", fit_status: "overflow", edited: true })]));
+    expect(screen.getByDisplayValue("Ahoj")).toBeTruthy();
     expect(screen.getByText("too long")).toBeTruthy();
     expect(screen.getByText(/1 where timing is tight/)).toBeTruthy();
+    expect(screen.getByText(/1 edited by you/)).toBeTruthy();
+  });
+
+  it("enables Save only for a changed line and sends the edit", async () => {
+    const patch = vi.fn().mockResolvedValue(segment({}));
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      patch(url, init?.body);
+      return new Response(JSON.stringify(segment({})));
+    }));
+    renderEditor(data([segment({})]));
+    const save = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Slovak text for line 1"), { target: { value: "Čau svet" } });
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    await waitFor(() => expect(patch).toHaveBeenCalled());
+    const [url, body] = patch.mock.calls[0] as [string, string];
+    expect(url).toBe("/api/projects/1/segments/1");
+    expect(JSON.parse(body)).toMatchObject({ translated_text: "Čau svet", voice_id: null, start: 0, end: 2 });
+    vi.unstubAllGlobals();
+  });
+
+  it("offers re-render only when edits are pending", () => {
+    const onRerender = vi.fn();
+    const { rerender } = renderEditor(data([segment({})], false), true, onRerender);
+    expect(screen.queryByRole("button", { name: /re-render/i })).toBeNull();
+    rerender(<DialogueEditor projectId={1} data={data([segment({})], true)} options={options} editable renderVersion={0} onChange={vi.fn()} onRerender={onRerender} busy={false} />);
+    fireEvent.click(screen.getByRole("button", { name: /re-render changed lines/i }));
+    expect(onRerender).toHaveBeenCalledOnce();
+  });
+
+  it("locks editing while a job runs and shows speaker voices for multiple speakers", () => {
+    renderEditor(data([segment({}), segment({ id: 2, speaker_id: "S2" })]), false);
+    expect((screen.getByLabelText("Slovak text for line 1") as HTMLTextAreaElement).disabled).toBe(true);
+    expect(screen.queryByText("Voice per speaker")).toBeNull();
+    cleanup();
+    renderEditor(data([segment({}), segment({ id: 2, speaker_id: "S2" })]), true);
+    expect(screen.getByText("Voice per speaker")).toBeTruthy();
   });
 
   it("explains the empty state", () => {
-    render(<SegmentsTable data={null} />);
-    expect(screen.getByText(/appear here/)).toBeTruthy();
+    renderEditor(null);
+    expect(screen.getByText(/appears here/)).toBeTruthy();
   });
 });

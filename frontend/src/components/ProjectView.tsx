@@ -3,7 +3,7 @@ import { api, watchJob, type Health, type Job, type Options, type Project, type 
 import { formatTime, isActive, restartStage } from "../lib/format";
 import { OptionFields, type Settings } from "./OptionFields";
 import { ProgressPanel } from "./ProgressPanel";
-import { SegmentsTable } from "./SegmentsTable";
+import { DialogueEditor } from "./DialogueEditor";
 
 interface Props {
   projectId: number;
@@ -206,7 +206,16 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted }
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="mb-3 font-medium">Dialogue</h3>
-        <SegmentsTable data={segments} />
+        <DialogueEditor
+          projectId={projectId}
+          data={segments}
+          options={options}
+          editable={!active && !busy && segments !== null && segments.stage !== null && segments.stage !== "asr"}
+          renderVersion={job?.finished_at ?? 0}
+          onChange={() => void api.segments(projectId).then(setSegments)}
+          onRerender={() => void act(() => api.startJob(projectId, "tts"))}
+          busy={busy}
+        />
       </section>
     </div>
   );

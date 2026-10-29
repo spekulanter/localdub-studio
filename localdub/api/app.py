@@ -6,18 +6,21 @@ The server only listens on localhost by default; all media stays on this machine
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import re
 import shutil
+import threading
 import unicodedata
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+import soundfile as sf
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -25,7 +28,18 @@ from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
 from localdub.core.media.ffmpeg import FFmpeg, MediaError
-from localdub.pipeline import STAGES
+from localdub.core.timeline.edits import (
+    SegmentEdit,
+    apply_edits,
+    load_edits,
+    save_edits,
+    source_hash,
+    validate_timing,
+)
+from localdub.core.timeline.fit import available_windows
+from localdub.core.timeline.models import DialogueSegment, ReviewStatus
+from localdub.core.translation.prompts import normalize_punctuation
+from localdub.pipeline import STAGES, default_providers
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +79,25 @@ class JobRequest(BaseModel):
     ) = None
 
 
+class SegmentPatch(BaseModel):
+    """Only fields present in the request are changed; sending null clears that field's edit."""
+
+    translated_text: str | None = None
+    voice_id: str | None = None
+    start: float | None = None
+    end: float | None = None
+    review_status: Literal["pending", "edited", "approved"] | None = None
+
+
+class SpeakerVoices(BaseModel):
+    voices: dict[str, str]
+
+
+class PreviewRequest(BaseModel):
+    text: str | None = None
+    voice: str | None = None
+
+
 def safe_filename(name: str, fallback: str = "video.mp4") -> str:
     """Keep Unicode and spaces; drop path parts, control chars and Windows-reserved characters."""
     base = Path(name.replace("\\", "/")).name
@@ -87,6 +120,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         yield
         if start_queue:
             await asyncio.to_thread(jobs.stop)
+        if app.state.preview_tts is not None:
+            app.state.preview_tts.close()
 
     app = FastAPI(title="LocalDub Studio", version="0.1.0", lifespan=lifespan)
     app.state.db, app.state.jobs, app.state.settings = db, jobs, settings
@@ -316,22 +351,209 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         )
         return {"lines": lines[-max(1, min(tail, 2000)) :]}
 
-    # ----- results -----------------------------------------------------------------------
-    @app.get("/api/projects/{pid}/segments")
-    def segments(pid: int) -> dict[str, Any]:
-        require_project(pid)
+    # ----- segments and edits ------------------------------------------------------------
+    def base_segments(pid: int) -> tuple[str | None, list[DialogueSegment]]:
         wd = project_dir(pid) / "work"
         for name in SEGMENT_FILES:
             path = wd / name
             if path.is_file():
                 data = json.loads(path.read_text(encoding="utf-8"))
-                keep = ("id", "start", "end", "source_text", "translated_text", "fit_status")
-                return {
-                    "stage": name.removesuffix(".json"),
-                    "segments": [{k: s.get(k) for k in keep} for s in data["segments"]],
-                }
-        return {"stage": None, "segments": []}
+                return name.removesuffix(".json"), [
+                    DialogueSegment.model_validate(x) for x in data["segments"]
+                ]
+        return None, []
 
+    def segment_view(pid: int) -> dict[str, Any]:
+        wd = project_dir(pid) / "work"
+        stage, segs = base_segments(pid)
+        edits = load_edits(wd / "edits.json")
+        report = apply_edits(segs, edits)
+        tts_json = wd / "tts.json"
+        pending = (
+            tts_json.is_file()
+            and (wd / "edits.json").is_file()
+            and (wd / "edits.json").stat().st_mtime > tts_json.stat().st_mtime
+        )
+        rows = []
+        for seg in segs:
+            clip = wd / seg.audio_path if seg.audio_path else None
+            rows.append(
+                {
+                    "id": seg.id,
+                    "start": seg.start,
+                    "end": seg.end,
+                    "source_text": seg.source_text,
+                    "translated_text": seg.translated_text,
+                    "fit_status": seg.fit_status.value if stage in ("tts", "segments") else None,
+                    "speaker_id": seg.speaker_id,
+                    "voice_id": seg.voice_id,
+                    "review_status": seg.review_status.value,
+                    "edited": seg.id in report["applied"],
+                    "stale_edit": seg.id in report["stale"],
+                    "has_audio": bool(clip and clip.is_file()),
+                }
+            )
+        return {
+            "stage": stage,
+            "segments": rows,
+            "edits_pending": pending,
+            "speaker_voices": edits.speaker_voices,
+        }
+
+    def require_editable(pid: int) -> tuple[Path, list[DialogueSegment]]:
+        require_project(pid)
+        if db.active_job(pid):
+            raise HTTPException(409, "Cannot edit while a job is queued or running")
+        stage, segs = base_segments(pid)
+        if stage in (None, "asr"):
+            raise HTTPException(409, "Nothing to edit yet: translation has not finished")
+        return project_dir(pid) / "work" / "edits.json", segs
+
+    @app.get("/api/projects/{pid}/segments")
+    def segments(pid: int) -> dict[str, Any]:
+        require_project(pid)
+        return segment_view(pid)
+
+    @app.patch("/api/projects/{pid}/segments/{sid}")
+    def patch_segment(pid: int, sid: int, patch: SegmentPatch) -> dict[str, Any]:
+        project = require_project(pid)
+        edits_path, base = require_editable(pid)
+        seg = next((x for x in base if x.id == sid), None)
+        if seg is None:
+            raise HTTPException(404, "Segment not found")
+        edits = load_edits(edits_path)
+        edit = edits.segments.get(sid)
+        if edit is None or edit.source_hash != source_hash(seg.source_text):
+            edit = SegmentEdit(source_hash=source_hash(seg.source_text))
+        sent = patch.model_fields_set
+        if "translated_text" in sent:
+            text = (patch.translated_text or "").strip()
+            if len(text) > 600:
+                raise HTTPException(422, "Translation is too long (max 600 characters)")
+            edit.translated_text = text if patch.translated_text is not None else None
+        if "voice_id" in sent:
+            if patch.voice_id is not None and patch.voice_id not in VOICES:
+                raise HTTPException(422, f"Unknown voice '{patch.voice_id}'")
+            edit.voice_id = patch.voice_id
+        if "review_status" in sent:
+            edit.review_status = ReviewStatus(patch.review_status) if patch.review_status else None
+        if "start" in sent or "end" in sent:
+            effective = [x.model_copy(deep=True) for x in base]
+            apply_edits(effective, edits)
+            idx = next(i for i, x in enumerate(effective) if x.id == sid)
+            cur = effective[idx]
+            # A sent null reverts that boundary to the original recognised time.
+            start = (
+                cur.start
+                if "start" not in sent
+                else (patch.start if patch.start is not None else seg.start)
+            )
+            end = (
+                cur.end if "end" not in sent else (patch.end if patch.end is not None else seg.end)
+            )
+            err = validate_timing(
+                start,
+                end,
+                project["duration"],
+                (
+                    effective[idx - 1].end if idx > 0 else None,
+                    effective[idx + 1].start if idx + 1 < len(effective) else None,
+                ),
+            )
+            if err:
+                raise HTTPException(422, err)
+            edit.start = None if start == seg.start else round(start, 3)
+            edit.end = None if end == seg.end else round(end, 3)
+        edits.segments[sid] = edit
+        save_edits(edits_path, edits)
+        view = segment_view(pid)
+        row: dict[str, Any] = next(r for r in view["segments"] if r["id"] == sid)
+        return row | {"edits_pending": view["edits_pending"]}
+
+    @app.delete("/api/projects/{pid}/segments/{sid}/edit", status_code=204)
+    def revert_segment(pid: int, sid: int) -> None:
+        edits_path, _ = require_editable(pid)
+        edits = load_edits(edits_path)
+        edits.segments.pop(sid, None)
+        save_edits(edits_path, edits)
+
+    @app.put("/api/projects/{pid}/speakers")
+    def set_speaker_voices(pid: int, body: SpeakerVoices) -> dict[str, Any]:
+        edits_path, _ = require_editable(pid)
+        bad = [v for v in body.voices.values() if v not in VOICES]
+        if bad:
+            raise HTTPException(422, f"Unknown voice(s): {bad}")
+        edits = load_edits(edits_path)
+        edits.speaker_voices = dict(body.voices)
+        save_edits(edits_path, edits)
+        return segment_view(pid)
+
+    @app.get("/api/projects/{pid}/segments/{sid}/audio")
+    def segment_audio(pid: int, sid: int) -> FileResponse:
+        require_project(pid)
+        wd = project_dir(pid) / "work"
+        tts_json = wd / "tts.json"
+        if not tts_json.is_file():
+            raise HTTPException(404, "No audio generated yet")
+        data = json.loads(tts_json.read_text(encoding="utf-8"))
+        rel = next((x.get("audio_path") for x in data["segments"] if x["id"] == sid), None)
+        path = wd / rel if rel else None
+        if path is None or not path.is_file():
+            raise HTTPException(404, "No audio for this segment")
+        return FileResponse(path, media_type="audio/wav", content_disposition_type="inline")
+
+    preview_lock = threading.Lock()
+    app.state.preview_tts = None
+
+    def synth_preview(text: str, voice: str, window: float | None) -> tuple[bytes, float]:
+        with preview_lock:
+            if app.state.preview_tts is None:
+                app.state.preview_tts = default_providers(settings).tts()
+            tts = app.state.preview_tts
+            text = normalize_punctuation(text).strip()
+            bad = tts.unsupported_chars(text)
+            if bad:
+                text = " ".join("".join(c for c in text if c not in bad).split())
+            if not text:
+                raise HTTPException(422, "Nothing to say: the text is empty")
+            speed = settings.tts_base_speed
+            wav = tts.synthesize(text, voice=voice, lang="sk", speed=speed)
+            dur = wav.size / tts.sample_rate
+            if window is not None and dur > window:
+                factor = min(dur / window * 1.02, settings.max_speed / speed)
+                wav = tts.synthesize(text, voice=voice, lang="sk", speed=speed * factor)
+                dur = wav.size / tts.sample_rate
+            buf = io.BytesIO()
+            sf.write(buf, wav, tts.sample_rate, format="WAV", subtype="PCM_16")
+            return buf.getvalue(), dur
+
+    @app.post("/api/projects/{pid}/segments/{sid}/preview")
+    async def preview_segment(pid: int, sid: int, req: PreviewRequest) -> Response:
+        project = require_project(pid)
+        view = await asyncio.to_thread(segment_view, pid)
+        rows = view["segments"]
+        row = next((r for r in rows if r["id"] == sid), None)
+        if row is None:
+            raise HTTPException(404, "Segment not found")
+        voice = req.voice or row["voice_id"] or settings.tts_voice
+        if voice not in VOICES:
+            raise HTTPException(422, f"Unknown voice '{voice}'")
+        text = req.text if req.text is not None else row["translated_text"]
+        segs = [
+            DialogueSegment(id=r["id"], start=r["start"], end=r["end"], source_text="")
+            for r in rows
+        ]
+        window = available_windows(segs, project["duration"], settings.segment_gap_s)[
+            rows.index(row)
+        ]
+        data, dur = await asyncio.to_thread(synth_preview, text, voice, window)
+        return Response(
+            data,
+            media_type="audio/wav",
+            headers={"X-Audio-Duration": f"{dur:.3f}", "X-Window": f"{window:.3f}"},
+        )
+
+    # ----- results -----------------------------------------------------------------------
     @app.get("/api/projects/{pid}/files/{kind}")
     def download(
         pid: int, kind: Literal["video", "srt", "srt_en"], inline: bool = False
