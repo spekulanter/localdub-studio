@@ -194,11 +194,16 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         )
 
     # ----- meta --------------------------------------------------------------------------
+    @app.get("/api/ping")
+    def ping() -> dict[str, bool]:
+        """Cheap liveness check with no external dependencies (used by the window and launcher)."""
+        return {"ok": True}
+
     @app.get("/api/health")
     def health() -> dict[str, Any]:
         from localdub.core.translation.ollama_provider import OllamaClient
 
-        client = OllamaClient(settings.ollama_url)
+        client = OllamaClient(settings.ollama_url, timeout=3.0)
         try:
             models, error = client.list_models(), None
         except Exception as exc:  # noqa: BLE001

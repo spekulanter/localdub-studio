@@ -28,6 +28,15 @@ def test_safe_filename_keeps_unicode_and_strips_paths():
     assert len(safe_filename("a" * 300 + ".mp4")) <= 120
 
 
+def test_ping_never_waits_for_ollama(client: TestClient, monkeypatch):
+    import time
+
+    client.app.state.settings.ollama_url = "http://10.255.255.1:11434"  # unroutable: would hang
+    t0 = time.monotonic()
+    assert client.get("/api/ping").json() == {"ok": True}
+    assert time.monotonic() - t0 < 1.0
+
+
 def test_options_and_health(client: TestClient):
     opts = client.get("/api/options").json()
     assert "F1" in opts["voices"] and opts["target_language"] == "sk"

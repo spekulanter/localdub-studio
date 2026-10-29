@@ -49,7 +49,7 @@ ERROR_PAGE = """<!doctype html><meta charset="utf-8"><title>LocalDub Studio</tit
 
 def healthy(url: str, timeout: float = 2.0) -> bool:
     try:
-        with urllib.request.urlopen(f"{url}/api/health", timeout=timeout) as resp:  # noqa: S310
+        with urllib.request.urlopen(f"{url}/api/ping", timeout=timeout) as resp:  # noqa: S310
             return bool(resp.status == 200)
     except OSError:
         return False

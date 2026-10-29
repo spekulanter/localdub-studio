@@ -5,7 +5,7 @@ Set-Location $PSScriptRoot
 $Host.UI.RawUI.WindowTitle = 'LocalDub Studio (close this window to quit)'
 $url = 'http://127.0.0.1:8765'
 
-function Healthy { try { (Invoke-WebRequest "$url/api/health" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200 } catch { $false } }
+function Healthy { try { (Invoke-WebRequest "$url/api/ping" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200 } catch { $false } }
 
 if (Healthy) {
     Write-Host 'LocalDub Studio is already running.'
@@ -22,7 +22,7 @@ if (-not $NoBrowser) {
     Start-Job -ScriptBlock {
         param($u)
         for ($i = 0; $i -lt 90; $i++) {
-            try { if ((Invoke-WebRequest "$u/api/health" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) { Start-Process $u; break } } catch { Start-Sleep -Seconds 1 }
+            try { if ((Invoke-WebRequest "$u/api/ping" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) { Start-Process $u; break } } catch { Start-Sleep -Seconds 1 }
         }
     } -ArgumentList $url | Out-Null
 }
