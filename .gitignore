@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+work/
+models/
+samples/*
+!samples/README.md
+*.wav
+*.mp4
+*.mkv
+node_modules/
+dist/

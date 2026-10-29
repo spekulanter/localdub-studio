@@ -1,0 +1,60 @@
+[project]
+name = "localdub"
+version = "0.0.1"
+description = "LocalDub Studio - local-first English-to-Slovak video dubbing"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary" }
+dependencies = [
+    "faster-whisper==1.2.1",
+    "ctranslate2==4.8.4",
+    "nvidia-cublas-cu12==12.9.2.10; sys_platform == 'win32' or sys_platform == 'linux'",
+    "nvidia-cudnn-cu12==9.27.0.42; sys_platform == 'win32' or sys_platform == 'linux'",
+    "supertonic==1.3.1",
+    "huggingface-hub>=0.30,<3",
+    "httpx==0.28.1",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.16.2",
+    "numpy>=2.0,<2.6",
+    "soundfile==0.14.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+    "ruff==0.17.3",
+    "mypy==2.4.1",
+]
+
+[project.scripts]
+localdub-m0 = "localdub.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["localdub"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "gpu: requires a CUDA GPU with faster-whisper",
+    "ollama: requires a running Ollama server",
+    "models: requires downloaded model weights",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S603", "S604"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501", "S603", "E741"]
