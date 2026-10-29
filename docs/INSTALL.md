@@ -42,6 +42,11 @@ the same folder). The server only listens on `127.0.0.1`; nothing is uploaded.
 Run `uninstall.ps1` in the install folder (right-click → *Run with PowerShell*). It asks whether to
 delete your data and the models. uv, FFmpeg and Ollama are left installed.
 
+## If nothing seems to happen
+The setup opens a console window titled "LocalDub Studio setup" (in Windows Terminal it can open behind
+other windows: check the taskbar). An earlier build of `Setup.exe` ran this window *hidden*; if you
+have that build, end any `LocalDub-Studio-0.1.0-Setup.exe` processes in Task Manager and use the new one.
+
 ## What has and has not been tested
 Tested on the developer's Windows 11 machine (RTX 5060 Laptop): the installer script from an
 unzipped package into a fresh folder (prerequisites already present, models shared), a full dubbing
