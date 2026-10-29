@@ -8,7 +8,7 @@ param(
     [string]$ModelsDir = '',
     [switch]$Yes,
     [switch]$NoShortcuts,
-    [switch]$WithSeparation,
+    [switch]$WithExperimental,
     [switch]$WithDiarization,
     [switch]$SkipModels,
     [switch]$SkipOllamaModel,
@@ -90,7 +90,7 @@ Step 'Installing Python 3.12 and the app libraries (about 2.5 GB download, sever
 Push-Location $InstallDir
 try {
     $syncArgs = @('sync', '--frozen', '--no-dev')
-    if ($WithSeparation) { $syncArgs += @('--extra', 'separation') }
+    if ($WithExperimental) { $syncArgs += @('--extra', 'separation') }
     Run 'uv' $syncArgs
 
     if ($ModelsDir -ne '') { [Environment]::SetEnvironmentVariable('LOCALDUB_MODELS_DIR', $ModelsDir, 'User'); $env:LOCALDUB_MODELS_DIR = $ModelsDir }
@@ -102,7 +102,7 @@ try {
         if (Ask 'Download the models now? (otherwise the first dubbing job downloads them)') {
             $fetch = @('run', '--no-sync', 'localdub', 'fetch-models')
             if ($WithDiarization) { $fetch += '--diarization' }
-            if ($WithSeparation) { $fetch += '--separation' }
+            if ($WithExperimental) { $fetch += '--separation' }
             Run 'uv' $fetch
         }
     }

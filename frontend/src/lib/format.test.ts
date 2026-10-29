@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Job } from "../api";
 import { formatTime, isActive, restartStage, statusLabel } from "./format";
 
-const base = { voice: "F1", llm_model: "m", original_audio: "duck", keep_original_track: true, diarize: false, num_speakers: null } as const;
+const base = { voice: "F1", llm_model: "m", original_audio: "duck", keep_original_track: true, diarize: false, clone_voice: false, num_speakers: null } as const;
 
 describe("formatTime", () => {
   it("formats m:ss", () => {
@@ -41,5 +41,14 @@ describe("job helpers", () => {
     expect(isActive(job("queued"))).toBe(true);
     expect(isActive(job("done"))).toBe(false);
     expect(isActive(null)).toBe(false);
+  });
+});
+
+describe("voice cloning restart", () => {
+  const b = { voice: "F1", llm_model: "m", original_audio: "duck", keep_original_track: true, diarize: false, clone_voice: false, num_speakers: null } as const;
+  it("only needs the convert step", () => {
+    expect(restartStage(b, { ...b, clone_voice: true })).toBe("convert");
+    expect(restartStage({ ...b, clone_voice: true }, b)).toBe("convert");
+    expect(restartStage(b, { ...b, clone_voice: true, voice: "M1" })).toBe("tts");
   });
 });

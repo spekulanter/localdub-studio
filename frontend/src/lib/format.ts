@@ -15,6 +15,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
   translate: "Translating to Slovak",
   tts: "Generating Slovak voice",
   separate: "Separating dialogue from music",
+  convert: "Matching the original voice",
   assemble: "Mixing audio",
   export: "Writing MP4 and subtitles",
 };
@@ -47,12 +48,15 @@ export function isActive(job: Job | null): boolean {
  * Earliest pipeline stage that must run again after changing project settings, or null if
  * nothing that affects the output changed.
  */
-type Tunable = Pick<Project, "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers">;
+type Tunable = Pick<Project, "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers" | "clone_voice">;
 
 export function restartStage(before: Tunable, after: Tunable): Stage | null {
   if (before.diarize !== after.diarize || (after.diarize && before.num_speakers !== after.num_speakers)) return "diarize";
   if (before.llm_model !== after.llm_model) return "translate";
   if (before.voice !== after.voice) return "tts";
+  if (before.clone_voice !== after.clone_voice && before.voice === after.voice) {
+    if (before.original_audio === after.original_audio || after.original_audio !== "background") return "convert";
+  }
   if (before.original_audio !== after.original_audio) {
     // Entering or leaving "background" needs (or discards) the Demucs split.
     return before.original_audio === "background" || after.original_audio === "background" ? "separate" : "assemble";

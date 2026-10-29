@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     diarization_num_speakers: int | None = None
     diarization_threshold: float = 0.85
 
+    # Voice cloning (optional, experimental, needs the `experimental` extra): the dub clips are
+    # converted towards the original speaker's timbre. Only for voices the user may imitate.
+    voice_cloning_enabled: bool = False
+    voice_cloning_tau: float = 0.3
+
     # Translation (Ollama is local-only; the URL must point at a local server by default)
     ollama_url: str = "http://127.0.0.1:11434"
     translation_model: str = "translategemma:4b"

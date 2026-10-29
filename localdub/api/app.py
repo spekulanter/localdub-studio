@@ -47,7 +47,14 @@ log = logging.getLogger(__name__)
 
 ALLOWED_SUFFIXES = {".mp4", ".m4v", ".mov", ".mkv"}
 SOURCE_LANGS = {"en": "English", "auto": "Auto-detect"}
-SEGMENT_FILES = ["segments.json", "tts.json", "translation.json", "dialogue.json", "asr.json"]
+SEGMENT_FILES = [
+    "segments.json",
+    "voiced.json",
+    "tts.json",
+    "translation.json",
+    "dialogue.json",
+    "asr.json",
+]
 _BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
@@ -62,6 +69,7 @@ class ProjectOut(BaseModel):
     original_audio: Literal["duck", "mute", "background"]
     keep_original_track: bool
     diarize: bool = False
+    clone_voice: bool = False
     num_speakers: int | None = None
     created_at: float
     latest_job: dict[str, Any] | None = None
@@ -75,6 +83,8 @@ class ProjectPatch(BaseModel):
     original_audio: Literal["duck", "mute", "background"] | None = None
     keep_original_track: bool | None = None
     diarize: bool | None = None
+    clone_voice: bool | None = None
+    clone_consent: bool = False
     num_speakers: int | None = None
 
 
@@ -88,6 +98,7 @@ class JobRequest(BaseModel):
             "translate",
             "tts",
             "separate",
+            "convert",
             "assemble",
             "export",
         ]
@@ -227,6 +238,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         original_audio: Annotated[Literal["duck", "mute", "background"], Form()] = "duck",
         keep_original_track: Annotated[bool, Form()] = True,
         diarize: Annotated[bool, Form()] = False,
+        clone_voice: Annotated[bool, Form()] = False,
+        clone_consent: Annotated[bool, Form()] = False,
         num_speakers: Annotated[int | None, Form(ge=1, le=10)] = None,
         start: Annotated[bool, Form()] = True,
     ) -> ProjectOut:
@@ -241,6 +254,10 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         if voice not in VOICES:
             raise HTTPException(422, f"Unknown voice '{voice}'")
 
+        if clone_voice and not clone_consent:
+            raise HTTPException(
+                422, "Voice cloning needs your confirmation that you may imitate these voices"
+            )
         pid = db.create_project(
             name=name.strip() or Path(filename).stem,
             original_name=filename,
@@ -252,6 +269,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             original_audio=original_audio,
             keep_original_track=int(keep_original_track),
             diarize=int(diarize),
+            clone_voice=int(clone_voice),
             num_speakers=num_speakers,
         )
         pdir = project_dir(pid)
@@ -300,7 +318,12 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             fields["num_speakers"] = patch.num_speakers  # null = detect automatically
         if "voice" in fields and fields["voice"] not in VOICES:
             raise HTTPException(422, f"Unknown voice '{fields['voice']}'")
-        for flag in ("keep_original_track", "diarize"):
+        fields.pop("clone_consent", None)
+        if fields.get("clone_voice") and not patch.clone_consent:
+            raise HTTPException(
+                422, "Voice cloning needs your confirmation that you may imitate these voices"
+            )
+        for flag in ("keep_original_track", "diarize", "clone_voice"):
             if flag in fields:
                 fields[flag] = int(fields[flag])
         if fields.get("num_speakers") is not None and not 1 <= fields["num_speakers"] <= 10:
@@ -544,6 +567,9 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         if not tts_json.is_file():
             raise HTTPException(404, "No audio generated yet")
         data = json.loads(tts_json.read_text(encoding="utf-8"))
+        voiced = wd / "voiced.json"
+        if voiced.is_file():  # the version that is actually mixed (voice-cloned if enabled)
+            data = json.loads(voiced.read_text(encoding="utf-8"))
         rel = next((x.get("audio_path") for x in data["segments"] if x["id"] == sid), None)
         path = wd / rel if rel else None
         if path is None or not path.is_file():

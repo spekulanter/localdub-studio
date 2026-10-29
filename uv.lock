@@ -386,7 +386,7 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-separation = [
+experimental = [
     { name = "demucs" },
     { name = "torch" },
 ]
@@ -401,7 +401,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ctranslate2", specifier = "==4.8.4" },
-    { name = "demucs", marker = "extra == 'separation'", specifier = "==4.1.0" },
+    { name = "demucs", marker = "extra == 'experimental'", specifier = "==4.1.0" },
     { name = "fastapi", specifier = "==0.162.0" },
     { name = "faster-whisper", specifier = "==1.2.1" },
     { name = "httpx", specifier = "==0.28.1" },
@@ -415,11 +415,11 @@ requires-dist = [
     { name = "sherpa-onnx", specifier = "==2.0.1" },
     { name = "soundfile", specifier = "==0.14.0" },
     { name = "supertonic", specifier = "==1.3.1" },
-    { name = "torch", marker = "sys_platform == 'win32' and extra == 'separation'", specifier = "==2.9.1", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "localdub", extra = "separation" } },
-    { name = "torch", marker = "sys_platform != 'win32' and extra == 'separation'", specifier = "==2.9.1" },
+    { name = "torch", marker = "sys_platform == 'win32' and extra == 'experimental'", specifier = "==2.9.1", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "localdub", extra = "experimental" } },
+    { name = "torch", marker = "sys_platform != 'win32' and extra == 'experimental'", specifier = "==2.9.1" },
     { name = "uvicorn", specifier = "==0.54.0" },
 ]
-provides-extras = ["separation"]
+provides-extras = ["experimental"]
 
 [package.metadata.requires-dev]
 dev = [

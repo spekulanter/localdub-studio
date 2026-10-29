@@ -20,6 +20,8 @@ const toSettings = (p: Project): Settings => ({
   original_audio: p.original_audio,
   keep_original_track: p.keep_original_track,
   diarize: p.diarize,
+  clone_voice: p.clone_voice,
+  clone_consent: p.clone_voice,
   num_speakers: p.num_speakers,
 });
 
@@ -180,7 +182,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted }
       <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="mb-3 font-medium">Settings</h3>
         <OptionFields options={options} health={health} value={draft} onChange={setDraft} lockSource disabled={active || busy} />
-        {stage && !active && (
+        {stage && !active && !(draft.clone_voice && !draft.clone_consent) && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button
               disabled={busy}
@@ -192,6 +194,8 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted }
                     original_audio: draft.original_audio,
                     keep_original_track: draft.keep_original_track,
                     diarize: draft.diarize,
+                    clone_voice: draft.clone_voice,
+                    clone_consent: draft.clone_consent,
                     num_speakers: draft.num_speakers,
                   });
                   await api.startJob(projectId, stage);

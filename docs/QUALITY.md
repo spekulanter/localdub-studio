@@ -193,3 +193,26 @@ Measured on the cuisine vlog (the only sample with background music, -29.3 LUFS 
 Limits (not tested): singing, music with vocals, speech over loud music, mono sources, long videos
 (memory use grows with `split` chunks but was only measured on 43 s), tracks where dialogue and
 effects overlap. A first-use download of about 80 MB and 3 GB of PyTorch is required.
+
+## Voice cloning (experimental, 2026-10-29)
+OpenVoice V2 tone-colour converter (GPU): the Slovak TTS clips of each speaker are converted
+towards the timbre of that speaker's original speech (their longest lines, up to 30 s, from the
+vocals stem if separation ran). RTX 5060 laptop: about 17 s for 10 clips including model load.
+
+Measured with an independent model (3D-Speaker ERes2Net embeddings, cosine similarity to the
+original speaker; control = the same converted audio against the *other* speaker), 12 clips per
+project, `scripts/m3/eval_voice_conversion.py`:
+
+| Project (speaker) | Plain Slovak TTS | Converted | Control (other speaker) |
+|---|---|---|---|
+| Interview (male) | 0.053 | **0.505** | 0.194 |
+| Cuisine vlog (female) | 0.304 | **0.443** | 0.096 |
+
+Intelligibility (Slovak Whisper transcript vs intended text) did not suffer: 0.991 -> 0.993 and
+0.974 -> 0.971. After conversion `verify` still passes.
+
+**What this does not show:** whether it sounds natural or pleasant (a listening judgement; I have no
+ears), how it handles several speakers (tested only with one speaker per clip), emotion, whispering,
+noisy references, or very short references (under 5 s the speaker keeps the plain TTS voice). The
+similarity measure is the same kind of model family as the diarization embedder, so it rates
+timbre, not "does it sound like them" to a human. Do not describe this as production quality.

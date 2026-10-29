@@ -158,7 +158,7 @@ describe("original voice options", () => {
   it("disables speech removal when the optional packages are missing and explains how to enable it", () => {
     render(<NewProject options={options} health={health} onCreated={vi.fn()} />);
     expect((screen.getByLabelText(/Remove the speech/) as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText(/uv sync --extra separation/)).toBeTruthy();
+    expect(screen.getAllByText(/uv sync --extra experimental/).length).toBeGreaterThan(0);
   });
 
   it("enables it when available", () => {
@@ -167,5 +167,25 @@ describe("original voice options", () => {
     expect(radio.disabled).toBe(false);
     fireEvent.click(radio);
     expect(screen.getByText(/downloads an 80 MB model/)).toBeTruthy();
+  });
+});
+
+describe("voice cloning consent", () => {
+  it("cannot start until the consent box is ticked", () => {
+    render(<NewProject options={{ ...options, separation_available: true }} health={health} onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [new File([new Uint8Array(5)], "a.mp4")] } });
+    const submit = screen.getByRole("button", { name: /upload and start/i }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(screen.getByLabelText(/sound like the original speaker/));
+    expect(submit.disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText(/I have the right to imitate/));
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(screen.getByLabelText(/sound like the original speaker/));
+    expect(screen.queryByLabelText(/I have the right to imitate/)).toBeNull();
+  });
+
+  it("is unavailable without the optional packages", () => {
+    render(<NewProject options={options} health={health} onCreated={vi.fn()} />);
+    expect((screen.getByLabelText(/sound like the original speaker/) as HTMLInputElement).disabled).toBe(true);
   });
 });

@@ -43,7 +43,7 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [ ] UI toggle for loudness matching (env var only for now)
 
 ## M3 — Experimental
-- [ ] Voice conversion (OpenVoice V2)
+- [~] Voice conversion (OpenVoice V2, vendored MIT code, optional extra, consent required): speaker-embedding similarity 0.05->0.51 and 0.30->0.44, intelligibility unchanged; naturalness unjudged
 - [~] Dialogue/background separation (Demucs, optional extra) → "background" original-audio mode: speech removed measurably (-94 dB in mix); tested on one clip with music
 - [x] Speaker → voice mapping (done in M2: per-speaker and per-line voices, gender-aware defaults)
 - [x] Batch processing: several videos in one upload, queued and dubbed one after another (UI test; real multi-job queue only tested with a fake worker)

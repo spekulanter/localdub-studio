@@ -399,5 +399,33 @@ class TestSeparateStage:
         monkeypatch.setitem(sys.modules, "torch", None)  # simulate a missing optional package
         s = settings.model_copy(update={"original_audio": "background"})
         pipe = Pipeline(video_path, tmp_path / "wd2", s, providers=providers)
-        with pytest.raises(PipelineError, match="uv sync --extra separation"):
+        with pytest.raises(PipelineError, match="uv sync --extra experimental"):
+            pipe.run()
+
+
+class TestConvertStage:
+    """Voice cloning is off by default: `convert` just copies the TTS output to voiced.json."""
+
+    def test_disabled_copies_segments_and_assemble_uses_them(
+        self, video_path, tmp_path, settings, providers
+    ):
+        pipe = Pipeline(video_path, tmp_path / "wd", settings, providers=providers)
+        result = pipe.run()
+        assert result["convert"] == "ran"
+        tts = json.loads((pipe.wd / "tts.json").read_text("utf-8"))["segments"]
+        voiced = json.loads((pipe.wd / "voiced.json").read_text("utf-8"))["segments"]
+        assert [s["audio_path"] for s in tts] == [s["audio_path"] for s in voiced]
+        assert not (pipe.wd / "tts" / "converted").exists()
+
+    def test_cloning_without_torch_fails_with_install_hint(
+        self, video_path, tmp_path, settings, providers, monkeypatch
+    ):
+        import sys
+
+        from localdub.pipeline import PipelineError
+
+        monkeypatch.setitem(sys.modules, "torch", None)
+        s = settings.model_copy(update={"voice_cloning_enabled": True})
+        pipe = Pipeline(video_path, tmp_path / "wd2", s, providers=providers)
+        with pytest.raises(PipelineError, match="uv sync --extra experimental"):
             pipe.run()

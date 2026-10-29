@@ -8,6 +8,8 @@ export interface Settings {
   original_audio: OriginalAudio;
   keep_original_track: boolean;
   diarize: boolean;
+  clone_voice: boolean;
+  clone_consent: boolean;
   num_speakers: number | null;
 }
 
@@ -78,7 +80,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
         ))}
         {!options.separation_available && (
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Speech removal needs an optional download of about 3 GB: run <code>uv sync --extra separation</code> and restart.
+            Speech removal needs an optional download of about 3 GB: run <code>uv sync --extra experimental</code> and restart.
           </p>
         )}
         {value.original_audio === "background" && options.separation_available && (
@@ -120,6 +122,33 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
               exact speaker count is much more reliable than automatic detection.
             </p>
           </div>
+        )}
+      </div>
+      <div className="text-sm sm:col-span-2">
+        <label className="flex items-center gap-2 py-0.5">
+          <input
+            type="checkbox"
+            checked={value.clone_voice}
+            disabled={!options.separation_available && !value.clone_voice}
+            onChange={(e) => onChange({ ...value, clone_voice: e.target.checked, clone_consent: e.target.checked ? value.clone_consent : false })}
+          />
+          Make the Slovak voice sound like the original speaker{" "}
+          <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">experimental</span>
+        </label>
+        {value.clone_voice && (
+          <div className="ml-6 mt-1 space-y-1">
+            <label className="flex items-start gap-2">
+              <input type="checkbox" className="mt-1" checked={value.clone_consent} onChange={(e) => set("clone_consent", e.target.checked)} />
+              <span>I have the right to imitate the voices in this video (they are my own, or I have the speakers&apos; permission).</span>
+            </label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Runs locally on your GPU. It shifts the timbre of the generated voice towards the speaker; it is not a perfect
+              copy. The finished file is marked as AI-generated.
+            </p>
+          </div>
+        )}
+        {!options.separation_available && (
+          <p className="ml-6 text-xs text-slate-500 dark:text-slate-400">Needs the optional download: <code>uv sync --extra experimental</code>.</p>
         )}
       </div>
     </fieldset>

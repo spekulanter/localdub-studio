@@ -165,3 +165,19 @@ def test_unknown_ids_are_404(client: TestClient):
     assert client.get("/api/jobs/99").status_code == 404
     assert client.post("/api/jobs/99/cancel").status_code == 404
     assert client.get("/api/jobs/99/events").status_code == 404
+
+
+def test_voice_cloning_requires_explicit_consent(client: TestClient, sample_mp4: Path):
+    r = upload(client, sample_mp4, clone_voice="true")
+    assert r.status_code == 422 and "confirmation" in r.json()["detail"]
+    assert client.get("/api/projects").json() == []
+    ok = upload(client, sample_mp4, clone_voice="true", clone_consent="true", start="false")
+    assert ok.status_code == 201 and ok.json()["clone_voice"] is True
+    pid = ok.json()["id"]
+    assert (
+        client.patch(f"/api/projects/{pid}", json={"clone_voice": False}).json()["clone_voice"]
+        is False
+    )
+    assert client.patch(f"/api/projects/{pid}", json={"clone_voice": True}).status_code == 422
+    done = client.patch(f"/api/projects/{pid}", json={"clone_voice": True, "clone_consent": True})
+    assert done.status_code == 200 and done.json()["clone_voice"] is True

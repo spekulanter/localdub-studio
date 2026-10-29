@@ -173,4 +173,16 @@ measured on the samples in docs/QUALITY.md.
 | `htdemucs` weights (about 80 MB, safetensors) | Hugging Face `adefossez/HTDemucs`, `main` branch, fetched by `demucs.pretrained` (revision **not pinned**, no checksum check by us) | MIT per the Demucs repository; **the weights' licence on that model card was not checked** | UNVERIFIED |
 | PyTorch 2.9.1 + CUDA 12.8 | download.pytorch.org/whl/cu128 | BSD-3-Clause-style (PyTorch) | NVIDIA CUDA runtime libraries inside the wheels are under NVIDIA's licence; check before redistributing an installer |
 
-Installed only by `uv sync --extra separation` (about 3 GB). Weights go to the Hugging Face cache (`~/.cache/huggingface`).
+Installed only by `uv sync --extra experimental` (about 3 GB). Weights go to the Hugging Face cache (`~/.cache/huggingface`).
+
+## Voice cloning (optional, experimental, M3)
+| Component | Source | Licence | Status |
+|---|---|---|---|
+| OpenVoice tone-colour converter code | github.com/myshell-ai/OpenVoice at commit `74a1d147…`, vendored in `localdub/vendor/openvoice/` (7 files, license file kept) | MIT, Copyright 2024 MyShell.ai | verified (GitHub licence metadata and the LICENSE file) |
+| OpenVoice V2 converter weights (`checkpoint.pth`, `config.json`) | Hugging Face `myshell-ai/OpenVoiceV2` at revision `f36e7edf…` | MIT (Hugging Face model metadata) | verified from metadata; **the licensing of OpenVoice's training data was not examined** |
+
+The checkpoint is loaded with `torch.load(weights_only=True)`. Same optional install as separation
+(`uv sync --extra experimental`). Voice cloning requires an explicit confirmation in the UI and API
+that the user may imitate the voices; generated MP4s keep the AI-disclosure metadata. Cloning
+people's voices can be illegal or harmful without their consent; this feature is meant for your own
+voice or voices you have permission to use.

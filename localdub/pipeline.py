@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import shutil
 import tempfile
 import time
 from collections.abc import Callable
@@ -46,6 +47,7 @@ STAGES = [
     "translate",
     "tts",
     "separate",
+    "convert",
     "assemble",
     "export",
 ]
@@ -250,6 +252,15 @@ class Pipeline:
                 [self.p("audio_orig.wav")],
                 self._separate,
             ),
+            "convert": (
+                {"enabled": s.voice_cloning_enabled, "tau": s.voice_cloning_tau},
+                [
+                    self.p("tts.json"),
+                    self.p("audio_orig.wav"),
+                    *([self.p("vocals.wav")] if s.original_audio == "background" else []),
+                ],
+                self._convert,
+            ),
             "assemble": (
                 {
                     "duck": [s.duck_db, s.duck_ramp_s],
@@ -264,7 +275,7 @@ class Pipeline:
                     "gap": s.segment_gap_s,
                 },
                 [
-                    self.p("tts.json"),
+                    self.p("voiced.json"),
                     self.p("audio_orig.wav"),
                     *([self.p("background.wav")] if s.original_audio == "background" else []),
                 ],
@@ -545,6 +556,74 @@ class Pipeline:
         src.unlink()
         return [out_bg, out_voc]
 
+    def _convert(self) -> list[Path]:
+        """Optional: make the Slovak clips sound like the original speakers (OpenVoice V2)."""
+        segs = load_segments(self.p("tts.json"))
+        out = self.p("voiced.json")
+        conv_dir = self.p("tts/converted")
+        if not self.s.voice_cloning_enabled:
+            shutil.rmtree(conv_dir, ignore_errors=True)
+            save_segments(out, segs)
+            return [out]
+        from localdub.core.separation.demucs_separator import SeparationUnavailable
+        from localdub.core.voice.openvoice_converter import OpenVoiceConverter
+
+        try:
+            conv = OpenVoiceConverter(self.s.models_dir)
+        except SeparationUnavailable as exc:
+            raise PipelineError("convert", str(exc)) from exc
+        conv_dir.mkdir(parents=True, exist_ok=True)
+        tmp = self.p("tts/convert_tmp")
+        tmp.mkdir(parents=True, exist_ok=True)
+        rate = conv.sample_rate
+
+        def load(path: Path) -> np.ndarray:
+            wav = tmp / "in.wav"
+            self.ff.convert_audio(path, wav, sample_rate=rate)
+            return np.asarray(sf.read(str(wav), dtype="float32")[0], dtype=np.float32)
+
+        try:
+            vocals = self.p("vocals.wav")
+            reference = load(vocals if vocals.is_file() else self.p("audio_orig.wav"))
+            by_speaker: dict[str, list[DialogueSegment]] = {}
+            for seg in segs:
+                if seg.audio_path:
+                    by_speaker.setdefault(seg.speaker_id, []).append(seg)
+            converted = 0
+            for speaker, members in by_speaker.items():
+                # Reference timbre: the speaker's longest original lines, up to 30 s.
+                lines = sorted(members, key=lambda s: s.end - s.start, reverse=True)
+                parts: list[np.ndarray] = []
+                for s in lines:
+                    parts.append(reference[int(s.start * rate) : int(s.end * rate)])
+                    if sum(p.size for p in parts) >= 30 * rate:
+                        break
+                ref = np.concatenate(parts) if parts else np.zeros(0, np.float32)
+                if ref.size < 5 * rate:
+                    log.warning(
+                        "Speaker %s: under 5 s of reference speech, voice kept as is", speaker
+                    )
+                    continue
+                clips = {s.id: load(self.wd / str(s.audio_path)) for s in members}
+                src_se = conv.extract_se(list(clips.values())[:10])
+                tgt_se = conv.extract_se([ref[: 30 * rate]])
+                for s in members:
+                    audio = conv.convert(clips[s.id], src_se, tgt_se, tau=self.s.voice_cloning_tau)
+                    raw = tmp / f"seg_{s.id:04d}.wav"
+                    dst = conv_dir / f"seg_{s.id:04d}.wav"
+                    sf.write(raw, audio, rate, subtype="FLOAT")
+                    self.ff.run(["-i", raw, "-ar", str(self.s.sample_rate), "-ac", "1",
+                                 "-c:a", "pcm_s16le", dst])  # fmt: skip
+                    s.audio_path = str(dst.relative_to(self.wd))
+                    s.audio_duration = round(sf.info(str(dst)).duration, 3)
+                    converted += 1
+            log.info("Voice cloning: %d clips converted", converted)
+        finally:
+            conv.close()
+            shutil.rmtree(tmp, ignore_errors=True)
+        save_segments(out, segs)
+        return [out]
+
     def _dub_loudness_gain(self, dub: np.ndarray, sr: int) -> float:
         """dB to add to the dub so its loudness matches the original audio (0 when disabled)."""
         if not self.s.match_original_loudness:
@@ -582,7 +661,7 @@ class Pipeline:
         return (mix * db_to_gain(gain_db)).astype(np.float32)
 
     def _assemble(self) -> list[Path]:
-        segs = load_segments(self.p("tts.json"))
+        segs = load_segments(self.p("voiced.json"))
         duration = self.info().duration
         sr = self.s.sample_rate
         voiced = [s for s in segs if s.audio_path]

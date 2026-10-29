@@ -24,14 +24,14 @@ accept every prompt).
 | Speech recognition model (faster-whisper large-v3) and Slovak voice (Supertonic 3) | Hugging Face | about 3.4 GB |
 | Translation model `translategemma:4b` | Ollama registry | about 3.3 GB |
 | Optional: speaker detection | GitHub release, SHA-256 verified | 46 MB |
-| Optional: speech removal (PyTorch + Demucs) | PyTorch index, Hugging Face | about 3 GB + 80 MB |
+| Optional: speech removal and voice cloning (PyTorch, Demucs, OpenVoice) | PyTorch index, Hugging Face | about 3 GB + 80 MB |
 
 3. Start **LocalDub Studio** from the Start menu. A console window shows the log and the app opens
    in your browser at <http://127.0.0.1:8765>. Close the console window to quit.
 
 Command-line options of `install.ps1`: `-InstallDir`, `-ModelsDir` (share models with another
 copy), `-Yes`, `-NoShortcuts`, `-SkipModels`, `-SkipOllamaModel`, `-SkipPrerequisites`,
-`-WithDiarization`, `-WithSeparation`.
+`-WithDiarization`, `-WithExperimental`.
 
 ## Where things are
 Default install folder: `%LOCALAPPDATA%\Programs\LocalDub Studio`. Your projects and results are in

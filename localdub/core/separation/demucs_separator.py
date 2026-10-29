@@ -1,6 +1,6 @@
 """Dialogue/background separation with Demucs (htdemucs). Experimental, optional, needs PyTorch.
 
-Install with `uv sync --extra separation`. The model weights (about 80 MB, safetensors) are
+Install with `uv sync --extra experimental`. The model weights (about 80 MB, safetensors) are
 downloaded on first use from the Hugging Face repository `adefossez/HTDemucs` (the `main` branch:
 the revision is not pinned by Demucs 4.1.0). Code is MIT-licensed (facebookresearch/demucs).
 """
@@ -43,7 +43,7 @@ class DemucsSeparator:
         except ImportError as exc:
             raise SeparationUnavailable(
                 "Dialogue separation needs the optional PyTorch packages. "
-                "Install them with: uv sync --extra separation"
+                "Install them with: uv sync --extra experimental"
             ) from exc
         self._torch = torch
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")

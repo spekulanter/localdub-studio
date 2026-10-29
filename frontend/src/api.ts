@@ -1,5 +1,5 @@
 export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
-export type Stage = "probe" | "extract" | "asr" | "diarize" | "translate" | "tts" | "separate" | "assemble" | "export";
+export type Stage = "probe" | "extract" | "asr" | "diarize" | "translate" | "tts" | "separate" | "convert" | "assemble" | "export";
 export type OriginalAudio = "duck" | "mute" | "background";
 
 export interface Job {
@@ -28,6 +28,7 @@ export interface Project {
   original_audio: OriginalAudio;
   keep_original_track: boolean;
   diarize: boolean;
+  clone_voice: boolean;
   num_speakers: number | null;
   created_at: number;
   latest_job: Job | null;
@@ -130,7 +131,7 @@ export const api = {
   project: (id: number) => request<Project>(`/api/projects/${id}`),
   createProject: (form: FormData) =>
     request<Project>("/api/projects", { method: "POST", body: form }),
-  patchProject: (id: number, patch: Partial<Pick<Project, "name" | "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers">>) =>
+  patchProject: (id: number, patch: Partial<Pick<Project, "name" | "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers" | "clone_voice">> & { clone_consent?: boolean }) =>
     request<Project>(`/api/projects/${id}`, json("PATCH", patch)),
   deleteProject: (id: number) => request<void>(`/api/projects/${id}`, { method: "DELETE" }),
   startJob: (projectId: number, fromStage?: Stage) =>

@@ -20,6 +20,8 @@ export function NewProject({ options, health, onCreated }: Props) {
     original_audio: "duck",
     keep_original_track: true,
     diarize: false,
+    clone_voice: false,
+    clone_consent: false,
     num_speakers: null,
   });
   const [busy, setBusy] = useState(false);
@@ -47,6 +49,8 @@ export function NewProject({ options, health, onCreated }: Props) {
       form.set("original_audio", settings.original_audio);
       form.set("keep_original_track", String(settings.keep_original_track));
       form.set("diarize", String(settings.diarize));
+      form.set("clone_voice", String(settings.clone_voice));
+      form.set("clone_consent", String(settings.clone_consent));
       if (settings.diarize && settings.num_speakers) form.set("num_speakers", String(settings.num_speakers));
       try {
         const created = await api.createProject(form);
@@ -118,7 +122,7 @@ export function NewProject({ options, health, onCreated }: Props) {
         </p>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={files.length === 0 || tooBig.length > 0 || busy} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        <button type="submit" disabled={files.length === 0 || tooBig.length > 0 || busy || (settings.clone_voice && !settings.clone_consent)} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
           {busy ? (progress ?? "Uploading…") : files.length > 1 ? `Upload and dub ${files.length} videos` : "Upload and start dubbing"}
         </button>
         <span className="text-xs text-slate-500">The video is copied into this app's local data folder and never leaves your computer.</span>

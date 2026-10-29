@@ -24,9 +24,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Optional, experimental: dialogue/background separation (and voice conversion). PyTorch is large
-# (about 3 GB with CUDA), so it is not part of the default install: `uv sync --extra separation`.
-separation = [
+# Optional, experimental: dialogue/background separation and voice conversion. PyTorch is large
+# (about 3 GB with CUDA), so it is not part of the default install: `uv sync --extra experimental`.
+experimental = [
     "demucs==4.1.0",
     "torch==2.9.1",
 ]
@@ -47,7 +47,7 @@ localdub = "localdub.cli:main"
 environments = ["sys_platform == 'win32'"]
 
 [tool.uv.sources]
-torch = [{ index = "pytorch-cu128", extra = "separation", marker = "sys_platform == 'win32'" }]
+torch = [{ index = "pytorch-cu128", extra = "experimental", marker = "sys_platform == 'win32'" }]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
@@ -71,12 +71,14 @@ markers = [
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["localdub/vendor"]
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S603", "S604"]
 
 [tool.mypy]
+exclude = ["localdub/vendor/"]
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true

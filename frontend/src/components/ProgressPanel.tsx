@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type Job, type Stage } from "../api";
 import { STAGE_LABELS, statusLabel } from "../lib/format";
 
-const ORDER: Stage[] = ["probe", "extract", "asr", "diarize", "translate", "tts", "separate", "assemble", "export"];
+const ORDER: Stage[] = ["probe", "extract", "asr", "diarize", "translate", "tts", "separate", "convert", "assemble", "export"];
 
 interface Props {
   job: Job;

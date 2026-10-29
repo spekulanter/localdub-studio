@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS projects (
     original_audio TEXT NOT NULL DEFAULT 'duck',
     keep_original_track INTEGER NOT NULL DEFAULT 1,
     diarize INTEGER NOT NULL DEFAULT 0,
+    clone_voice INTEGER NOT NULL DEFAULT 0,
     num_speakers INTEGER,
     created_at REAL NOT NULL
 );
@@ -46,7 +47,11 @@ CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS jobs_project ON jobs(project_id);
 """
 
-MIGRATIONS = {"diarize": "INTEGER NOT NULL DEFAULT 0", "num_speakers": "INTEGER"}
+MIGRATIONS = {
+    "diarize": "INTEGER NOT NULL DEFAULT 0",
+    "num_speakers": "INTEGER",
+    "clone_voice": "INTEGER NOT NULL DEFAULT 0",
+}
 ACTIVE = ("queued", "running")
 TERMINAL = ("done", "failed", "cancelled")
 Row = dict[str, Any]
