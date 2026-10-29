@@ -13,7 +13,7 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 75
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -56,9 +56,22 @@ jobs:
           $setup = Get-ChildItem release -Filter 'LocalDub-Studio-*-Setup.exe' | Select-Object -First 1
           if (-not $setup) { throw 'The installer was not built' }
           $dir = 'C:\LDTest'
-          $p = Start-Process -FilePath $setup.FullName -Wait -PassThru -ArgumentList @(
+          # Tasks "models" and "ollamamodel" would download several GB: switch them off explicitly.
+          $p = Start-Process -FilePath $setup.FullName -PassThru -ArgumentList @(
             '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$dir",
-            '/COMPONENTS=core', '/TASKS=', '/LOG=C:\ld-setup.log')
+            '/COMPONENTS=core', '/TASKS=!models,!ollamamodel,!desktopicon', '/LOG=C:\ld-setup.log')
+          $deadline = (Get-Date).AddMinutes(20)
+          while (-not $p.HasExited -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 30
+            Write-Host "[$(Get-Date -Format T)] installer still running; install.log tail:"
+            if (Test-Path "$dir\install.log") { Get-Content "$dir\install.log" -Tail 3 }
+          }
+          if (-not $p.HasExited) {
+            Get-Content C:\ld-setup.log -Tail 40 -ErrorAction SilentlyContinue
+            Get-Process | Where-Object { $_.Name -match 'uv|python|cmd|winget' } | Format-Table Name, Id, StartTime
+            Stop-Process -Id $p.Id -Force
+            throw 'The installer did not finish within 20 minutes'
+          }
           Get-Content C:\ld-setup.log -Tail 30
           if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
           foreach ($f in '.venv\Scripts\localdub-app.exe', '.venv\Scripts\python.exe', 'frontend\dist\index.html', 'tools\uv.exe', 'docs\LICENSES.md') {
