@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     segment_max_s: float = 8.0
     segment_max_gap_s: float = 0.6
 
+    # Speaker diarization (optional, experimental). Threshold is used when the count is unknown.
+    diarization_enabled: bool = False
+    diarization_num_speakers: int | None = None
+    diarization_threshold: float = 0.85
+
     # Translation (Ollama is local-only; the URL must point at a local server by default)
     ollama_url: str = "http://127.0.0.1:11434"
     translation_model: str = "translategemma:4b"

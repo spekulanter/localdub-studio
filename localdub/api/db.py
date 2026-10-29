@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS projects (
     llm_model TEXT NOT NULL,
     original_audio TEXT NOT NULL DEFAULT 'duck',
     keep_original_track INTEGER NOT NULL DEFAULT 1,
+    diarize INTEGER NOT NULL DEFAULT 0,
+    num_speakers INTEGER,
     created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS jobs (
@@ -44,6 +46,7 @@ CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS jobs_project ON jobs(project_id);
 """
 
+MIGRATIONS = {"diarize": "INTEGER NOT NULL DEFAULT 0", "num_speakers": "INTEGER"}
 ACTIVE = ("queued", "running")
 TERMINAL = ("done", "failed", "cancelled")
 Row = dict[str, Any]
@@ -56,6 +59,11 @@ class Database:
         self._lock = threading.RLock()
         with self.tx() as c:
             c.executescript(SCHEMA)
+            # Databases created by an earlier version lack the newer columns.
+            have = {r["name"] for r in c.execute("PRAGMA table_info(projects)")}
+            for col, ddl in MIGRATIONS.items():
+                if col not in have:
+                    c.execute(f"ALTER TABLE projects ADD COLUMN {col} {ddl}")
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:

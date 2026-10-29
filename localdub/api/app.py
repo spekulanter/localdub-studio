@@ -27,6 +27,7 @@ from pydantic import BaseModel
 from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
+from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.media.ffmpeg import FFmpeg, MediaError
 from localdub.core.timeline.edits import (
     SegmentEdit,
@@ -39,14 +40,14 @@ from localdub.core.timeline.edits import (
 from localdub.core.timeline.fit import available_windows
 from localdub.core.timeline.models import DialogueSegment, ReviewStatus
 from localdub.core.translation.prompts import normalize_punctuation
+from localdub.core.tts.base import VOICES, default_speaker_voices
 from localdub.pipeline import STAGES, default_providers
 
 log = logging.getLogger(__name__)
 
 ALLOWED_SUFFIXES = {".mp4", ".m4v", ".mov", ".mkv"}
-VOICES = [f"F{i}" for i in range(1, 6)] + [f"M{i}" for i in range(1, 6)]
 SOURCE_LANGS = {"en": "English", "auto": "Auto-detect"}
-SEGMENT_FILES = ["segments.json", "tts.json", "translation.json", "asr.json"]
+SEGMENT_FILES = ["segments.json", "tts.json", "translation.json", "dialogue.json", "asr.json"]
 _BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
@@ -60,6 +61,8 @@ class ProjectOut(BaseModel):
     llm_model: str
     original_audio: Literal["duck", "mute"]
     keep_original_track: bool
+    diarize: bool = False
+    num_speakers: int | None = None
     created_at: float
     latest_job: dict[str, Any] | None = None
     has_output: bool = False
@@ -71,11 +74,14 @@ class ProjectPatch(BaseModel):
     llm_model: str | None = None
     original_audio: Literal["duck", "mute"] | None = None
     keep_original_track: bool | None = None
+    diarize: bool | None = None
+    num_speakers: int | None = None
 
 
 class JobRequest(BaseModel):
     from_stage: (
-        Literal["probe", "extract", "asr", "translate", "tts", "assemble", "export"] | None
+        Literal["probe", "extract", "asr", "diarize", "translate", "tts", "assemble", "export"]
+        | None
     ) = None
 
 
@@ -202,6 +208,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         llm_model: Annotated[str, Form()] = "",
         original_audio: Annotated[Literal["duck", "mute"], Form()] = "duck",
         keep_original_track: Annotated[bool, Form()] = True,
+        diarize: Annotated[bool, Form()] = False,
+        num_speakers: Annotated[int | None, Form(ge=1, le=10)] = None,
         start: Annotated[bool, Form()] = True,
     ) -> ProjectOut:
         filename = safe_filename(file.filename or "video.mp4")
@@ -225,6 +233,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             llm_model=llm_model.strip() or settings.translation_model,
             original_audio=original_audio,
             keep_original_track=int(keep_original_track),
+            diarize=int(diarize),
+            num_speakers=num_speakers,
         )
         pdir = project_dir(pid)
         dest = pdir / "input" / filename
@@ -268,10 +278,15 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         if db.active_job(pid):
             raise HTTPException(409, "Cannot change settings while a job is queued or running")
         fields = patch.model_dump(exclude_none=True)
+        if "num_speakers" in patch.model_fields_set:
+            fields["num_speakers"] = patch.num_speakers  # null = detect automatically
         if "voice" in fields and fields["voice"] not in VOICES:
             raise HTTPException(422, f"Unknown voice '{fields['voice']}'")
-        if "keep_original_track" in fields:
-            fields["keep_original_track"] = int(fields["keep_original_track"])
+        for flag in ("keep_original_track", "diarize"):
+            if flag in fields:
+                fields[flag] = int(fields[flag])
+        if fields.get("num_speakers") is not None and not 1 <= fields["num_speakers"] <= 10:
+            raise HTTPException(422, "num_speakers must be between 1 and 10")
         if fields:
             db.update_project(pid, **fields)
         return project_out(require_project(pid))
@@ -368,12 +383,24 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         stage, segs = base_segments(pid)
         edits = load_edits(wd / "edits.json")
         report = apply_edits(segs, edits)
+        project = db.get_project(pid)
+        speakers = list(dict.fromkeys(x.speaker_id for x in segs))
+        defaults = default_speaker_voices(
+            speakers,
+            project["voice"] if project else "F1",
+            load_speaker_genders(wd / "diarization.json"),
+        )
         tts_json = wd / "tts.json"
         pending = (
             tts_json.is_file()
             and (wd / "edits.json").is_file()
             and (wd / "edits.json").stat().st_mtime > tts_json.stat().st_mtime
         )
+
+        def own_voice(seg_id: int) -> str | None:
+            e = edits.segments.get(seg_id)
+            return e.voice_id if e and seg_id in report["applied"] else None
+
         rows = []
         for seg in segs:
             clip = wd / seg.audio_path if seg.audio_path else None
@@ -386,7 +413,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
                     "translated_text": seg.translated_text,
                     "fit_status": seg.fit_status.value if stage in ("tts", "segments") else None,
                     "speaker_id": seg.speaker_id,
-                    "voice_id": seg.voice_id,
+                    "voice_id": own_voice(seg.id),
+                    "effective_voice": seg.voice_id or defaults.get(seg.speaker_id),
                     "review_status": seg.review_status.value,
                     "edited": seg.id in report["applied"],
                     "stale_edit": seg.id in report["stale"],
@@ -398,6 +426,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             "segments": rows,
             "edits_pending": pending,
             "speaker_voices": edits.speaker_voices,
+            "speaker_defaults": defaults,
+            "speaker_gender_estimate": load_speaker_genders(wd / "diarization.json"),
         }
 
     def require_editable(pid: int) -> tuple[Path, list[DialogueSegment]]:

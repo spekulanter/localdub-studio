@@ -37,7 +37,7 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Per-segment audio preview (rendered clip + try-unsaved-text); only changed segments are re-synthesised (clip cache; 1 edited line = 4.4 s)
 - [x] Manual timing adjustment (start/end, overlap and range validation)
 - [x] Voice per segment and per speaker (speaker→voice map)
-- [ ] Optional diarization (WhisperX + pyannote; PyTorch cu128+)
+- [~] Optional diarization: sherpa-onnx (pyannote segmentation + 3D-Speaker, CPU, no PyTorch) instead of WhisperX; 10/10 on a synthetic 3-voice dialogue, real recordings unverified (docs/QUALITY.md)
 - [x] Original audio: duck (default) or mute, optional drop of the original track (M0, CLI/env)
 - [ ] Mixing: loudness normalization (EBU R128), smarter ducking; UI toggle in M1 settings
 

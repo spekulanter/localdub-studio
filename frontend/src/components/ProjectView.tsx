@@ -19,6 +19,8 @@ const toSettings = (p: Project): Settings => ({
   llm_model: p.llm_model,
   original_audio: p.original_audio,
   keep_original_track: p.keep_original_track,
+  diarize: p.diarize,
+  num_speakers: p.num_speakers,
 });
 
 export function ProjectView({ projectId, options, health, onChanged, onDeleted }: Props) {
@@ -189,6 +191,8 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted }
                     llm_model: draft.llm_model,
                     original_audio: draft.original_audio,
                     keep_original_track: draft.keep_original_track,
+                    diarize: draft.diarize,
+                    num_speakers: draft.num_speakers,
                   });
                   await api.startJob(projectId, stage);
                 })

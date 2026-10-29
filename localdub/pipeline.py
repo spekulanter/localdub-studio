@@ -23,6 +23,8 @@ from localdub.core.asr.base import ASRProvider
 from localdub.core.asr.segmentation import group_words
 from localdub.core.audio.assemble import build_timeline, normalize_rms, trim_silence
 from localdub.core.audio.mix import voice_over_mix
+from localdub.core.diarize.base import Diarizer
+from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.export.srt import write_srt
 from localdub.core.jobs.checkpoints import CheckpointStore, atomic_write_json, fingerprint
 from localdub.core.media.ffmpeg import FFmpeg, MediaError, MediaInfo
@@ -31,11 +33,11 @@ from localdub.core.timeline.fit import available_windows, decide, place
 from localdub.core.timeline.models import DialogueSegment, FitStatus, Transcript
 from localdub.core.translation.base import TranslationProvider
 from localdub.core.translation.prompts import normalize_punctuation
-from localdub.core.tts.base import TTSProvider
+from localdub.core.tts.base import TTSProvider, default_speaker_voices
 
 log = logging.getLogger(__name__)
 
-STAGES = ["probe", "extract", "asr", "translate", "tts", "assemble", "export"]
+STAGES = ["probe", "extract", "asr", "diarize", "translate", "tts", "assemble", "export"]
 
 ProgressFn = Callable[[str, str], None]
 
@@ -53,6 +55,7 @@ class Providers:
     asr: Callable[[], ASRProvider]
     translator: Callable[[], TranslationProvider]
     tts: Callable[[], TTSProvider]
+    diarizer: Callable[[], Diarizer] | None = None  # None -> sherpa-onnx (built when needed)
 
 
 def default_providers(settings: Settings) -> Providers:
@@ -200,6 +203,15 @@ class Pipeline:
                 [self.p("audio_16k.wav")],
                 self._asr,
             ),
+            "diarize": (
+                {
+                    "enabled": s.diarization_enabled,
+                    "speakers": s.diarization_num_speakers,
+                    "threshold": s.diarization_threshold,
+                },
+                [self.p("audio_16k.wav"), self.p("asr.json")],
+                self._diarize,
+            ),
             "translate": (
                 {
                     "model": s.translation_model,
@@ -207,7 +219,7 @@ class Pipeline:
                     "ctx": [s.translation_context_before, s.translation_context_after],
                     "cps": s.chars_per_second,
                 },
-                [self.p("asr.json")],
+                [self.p("dialogue.json")],
                 self._translate,
             ),
             "tts": (
@@ -288,9 +300,53 @@ class Pipeline:
         log.info("ASR: %d words -> %d segments (%s)", len(res.words), len(segs), res.engine)
         return [out]
 
-    def _translate(self) -> list[Path]:
+    def _make_diarizer(self) -> Diarizer:
+        if self.providers.diarizer is not None:
+            return self.providers.diarizer()
+        from localdub.core.diarize.sherpa_diarizer import SherpaDiarizer
+
+        return SherpaDiarizer(
+            self.s.models_dir,
+            num_speakers=self.s.diarization_num_speakers,
+            threshold=self.s.diarization_threshold,
+            threads=self.s.tts_threads or 4,
+        )
+
+    def _diarize(self) -> list[Path]:
+        """Optional: label speakers and split segments at speaker changes -> dialogue.json."""
         segs = load_segments(self.p("asr.json"))
-        src = self.source_lang or json.loads(self.p("asr.json").read_text("utf-8"))["language"]
+        asr = json.loads(self.p("asr.json").read_text("utf-8"))
+        out = self.p("dialogue.json")
+        if not self.s.diarization_enabled:
+            self.p("diarization.json").unlink(missing_ok=True)
+            save_segments(out, segs, language=asr["language"])
+            return [out]
+        from localdub.core.diarize.assign import assign_speakers
+
+        diarizer = self._make_diarizer()
+        try:
+            turns = diarizer.diarize(self.p("audio_16k.wav"))
+        finally:
+            diarizer.close()
+        from localdub.core.diarize.pitch import estimate_speaker_f0
+
+        samples, sr = sf.read(str(self.p("audio_16k.wav")), dtype="float32")
+        atomic_write_json(
+            self.p("diarization.json"),
+            {
+                "turns": [{"start": t.start, "end": t.end, "speaker": t.speaker} for t in turns],
+                "speaker_f0": estimate_speaker_f0(samples, sr, turns),
+            },
+        )
+        split = assign_speakers(segs, turns)
+        save_segments(out, split, language=asr["language"])
+        speakers = sorted({s.speaker_id for s in split})
+        log.info("Diarize: %d segments -> %d, speakers %s", len(segs), len(split), speakers)
+        return [out, self.p("diarization.json")]
+
+    def _translate(self) -> list[Path]:
+        segs = load_segments(self.p("dialogue.json"))
+        src = self.source_lang or json.loads(self.p("dialogue.json").read_text("utf-8"))["language"]
         tr = self.providers.translator()
         try:
             texts = tr.translate_segments(segs, src, self.target_lang)
@@ -320,7 +376,12 @@ class Pipeline:
 
     def _tts(self) -> list[Path]:
         segs = load_segments(self.p("translation.json"))
-        report = apply_edits(segs, load_edits(self.p("edits.json")))
+        edits = load_edits(self.p("edits.json"))
+        speakers = list(dict.fromkeys(s.speaker_id for s in segs))
+        genders = load_speaker_genders(self.p("diarization.json"))
+        for sp, v in default_speaker_voices(speakers, self.voice, genders).items():
+            edits.speaker_voices.setdefault(sp, v)
+        report = apply_edits(segs, edits)
         if report["stale"]:
             log.warning(
                 "Ignoring edits for segments whose source text changed: %s", report["stale"]

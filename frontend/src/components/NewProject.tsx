@@ -18,6 +18,8 @@ export function NewProject({ options, health, onCreated }: Props) {
     llm_model: options.default_llm,
     original_audio: "duck",
     keep_original_track: true,
+    diarize: false,
+    num_speakers: null,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +40,8 @@ export function NewProject({ options, health, onCreated }: Props) {
     form.set("llm_model", settings.llm_model);
     form.set("original_audio", settings.original_audio);
     form.set("keep_original_track", String(settings.keep_original_track));
+    form.set("diarize", String(settings.diarize));
+    if (settings.diarize && settings.num_speakers) form.set("num_speakers", String(settings.num_speakers));
     try {
       onCreated(await api.createProject(form));
     } catch (err) {

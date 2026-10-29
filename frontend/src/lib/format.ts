@@ -11,6 +11,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
   probe: "Inspecting video",
   extract: "Extracting audio",
   asr: "Recognising speech",
+  diarize: "Identifying speakers",
   translate: "Translating to Slovak",
   tts: "Generating Slovak voice",
   assemble: "Mixing audio",
@@ -45,10 +46,10 @@ export function isActive(job: Job | null): boolean {
  * Earliest pipeline stage that must run again after changing project settings, or null if
  * nothing that affects the output changed.
  */
-export function restartStage(
-  before: Pick<Project, "voice" | "llm_model" | "original_audio" | "keep_original_track">,
-  after: Pick<Project, "voice" | "llm_model" | "original_audio" | "keep_original_track">,
-): Stage | null {
+type Tunable = Pick<Project, "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers">;
+
+export function restartStage(before: Tunable, after: Tunable): Stage | null {
+  if (before.diarize !== after.diarize || (after.diarize && before.num_speakers !== after.num_speakers)) return "diarize";
   if (before.llm_model !== after.llm_model) return "translate";
   if (before.voice !== after.voice) return "tts";
   if (before.original_audio !== after.original_audio) return "assemble";

@@ -28,8 +28,9 @@ STAGE_WEIGHTS = {
     "probe": 0.01,
     "extract": 0.02,
     "asr": 0.2,
+    "diarize": 0.04,
     "translate": 0.15,
-    "tts": 0.5,
+    "tts": 0.46,
     "assemble": 0.04,
     "export": 0.08,
 }
@@ -59,6 +60,9 @@ def project_settings(base: Settings, project: dict[str, object]) -> Settings:
     s.translation_model = str(project["llm_model"])
     s.original_audio = "mute" if project["original_audio"] == "mute" else "duck"
     s.keep_original_track = bool(project["keep_original_track"])
+    s.diarization_enabled = bool(project["diarize"])
+    num = project["num_speakers"]
+    s.diarization_num_speakers = int(num) if isinstance(num, int) and num > 0 else None
     return s
 
 

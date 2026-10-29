@@ -7,6 +7,8 @@ export interface Settings {
   llm_model: string;
   original_audio: OriginalAudio;
   keep_original_track: boolean;
+  diarize: boolean;
+  num_speakers: number | null;
 }
 
 interface Props {
@@ -73,6 +75,31 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Muting also removes music and sound effects from the dubbed track.
           </p>
+        )}
+      </div>
+      <div className="text-sm sm:col-span-2">
+        <label className="flex items-center gap-2 py-0.5">
+          <input type="checkbox" checked={value.diarize} onChange={(e) => set("diarize", e.target.checked)} />
+          Detect different speakers and give each its own voice <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">experimental</span>
+        </label>
+        {value.diarize && (
+          <div className="ml-6 mt-1 space-y-1">
+            <label className="flex items-center gap-2">
+              Number of speakers (leave empty to detect)
+              <input
+                type="number"
+                min={1}
+                max={10}
+                className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
+                value={value.num_speakers ?? ""}
+                onChange={(e) => set("num_speakers", e.target.value === "" ? null : Number(e.target.value))}
+              />
+            </label>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Runs on the CPU. The first use downloads two small model files (about 46 MB) from GitHub. Giving the
+              exact speaker count is much more reliable than automatic detection.
+            </p>
+          </div>
         )}
       </div>
     </fieldset>

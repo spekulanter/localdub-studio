@@ -136,3 +136,25 @@ covered by component tests only.
 Also fixed after reading the 5.7-min dialogue: slash gender forms from the LLM ("stretol/a",
 "rád/a") are now reduced to the masculine form before TTS. The speaker's gender is still guessed;
 a per-project "speaker gender" option is a candidate for M2.
+
+## M2 editing and diarization (2026-10-29)
+**Editing (verified):** editing one line of a 10-line project and re-rendering took 4.4 s (9 clips
+reused from the cache, 1 synthesised); verify PASS afterwards (similarity 1.000). An edit made for a
+sentence whose recognised English later changes is ignored and flagged, never applied to the wrong
+line. Editing is blocked while a job runs.
+
+**Diarization (experimental, opt-in):** sherpa-onnx, CPU, about 0.4x real time (21 s for 50 s of
+audio) plus a 10-14 s model load.
+- Synthetic 3-voice English dialogue (Supertonic M1/F1/M2, 10 lines, exact ground truth, full
+  pipeline via the API): **10 of 10 lines attributed to the right speaker** with the count given
+  (3). Without the count, the default threshold 0.5 found 6-7 speakers; 0.8-0.9 found 3-4. The
+  default is now 0.85 and the UI asks for the speaker count; results varied slightly between runs
+  because the synthetic audio differs on every run.
+- Voice gender from median pitch (heuristic): the three synthetic speakers were classified
+  correctly (126 Hz, 184 Hz, 97 Hz -> M, F, M), and default voices follow it.
+- **Real recordings: not verified.** The only two-person-looking clip (role play) gave a single
+  speaker when told to find two and two speakers when told to find three, and its pitch difference
+  between the two groups was small (184 vs 213 Hz). I do not know its ground truth, so I cannot say
+  whether the split is right. Treat diarization as experimental until tested on real multi-speaker
+  video with a known speaker count.
+- Synthetic TTS voices are far more distinct than real people, so 10/10 is an upper bound.

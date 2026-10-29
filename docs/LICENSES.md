@@ -151,3 +151,17 @@ The following uses are **prohibited** under the OpenRAIL-M license for the Super
 | OpenRAIL-M (Supertonic 3) | Use-based restrictions must be passed to end users. Compatible with commercial use but with significant content/usage restrictions. |
 | NVIDIA EULA | Proprietary. cuBLAS redistribution is permitted under conditions; cuDNN redistribution status is unclear — verify before shipping. |
 | MIT / BSD / Apache-2.0 components | Permissive. Retain copyright notices and license texts. Apache-2.0 components require preserving NOTICE files. |
+
+
+## Speaker diarization (optional, M2)
+| Component | Source | Licence | Status |
+|---|---|---|---|
+| sherpa-onnx 2.0.1 (inference library) | PyPI, k2-fsa | Apache-2.0 (PyPI metadata) | verified from package metadata |
+| pyannote segmentation 3.0, ONNX conversion | GitHub release `speaker-segmentation-models` (tarball sha256 `24615ee8…6488`) | MIT, Copyright 2022 CNRS (LICENSE file inside the tarball) | verified |
+| 3D-Speaker ERes2Net-base speaker embedding, ONNX | GitHub release `speaker-recongition-models` (sha256 `1a331345…5e4b`) | The 3D-Speaker toolkit is Apache-2.0; **no source states the licence of these weights explicitly** | **UNVERIFIED**: check the ModelScope card before redistributing |
+
+The two model files (about 46 MB) are downloaded only when a project enables diarization, into
+`models/diarization/`, and refused unless their sha256 matches the values pinned in
+`localdub/core/diarize/sherpa_diarizer.py`. The pins were recorded at first download (trust on first
+use). The embedding model was trained on Mandarin speech; its behaviour on other languages is only
+measured on the samples in docs/QUALITY.md.

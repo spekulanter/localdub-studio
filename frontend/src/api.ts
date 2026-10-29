@@ -1,5 +1,5 @@
 export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
-export type Stage = "probe" | "extract" | "asr" | "translate" | "tts" | "assemble" | "export";
+export type Stage = "probe" | "extract" | "asr" | "diarize" | "translate" | "tts" | "assemble" | "export";
 export type OriginalAudio = "duck" | "mute";
 
 export interface Job {
@@ -27,6 +27,8 @@ export interface Project {
   llm_model: string;
   original_audio: OriginalAudio;
   keep_original_track: boolean;
+  diarize: boolean;
+  num_speakers: number | null;
   created_at: number;
   latest_job: Job | null;
   has_output: boolean;
@@ -58,6 +60,7 @@ export interface SegmentRow {
   fit_status: string | null;
   speaker_id: string;
   voice_id: string | null;
+  effective_voice: string | null;
   review_status: ReviewStatus;
   edited: boolean;
   stale_edit: boolean;
@@ -69,6 +72,8 @@ export interface SegmentsResponse {
   segments: SegmentRow[];
   edits_pending: boolean;
   speaker_voices: Record<string, string>;
+  speaker_defaults: Record<string, string>;
+  speaker_gender_estimate: Record<string, string>;
 }
 
 /** Fields sent in a segment PATCH. A key set to null clears that edit. */
@@ -124,7 +129,7 @@ export const api = {
   project: (id: number) => request<Project>(`/api/projects/${id}`),
   createProject: (form: FormData) =>
     request<Project>("/api/projects", { method: "POST", body: form }),
-  patchProject: (id: number, patch: Partial<Pick<Project, "name" | "voice" | "llm_model" | "original_audio" | "keep_original_track">>) =>
+  patchProject: (id: number, patch: Partial<Pick<Project, "name" | "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers">>) =>
     request<Project>(`/api/projects/${id}`, json("PATCH", patch)),
   deleteProject: (id: number) => request<void>(`/api/projects/${id}`, { method: "DELETE" }),
   startJob: (projectId: number, fromStage?: Stage) =>

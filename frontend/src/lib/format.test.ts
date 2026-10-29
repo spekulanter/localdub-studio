@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Job } from "../api";
 import { formatTime, isActive, restartStage, statusLabel } from "./format";
 
-const base = { voice: "F1", llm_model: "m", original_audio: "duck", keep_original_track: true } as const;
+const base = { voice: "F1", llm_model: "m", original_audio: "duck", keep_original_track: true, diarize: false, num_speakers: null } as const;
 
 describe("formatTime", () => {
   it("formats m:ss", () => {
@@ -19,6 +19,9 @@ describe("restartStage", () => {
     expect(restartStage(base, { ...base, keep_original_track: false })).toBe("export");
     expect(restartStage(base, { ...base, voice: "M1", original_audio: "mute" })).toBe("tts");
     expect(restartStage(base, { ...base, llm_model: "x", voice: "M1" })).toBe("translate");
+    expect(restartStage(base, { ...base, diarize: true, llm_model: "x" })).toBe("diarize");
+    expect(restartStage({ ...base, diarize: true }, { ...base, diarize: true, num_speakers: 3 })).toBe("diarize");
+    expect(restartStage(base, { ...base, num_speakers: 3 })).toBeNull(); // ignored while diarization is off
   });
 });
 

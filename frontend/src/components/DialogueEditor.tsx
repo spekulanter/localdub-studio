@@ -82,7 +82,7 @@ export function DialogueEditor({ projectId, data, options, editable, renderVersi
                     api.setSpeakerVoices(projectId, next).then(onChange).catch((err: unknown) => setError(String(err)));
                   }}
                 >
-                  <option value="">project default</option>
+                  <option value="">auto ({data.speaker_defaults[sp] ?? "project voice"})</option>
                   {options.voices.map((v) => (
                     <option key={v}>{v}</option>
                   ))}
@@ -182,7 +182,7 @@ function Row({ seg, projectId, options, editable, renderVersion, play, onChange,
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <select aria-label={`Voice for line ${seg.id}`} className={input} value={voice} disabled={!editable || working} onChange={(e) => setVoice(e.target.value)}>
-          <option value="">default voice</option>
+          <option value="">{seg.effective_voice ? `default (${seg.effective_voice})` : "default voice"}</option>
           {options.voices.map((v) => (
             <option key={v}>{v}</option>
           ))}

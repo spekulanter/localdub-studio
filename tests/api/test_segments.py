@@ -159,7 +159,8 @@ def test_speaker_voices(client: TestClient, project: dict):
         f"/api/projects/{project['id']}/speakers", json={"voices": {"S2": "M4"}}
     ).json()
     assert got["speaker_voices"] == {"S2": "M4"}
-    assert got["segments"][0]["voice_id"] == "M4" and got["segments"][1]["voice_id"] is None
+    assert got["segments"][0]["effective_voice"] == "M4" and got["segments"][0]["voice_id"] is None
+    assert got["segments"][1]["effective_voice"] == "F1"  # S1 keeps the project voice
 
 
 def test_editing_blocked_while_job_active(client: TestClient, project: dict):
