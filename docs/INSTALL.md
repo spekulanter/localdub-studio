@@ -14,8 +14,8 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
 1. Run `LocalDub-Studio-<version>-Setup.exe`. It is **not code-signed**, so Windows SmartScreen shows
    "Windows protected your PC": choose *More info → Run anyway*. (Compare the SHA-256 in the
    `.sha256` file with `Get-FileHash` if you want to be sure.)
-2. The wizard asks for the install folder (default `%LOCALAPPDATA%\Programs\LocalDub Studio`, no
-   administrator rights needed), which parts to install, and which downloads to do now:
+2. The wizard asks for administrator rights (it installs into `C:\Program Files\LocalDub Studio`),
+   the install folder, which parts to install, and which downloads to do now:
 
 | Step | Source | Size |
 |---|---|---|
@@ -31,8 +31,9 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
    job is paused and continues the next time you open the program.
 
 ## Where things are
-Projects and results are in the `data` folder of the install folder and the models in `models`;
-both survive an upgrade (run the new setup and keep the same folder). Logs: `data\logs`. The
+The program (with its own Python) is in the install folder, which is read-only for normal users.
+Your projects and results are in `%LOCALAPPDATA%\LocalDub Studio\data` and the models in
+`%LOCALAPPDATA%\LocalDub Studio\models`; both survive an upgrade. Logs: `...\data\logs`. The
 program only listens on `127.0.0.1`.
 
 ## Uninstall

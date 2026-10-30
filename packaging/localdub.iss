@@ -7,6 +7,7 @@
 #define AppName "LocalDub Studio"
 #define AppExe "{app}\.venv\Scripts\localdub-app.exe"
 #define OllamaModel "translategemma:4b"
+#define UserData "{localappdata}\LocalDub Studio"
 
 [Setup]
 AppId={{6E0B8F6E-3B1D-4C52-9E0A-7C6F0B7D4A11}
@@ -14,10 +15,12 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=LocalDub Studio
 AppMutex=LocalDubStudioRunning
-DefaultDirName={localappdata}\Programs\{#AppName}
+DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-PrivilegesRequired=lowest
+; Installs into Program Files. Running elevated also makes the Python junction that uv creates trusted,
+; which Windows' RedirectionGuard requires (a user-created junction fails with error 448).
+PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\release
@@ -60,6 +63,7 @@ Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion; Components: core
 Source: "..\docs\LICENSES.md"; DestDir: "{app}\docs"; Flags: ignoreversion; Components: core
 Source: "..\docs\QUALITY.md"; DestDir: "{app}\docs"; Flags: ignoreversion; Components: core
 Source: "tools\uv.exe"; DestDir: "{app}\tools"; Flags: ignoreversion; Components: core
+Source: "installed.marker"; DestDir: "{app}"; DestName: ".installed"; Flags: ignoreversion; Components: core
 Source: "THIRD-PARTY-uv.txt"; DestDir: "{app}\tools"; Flags: ignoreversion; Components: core
 
 [Icons]
@@ -67,14 +71,16 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; I
 Name: "{autodesktop}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\localdub\assets\localdub.ico"; Tasks: desktopicon
 
 [Run]
-Filename: "{#AppExe}"; WorkingDir: "{app}"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{#AppExe}"; WorkingDir: "{app}"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent runasoriginaluser; Check: AppInstalled
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\.venv"
+Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\localdub"
 Type: filesandordirs; Name: "{app}\frontend"
 Type: filesandordirs; Name: "{app}\tools"
 Type: files; Name: "{app}\install.log"
+Type: files; Name: "{app}\.installed"
 
 [Code]
 var
@@ -90,10 +96,32 @@ begin
     (RegQueryStringValue(HKCU, 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) and (Version <> '') and (Version <> '0.0.0.0'));
 end;
 
-function RunHidden(const CommandLine: String; var ResultCode: Integer): Boolean;
+function UserLog: String;
 begin
-  { cmd /S /C "<command line>" lets the command line contain quoted paths and redirections. }
-  Result := Exec(ExpandConstant('{cmd}'), '/S /C "' + CommandLine + '"', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  { Program Files is read-only for the original (non-elevated) user, so its commands log here. }
+  ForceDirectories(ExpandConstant('{#UserData}'));
+  Result := ExpandConstant('{#UserData}\install-user.log');
+end;
+
+function AppInstalled: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{#AppExe}'));
+end;
+
+function LastLogLines(const Count: Integer): String;
+var
+  Lines: TArrayOfString;
+  I, First: Integer;
+begin
+  Result := '';
+  if LoadStringsFromFile(ExpandConstant('{app}\install.log'), Lines) then
+  begin
+    First := GetArrayLength(Lines) - Count;
+    if First < 0 then
+      First := 0;
+    for I := First to GetArrayLength(Lines) - 1 do
+      Result := Result + Lines[I] + #13#10;
+  end;
 end;
 
 function ToolOnPath(const Name: String): Boolean;
@@ -160,7 +188,8 @@ begin
   begin
     ShowProgress('Installing ' + Title + ' with winget...', 'This can take a minute.');
     try
-      if not Exec(ExpandConstant('{cmd}'), '/S /C "winget install --id ' + Id + ' -e --accept-source-agreements --accept-package-agreements >> "' + ExpandConstant('{app}\install.log') + '" 2>&1"', '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
+      { winget and per-user programs (FFmpeg, Ollama) must be installed as the user, not as the elevated admin. }
+      if not ExecAsOriginalUser(ExpandConstant('{cmd}'), '/S /C "winget install --id ' + Id + ' -e --accept-source-agreements --accept-package-agreements >> "' + UserLog + '" 2>&1"', '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
         Problems := Problems + #13#10 + '- ' + Title + ' could not be installed automatically (see install.log).';
     finally
       HideProgress;
@@ -170,15 +199,29 @@ begin
     Problems := Problems + #13#10 + '- ' + Title + ' still has to be installed.';
 end;
 
-procedure RunStep(const Caption, Detail, CommandLine: String);
+function RunLogged(const CommandLine: String; AsOriginalUser: Boolean; var Code: Integer): Boolean;
+var
+  Full: String;
+begin
+  if AsOriginalUser then
+    Full := '/S /C "' + CommandLine + ' >> "' + UserLog + '" 2>&1"'
+  else
+    Full := '/S /C "' + CommandLine + ' >> "' + ExpandConstant('{app}\install.log') + '" 2>&1"';
+  if AsOriginalUser then
+    Result := ExecAsOriginalUser(ExpandConstant('{cmd}'), Full, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code)
+  else
+    Result := Exec(ExpandConstant('{cmd}'), Full, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
+procedure RunStep(const Caption, Detail, CommandLine: String; AsOriginalUser: Boolean);
 var
   Code: Integer;
 begin
   Log('Step: ' + Caption);
   ShowProgress(Caption, Detail);
   try
-    if not RunHidden(CommandLine + ' >> "' + ExpandConstant('{app}\install.log') + '" 2>&1', Code) or (Code <> 0) then
-      Problems := Problems + #13#10 + '- Step failed: ' + Caption + ' (exit code ' + IntToStr(Code) + ').';
+    if not RunLogged(CommandLine, AsOriginalUser, Code) or (Code <> 0) then
+      Problems := Problems + #13#10 + '- Step failed: ' + Caption + ' (exit code ' + IntToStr(Code) + '). Last lines of install.log:' + #13#10 + LastLogLines(6);
   finally
     HideProgress;
   end;
@@ -200,7 +243,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Uv, Extra, Fetch: String;
+  Uv, Extra, Fetch, EnvPrefix: String;
 begin
   if CurStep = ssDone then
     Log('Setup is done');
@@ -225,32 +268,52 @@ begin
   if WizardIsComponentSelected('diarization') then
     Fetch := Fetch + ' --diarization';
 
-  RunStep('Installing Python 3.12 and the program libraries...', 'About 2.5 GB (6 GB with the experimental features). Python comes from python-build-standalone, libraries from PyPI.',
-    Uv + ' sync --frozen --no-dev' + Extra);
+  { Python lives inside the install folder (not in one user's profile) and models/data in the user's
+    %LOCALAPPDATA%, because Program Files is read-only for normal users. }
+  EnvPrefix := 'set "UV_PYTHON_INSTALL_DIR=' + ExpandConstant('{app}\python') + '" && set "LOCALDUB_MODELS_DIR=' + ExpandConstant('{#UserData}\models') + '" && ';
 
-  if WizardIsTaskSelected('models') then
+  RunStep('Installing Python 3.12 and the program libraries...', 'About 2.5 GB (6 GB with the experimental features). Python comes from python-build-standalone, libraries from PyPI.',
+    EnvPrefix + Uv + ' sync --frozen --no-dev' + Extra, False);
+  if not AppInstalled then
+  begin
+    { A leftover or damaged .venv from an earlier attempt: start again from a clean one. }
+    Log('The program is missing after the first attempt; retrying with a clean environment');
+    DelTree(ExpandConstant('{app}\.venv'), True, True, True);
+    DelTree(ExpandConstant('{app}\python'), True, True, True);
+    RunStep('Installing Python 3.12 and the program libraries (second attempt)...', 'Starting from a clean environment.',
+      EnvPrefix + Uv + ' sync --frozen --no-dev' + Extra, False);
+  end;
+
+  if AppInstalled and WizardIsTaskSelected('models') then
     RunStep('Downloading the speech and voice models...', 'About 3.4 GB from Hugging Face. Optional models are checksum-verified.',
-      Uv + ' run --no-sync localdub fetch-models' + Fetch);
+      EnvPrefix + Uv + ' run --no-sync localdub fetch-models' + Fetch, False);
 
   if WizardIsTaskSelected('ollamamodel') and OllamaPresent then
     RunStep('Downloading the translation model {#OllamaModel}...', 'About 3.3 GB from the Ollama registry.',
-      '"' + OllamaExe + '" pull {#OllamaModel}');
+      '"' + OllamaExe + '" pull {#OllamaModel}', True);
 
+  if not AppInstalled then
+    Problems := Problems + #13#10 + '- LocalDub Studio could not be set up: the program files are missing. See install.log.';
   Log('Post-install finished; problems: [' + Problems + ']');
   if (Problems <> '') and (not WizardSilent) then
     MsgBox('Setup finished, but some steps need attention:' + #13#10 + Problems + #13#10#13#10 + 'Details: ' + ExpandConstant('{app}\install.log') + #13#10 + 'You can repeat a step later; see docs in the install folder.', mbInformation, MB_OK);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Data, Models: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    if DirExists(ExpandConstant('{app}\data')) and (not UninstallSilent) then
-      if MsgBox('Delete your LocalDub Studio projects, videos and results as well?' + #13#10#13#10 + ExpandConstant('{app}\data'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-        DelTree(ExpandConstant('{app}\data'), True, True, True);
-    if DirExists(ExpandConstant('{app}\models')) and (not UninstallSilent) then
-      if MsgBox('Delete the downloaded models (several GB) as well?' + #13#10#13#10 + ExpandConstant('{app}\models'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-        DelTree(ExpandConstant('{app}\models'), True, True, True);
+    Data := ExpandConstant('{#UserData}\data');
+    Models := ExpandConstant('{#UserData}\models');
+    if DirExists(Data) and (not UninstallSilent) then
+      if MsgBox('Delete your LocalDub Studio projects, videos and results as well?' + #13#10#13#10 + Data, mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+        DelTree(Data, True, True, True);
+    if DirExists(Models) and (not UninstallSilent) then
+      if MsgBox('Delete the downloaded models (several GB) as well?' + #13#10#13#10 + Models, mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+        DelTree(Models, True, True, True);
+    RemoveDir(ExpandConstant('{#UserData}'));
     RemoveDir(ExpandConstant('{app}'));
   end;
 end;

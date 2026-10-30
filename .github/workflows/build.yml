@@ -55,11 +55,10 @@ jobs:
         run: |
           $setup = Get-ChildItem release -Filter 'LocalDub-Studio-*-Setup.exe' | Select-Object -First 1
           if (-not $setup) { throw 'The installer was not built' }
-          $dir = 'C:\LDTest'
+          $dir = Join-Path $env:ProgramFiles 'LocalDub Studio'   # the default install folder
           # Tasks "models" and "ollamamodel" would download several GB: switch them off explicitly.
           $p = Start-Process -FilePath $setup.FullName -PassThru -ArgumentList @(
-            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$dir",
-            '/COMPONENTS=core', '/TASKS=!models,!ollamamodel,!desktopicon', '/LOG=C:\ld-setup.log')
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',             '/COMPONENTS=core', '/TASKS=!models,!ollamamodel,!desktopicon', '/LOG=C:\ld-setup.log')
           $deadline = (Get-Date).AddMinutes(20)
           while (-not $p.HasExited -and (Get-Date) -lt $deadline) {
             Start-Sleep -Seconds 30
@@ -74,11 +73,10 @@ jobs:
           }
           Get-Content C:\ld-setup.log -Tail 30
           if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
-          foreach ($f in '.venv\Scripts\localdub-app.exe', '.venv\Scripts\python.exe', 'frontend\dist\index.html', 'tools\uv.exe', 'docs\LICENSES.md') {
+          foreach ($f in '.venv\Scripts\localdub-app.exe', '.venv\Scripts\python.exe', 'python', '.installed', 'frontend\dist\index.html', 'tools\uv.exe', 'docs\LICENSES.md') {
             if (-not (Test-Path (Join-Path $dir $f))) { throw "Missing after install: $f" }
           }
           & "$dir\.venv\Scripts\python.exe" -c "import localdub, fastapi, webview, sherpa_onnx; print('imports ok')"
-          $env:LOCALDUB_DATA_DIR = 'C:\ld-data'
           $srv = Start-Process -FilePath "$dir\.venv\Scripts\localdub.exe" -ArgumentList 'serve' -PassThru -WindowStyle Hidden -WorkingDirectory $dir
           $ok = $false
           for ($i = 0; $i -lt 40 -and -not $ok; $i++) {
@@ -89,10 +87,14 @@ jobs:
           $page = Invoke-WebRequest 'http://127.0.0.1:8765/' -UseBasicParsing
           if ($page.Content -notmatch 'LocalDub Studio') { throw 'The web UI is not served' }
           Stop-Process -Id $srv.Id -Force
+          $userData = Join-Path $env:LOCALAPPDATA 'LocalDub Studio\data'
+          if (-not (Test-Path (Join-Path $userData 'localdub.sqlite'))) { throw "User data is not in $userData" }
+          if (Test-Path (Join-Path $dir 'data')) { throw 'The program wrote user data into its install folder' }
           $u = Start-Process -FilePath "$dir\unins000.exe" -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
           if ($u.ExitCode -ne 0) { throw "Uninstaller exit code $($u.ExitCode)" }
           Start-Sleep -Seconds 3
           if (Test-Path "$dir\.venv") { throw 'The uninstaller left the virtual environment behind' }
+          if (Test-Path "$dir\python") { throw 'The uninstaller left the bundled Python behind' }
           Write-Host 'Install, start and uninstall OK'
 
       - uses: actions/upload-artifact@v4

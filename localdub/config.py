@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -9,6 +10,17 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+# Written by the Windows installer next to the program (usually in Program Files, which a normal
+# user cannot write to): user data then lives in %LOCALAPPDATA% instead of the install folder.
+INSTALLED_MARKER = REPO_ROOT / ".installed"
+
+
+def user_dir(name: str) -> Path:
+    """Where projects (`data`) and downloaded models (`models`) go."""
+    if INSTALLED_MARKER.is_file():
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+        return base / "LocalDub Studio" / name
+    return REPO_ROOT / name
 
 
 class Settings(BaseSettings):
@@ -18,10 +30,10 @@ class Settings(BaseSettings):
     ffmpeg_path: Path | None = None
     ffprobe_path: Path | None = None
 
-    models_dir: Path = REPO_ROOT / "models"
+    models_dir: Path = Field(default_factory=lambda: user_dir("models"))
     work_dir: Path = REPO_ROOT / "work"
     # API server: project database, uploads and per-project work directories.
-    data_dir: Path = REPO_ROOT / "data"
+    data_dir: Path = Field(default_factory=lambda: user_dir("data"))
     api_host: str = "127.0.0.1"  # local only; never bind a public address by default
     api_port: int = 8765
     max_upload_mb: int = 4096
