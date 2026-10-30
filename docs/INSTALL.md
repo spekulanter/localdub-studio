@@ -65,7 +65,8 @@ program only listens on `127.0.0.1`.
 
 ## Uninstall
 *Settings → Apps → LocalDub Studio → Uninstall*. It asks whether to delete your data, the
-downloaded models and the optional packages. FFmpeg and Ollama are left installed.
+downloaded models and the optional packages. The small YouTube tools are removed without asking. FFmpeg and
+Ollama are left installed.
 
 ## Without the wizard
 `LocalDub-Studio-<version>-win64.zip` contains the same program with PowerShell scripts
@@ -77,13 +78,19 @@ downloaded models and the optional packages. FFmpeg and Ollama are left installe
 (`winget install --id JRSoftware.InnoSetup -e`), the wizard `Setup.exe` in `release/`.
 
 ## What has and has not been tested
-**Tested** on the developer's Windows 11 machine (RTX 5060 Laptop): the app window (starts, shows
-the UI, icon in title bar and taskbar, closing it stops the server), the PowerShell installer from
-an unzipped package into a fresh folder (including `-WithExperimental`), a full dubbing job from the
-installed copy, and the uninstall script.
+**Tested automatically on every release build** (GitHub Actions, a clean Windows runner without any GPU, FFmpeg
+or Ollama): the Inno Setup script compiles; the installer is run silently; the program and its own Python are
+there; the server starts and serves the UI; user data lands in `%LOCALAPPDATA%` and nothing is written into
+Program Files; the uninstaller removes the program. The Python (260+) and UI (70+) test suites run first.
 
-**Not tested:** the Inno Setup wizard itself. The script `packaging/localdub.iss` was written, but
-Inno Setup was not installed on the build machine, so it has not been compiled or run; expect to fix
-small errors on the first build. Also untested: a clean Windows without FFmpeg/Ollama (the winget
-prompts), a PC without an NVIDIA GPU, Windows 10, a PC without the WebView2 runtime (the program
-then opens in the browser; that path is coded but not run), and the desktop RTX 5070 Ti.
+**Tested by hand on the developer's Windows 11 PC (RTX 5060 Laptop):** the app window (title-bar and taskbar icon,
+closing it stops the server), a full dubbing job from the installed copy, in-app installation of the PyTorch
+packages as a normal user, a real YouTube download and dub, and real-browser (Edge) click-throughs of the
+timeline and the YouTube form. Updating from 0.1.x is covered by automated tests on the database and work
+folders. Running the wizard interactively on that PC found the Program Files / error 448 and error 13
+problems, fixed in 0.1.1 and 0.1.2.
+
+**Not tested:** that a person has clicked through the current wizard from start to finish (the CI run is silent,
+so the wizard pages, the winget prompts for FFmpeg/Ollama and the messages shown are unconfirmed), a PC without
+an NVIDIA GPU, Windows 10, a PC without the WebView2 runtime (the program then opens in the browser; the path is
+coded, not run), age-restricted YouTube videos and the browser-cookie option, and the desktop RTX 5070 Ti.

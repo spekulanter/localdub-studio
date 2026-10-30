@@ -17,6 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: The changelog has a section for this tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $ver = $env:GITHUB_REF_NAME.TrimStart('v')
+          $text = Get-Content CHANGELOG.md -Raw -Encoding UTF8
+          if ($text -notmatch "(?m)^## \[$([regex]::Escape($ver))\]") { throw "CHANGELOG.md has no '## [$ver]' section" }
+          $py = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ($py -ne $ver) { throw "pyproject.toml says version $py but the tag is v$ver" }
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -108,12 +118,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $notes = @"
-          Unsigned Windows installer (Windows SmartScreen will warn: More info, then Run anyway).
-          Requires Windows 10/11 64-bit and an NVIDIA GPU with 8 GB or more is recommended.
-          The installer downloads Python, libraries and AI models during setup (several GB).
-          Verify the download against the .sha256 files. See docs/INSTALL.md and docs/QUALITY.md
-          for what has and has not been tested.
-          "@
+          $ver = $env:GITHUB_REF_NAME.TrimStart('v')
+          $text = Get-Content CHANGELOG.md -Raw -Encoding UTF8
+          $m = [regex]::Match($text, "(?ms)^## \[$([regex]::Escape($ver))\][^\r\n]*\r?\n(.*?)(?=^## \[|\z)")
+          if (-not $m.Success) { throw "CHANGELOG.md has no section for $ver" }
+          $footer = @'
+
+          ---
+          **Unsigned installer**: Windows SmartScreen will warn (More info, then Run anyway). Compare the download with
+          the `.sha256` file. Needs Windows 10/11 64-bit; an NVIDIA GPU with 8 GB or more is recommended.
+          Setup installs the program and its Python libraries (about 2.5 GB). The AI models (about 6.7 GB) are
+          downloaded inside the app on first start. See docs/INSTALL.md and docs/QUALITY.md.
+          '@
+          Set-Content -Path release-notes.md -Value ($m.Groups[1].Value.Trim() + "`n" + $footer) -Encoding UTF8
           gh release create $env:GITHUB_REF_NAME release/*.exe release/*.zip release/*.sha256 `
-            --title "LocalDub Studio $env:GITHUB_REF_NAME" --notes $notes --prerelease
+            --title "LocalDub Studio $env:GITHUB_REF_NAME" --notes-file release-notes.md --prerelease

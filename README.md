@@ -31,7 +31,9 @@ Choose an MP4 (or paste a YouTube link), pick the Slovak voice, translation mode
 (quiet under the dub, or muted completely), then start. Progress is live; you can cancel, and a
 job that is interrupted (crash, restart) resumes from its finished steps. When done, preview the
 dub, download the MP4 and the Slovak/English `.srt`, or change settings and re-render (only the
-affected steps re-run).
+affected steps re-run). Below the preview a timeline shows the waveform and the lines: drag a block to
+retime it, drag its edges to resize, or click it to jump there; the lane underneath shows where the Slovak speech
+really lands. See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## Command line
 ```powershell

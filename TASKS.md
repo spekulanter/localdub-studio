@@ -54,3 +54,4 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Timeline editor: waveform of the original, English lines (drag/resize/keyboard, snapping, neighbour limits) and the Slovak dub lane that shows speech running past its window; verified in real Edge (`npm run e2e:timeline`)
 - [x] YouTube import: link tab, tools installed on request (SHA-256), download as the first pipeline stage; tested with a real CC video end to end and in real Edge (`npm run e2e:youtube`)
 - [x] UI redesign ("dubbing booth": paper/ink light theme, console dark theme, signal accent, Fraunces + IBM Plex, meter-style progress, new shell); checked on screenshots in light and dark in real Edge
+- [x] Release 0.2.0 prepared: CHANGELOG-driven release notes (the build fails if the section is missing), upgrade-from-0.1.x tests, uninstall removes the YouTube tools

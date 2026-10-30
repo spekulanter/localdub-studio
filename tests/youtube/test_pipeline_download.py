@@ -151,3 +151,20 @@ def test_a_broken_leftover_file_is_downloaded_again(tmp_path, settings, provider
     )
     assert pipe.run()["export"] == "ran" and calls == [1]
     assert pipe.ff.probe(dest).duration > 5
+
+
+def test_work_from_before_the_download_stage_existed_is_reused(tmp_path, settings, providers):
+    """Projects made by an older version have no "download" record: only that step runs."""
+    video = tmp_path / "v.mp4"
+    make_video(video)
+    pipe = Pipeline(video, tmp_path / "w", settings, providers=providers)
+    assert pipe.run()["export"] == "ran"
+    state = tmp_path / "w" / "state.json"
+    data = json.loads(state.read_text(encoding="utf-8"))
+    data["stages"].pop("download")  # what a work folder of version 0.1.x looks like
+    state.write_text(json.dumps(data), encoding="utf-8")
+    again = Pipeline(video, tmp_path / "w", settings, providers=providers).run()
+    assert again["download"] == "ran"
+    assert {k: v for k, v in again.items() if k != "download"} == {
+        k: "skipped" for k in again if k != "download"
+    }

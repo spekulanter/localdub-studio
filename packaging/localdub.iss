@@ -290,6 +290,8 @@ begin
     if DirExists(Extras) and (not UninstallSilent) then
       if MsgBox('Delete the optional packages (PyTorch, several GB) as well?' + #13#10#13#10 + Extras, mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
         DelTree(Extras, True, True, True);
+    { small programs the app installed for the YouTube import (yt-dlp, Deno): no question needed }
+    DelTree(ExpandConstant('{#UserData}\youtube-tools'), True, True, True);
     { leftovers of an interrupted package installation }
     DelTree(ExpandConstant('{#UserData}\extras-download'), True, True, True);
     DelTree(ExpandConstant('{#UserData}\extras-new'), True, True, True);
