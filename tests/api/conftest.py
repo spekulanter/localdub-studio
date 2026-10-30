@@ -25,7 +25,12 @@ def sample_mp4(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    return Settings(data_dir=tmp_path / "data", max_upload_mb=5)
+    return Settings(
+        data_dir=tmp_path / "data",
+        models_dir=tmp_path / "models",
+        max_upload_mb=5,
+        require_models_before_jobs=False,
+    )
 
 
 FAKE_WORKER = """

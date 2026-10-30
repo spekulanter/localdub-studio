@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Health, Job, Options, SegmentRow, SegmentsResponse } from "../api";
+import type { Health, Job, ModelInfo, ModelsResponse, Options, SegmentRow, SegmentsResponse } from "../api";
+import { ModelsPanel } from "./ModelsPanel";
 import { NewProject } from "./NewProject";
 import { ProgressPanel } from "./ProgressPanel";
 import { DialogueEditor } from "./DialogueEditor";
@@ -187,5 +188,64 @@ describe("voice cloning consent", () => {
   it("is unavailable without the optional packages", () => {
     render(<NewProject options={options} health={health} onCreated={vi.fn()} />);
     expect((screen.getByLabelText(/sound like the original speaker/) as HTMLInputElement).disabled).toBe(true);
+  });
+});
+
+describe("ModelsPanel", () => {
+  const model = (over: Partial<ModelInfo>): ModelInfo => ({
+    id: "whisper", title: "Speech recognition", description: "d", size_bytes: 3_000_000_000, required: true,
+    group: "core", installed: false, available: true, download: null, ...over,
+  });
+  const resp = (models: ModelInfo[], busy = false): ModelsResponse => ({
+    models, busy, required_missing: models.filter((m) => m.required && !m.installed).map((m) => m.id),
+  });
+
+  it("offers one button for all missing required models and shows the total size", () => {
+    render(<ModelsPanel data={resp([model({}), model({ id: "tts", title: "Voice", size_bytes: 400_000_000 })])} onChanged={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /Download the required models \(3\.4 GB\)/ })).toBeTruthy();
+  });
+
+  it("shows a progress bar with percent and bytes while downloading", () => {
+    const dl = { status: "running" as const, done: 1_500_000_000, total: 3_000_000_000, message: "", error: null };
+    render(<ModelsPanel data={resp([model({ download: dl })], true)} onChanged={vi.fn()} />);
+    const bar = screen.getByRole("progressbar", { name: /Download of Speech recognition/ });
+    expect(bar.getAttribute("aria-valuenow")).toBe("50");
+    expect(screen.getByText(/50% · 1\.5 GB of 3\.0 GB/)).toBeTruthy();
+  });
+
+  it("shows a failed download with its reason and a retry button", () => {
+    const dl = { status: "error" as const, done: 0, total: 1, message: "Failed", error: "Ollama is not running" };
+    render(<ModelsPanel data={resp([model({ download: dl })])} onChanged={vi.fn()} />);
+    expect(screen.getByRole("alert").textContent).toContain("Ollama is not running");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+
+  it("marks installed models and explains unavailable optional ones", () => {
+    render(<ModelsPanel data={resp([model({ installed: true }), model({ id: "separation", title: "Separation", required: false, available: false })])} onChanged={vi.fn()} />);
+    expect(screen.getByText("✓ installed")).toBeTruthy();
+    expect(screen.getByText(/needs the optional packages/)).toBeTruthy();
+  });
+});
+
+describe("failed job log actions", () => {
+  it("copies the error and offers the full log as a download", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: write } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ lines: [] }))));
+    render(<ProgressPanel job={job({ status: "failed", error: "[tts] boom" })} onCancel={vi.fn()} onRetry={vi.fn()} busy={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy error" }));
+    await waitFor(() => expect(write).toHaveBeenCalledWith("[tts] boom"));
+    const link = screen.getByRole("link", { name: "Download log" }) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/api/jobs/7/log/download");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("start is blocked while required models are missing", () => {
+  it("disables the upload button and explains why", () => {
+    render(<NewProject options={options} health={health} onCreated={vi.fn()} modelsMissing />);
+    fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [new File([new Uint8Array(5)], "a.mp4")] } });
+    expect((screen.getByRole("button", { name: /upload and start/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/Download the AI models first/)).toBeTruthy();
   });
 });

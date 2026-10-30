@@ -56,9 +56,8 @@ jobs:
           $setup = Get-ChildItem release -Filter 'LocalDub-Studio-*-Setup.exe' | Select-Object -First 1
           if (-not $setup) { throw 'The installer was not built' }
           $dir = Join-Path $env:ProgramFiles 'LocalDub Studio'   # the default install folder
-          # Tasks "models" and "ollamamodel" would download several GB: switch them off explicitly.
           $p = Start-Process -FilePath $setup.FullName -PassThru -ArgumentList @(
-            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',             '/COMPONENTS=core', '/TASKS=!models,!ollamamodel,!desktopicon', '/LOG=C:\ld-setup.log')
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',             '/COMPONENTS=core', '/TASKS=!desktopicon', '/LOG=C:\ld-setup.log')
           $deadline = (Get-Date).AddMinutes(20)
           while (-not $p.HasExited -and (Get-Date) -lt $deadline) {
             Start-Sleep -Seconds 30

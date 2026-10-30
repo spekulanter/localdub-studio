@@ -16,6 +16,18 @@ export function ProgressPanel({ job, onCancel, onRetry, busy }: Props) {
   const pct = Math.round(job.progress * 100);
   const current = job.stage === "" ? -1 : ORDER.indexOf(job.stage);
   const [log, setLog] = useState<string[] | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied("Copied");
+    } catch {
+      setCopied("Could not copy: use Download log");
+    }
+    window.setTimeout(() => setCopied(null), 3000);
+  }
+  const copyFullLog = async () => copy(`${job.error ?? ""}\n\n${await api.jobLogFull(job.id)}`);
 
   useEffect(() => {
     if (job.status !== "failed") {
@@ -72,6 +84,18 @@ export function ProgressPanel({ job, onCancel, onRetry, busy }: Props) {
       {job.status === "failed" && (
         <div className="mt-3 space-y-2" role="alert">
           <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">{job.error ?? "The job failed."}</p>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => void copy(job.error ?? "")} className="rounded-md border border-slate-300 px-3 py-1 text-sm dark:border-slate-700">
+              Copy error
+            </button>
+            <button onClick={() => void copyFullLog()} className="rounded-md border border-slate-300 px-3 py-1 text-sm dark:border-slate-700">
+              Copy full log
+            </button>
+            <a href={api.jobLogUrl(job.id)} download={`localdub-job-${job.id}.log`} className="rounded-md border border-slate-300 px-3 py-1 text-sm dark:border-slate-700">
+              Download log
+            </a>
+            {copied && <span className="self-center text-xs text-emerald-600" role="status">{copied}</span>}
+          </div>
           {log && log.length > 0 && (
             <details>
               <summary className="cursor-pointer text-xs text-slate-500">Show the last log lines</summary>

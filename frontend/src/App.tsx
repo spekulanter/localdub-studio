@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type Health, type Options, type Project } from "./api";
+import { api, type Health, type ModelsResponse, type Options, type Project } from "./api";
+import { ModelsPanel } from "./components/ModelsPanel";
 import { NewProject } from "./components/NewProject";
 import { ProjectList } from "./components/ProjectList";
 import { ProjectView } from "./components/ProjectView";
 
-type Selection = number | "new";
+type Selection = number | "new" | "models";
 
 function selectionFromHash(hash: string): Selection {
   const m = /^#\/project\/(\d+)$/.exec(hash);
+  if (hash === "#/models") return "models";
   return m?.[1] ? Number(m[1]) : "new";
 }
 
@@ -17,10 +19,15 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selected, setSelectedState] = useState<Selection>(() => selectionFromHash(window.location.hash));
   const setSelected = useCallback((s: Selection) => {
-    window.location.hash = s === "new" ? "" : `/project/${s}`;
+    window.location.hash = s === "new" ? "" : s === "models" ? "/models" : `/project/${s}`;
     setSelectedState(s);
   }, []);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [models, setModels] = useState<ModelsResponse | null>(null);
+
+  const refreshModels = useCallback(() => {
+    api.models().then(setModels).catch(() => undefined);
+  }, []);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -39,7 +46,16 @@ export default function App() {
     api.options().then(setOptions).catch((e: unknown) => setLoadError(String(e)));
     void refreshProjects();
     refreshHealth();
-  }, [refreshProjects, refreshHealth]);
+    refreshModels();
+  }, [refreshProjects, refreshHealth, refreshModels]);
+
+  // Poll while a download runs so the progress bars move.
+  const downloading = models?.busy ?? false;
+  useEffect(() => {
+    if (!downloading) return;
+    const t = window.setInterval(refreshModels, 1000);
+    return () => window.clearInterval(t);
+  }, [downloading, refreshModels]);
 
   useEffect(() => {
     const onHash = () => setSelectedState(selectionFromHash(window.location.hash));
@@ -75,6 +91,19 @@ export default function App() {
             recheck
           </button>
         </div>
+        <button
+          onClick={() => setSelected("models")}
+          className={`mb-2 w-full rounded-md border px-3 py-2 text-left text-sm ${
+            selected === "models" ? "border-indigo-500 bg-white dark:bg-slate-900" : "border-slate-300 dark:border-slate-700"
+          }`}
+        >
+          AI models
+          {models && models.required_missing.length > 0 && (
+            <span className="ml-2 rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+              {models.busy ? "downloading…" : "download needed"}
+            </span>
+          )}
+        </button>
         <ProjectList
           projects={projects}
           selected={selected}
@@ -88,12 +117,30 @@ export default function App() {
             {loadError}
           </p>
         )}
+        {models && models.required_missing.length > 0 && selected !== "models" && (
+          <div
+            className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+            role="status"
+          >
+            <span>
+              {models.busy
+                ? "Downloading the AI models… dubbing starts when they are ready."
+                : "The AI models are not downloaded yet. They are needed before the first dub."}
+            </span>
+            <button onClick={() => setSelected("models")} className="rounded-md bg-amber-600 px-3 py-1 text-white">
+              {models.busy ? "Show progress" : "Download models"}
+            </button>
+          </div>
+        )}
         {options === null ? (
           <p className="text-slate-500">Loading…</p>
+        ) : selected === "models" ? (
+          <ModelsPanel data={models} onChanged={refreshModels} />
         ) : selected === "new" ? (
           <NewProject
             options={options}
             health={health}
+            modelsMissing={(models?.required_missing.length ?? 0) > 0}
             onCreated={(p) => {
               void refreshProjects();
               setSelected(p.id);

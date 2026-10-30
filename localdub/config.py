@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     api_port: int = 8765
     max_upload_mb: int = 4096
     max_job_attempts: int = 3
+    # Refuse to start jobs until the required models are installed (the UI offers to download them).
+    require_models_before_jobs: bool = True
 
     # ASR
     asr_model: str = "large-v3"

@@ -27,6 +27,7 @@ from pydantic import BaseModel
 from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
+from localdub.core import model_catalog
 from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.media.ffmpeg import FFmpeg, MediaError
 from localdub.core.timeline.edits import (
@@ -146,6 +147,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
     settings = settings or Settings()
     db = Database(settings.data_dir / "localdub.sqlite")
     jobs = JobManager(db, settings)
+    downloads = model_catalog.Downloads(settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -159,6 +161,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
 
     app = FastAPI(title="LocalDub Studio", version="0.1.0", lifespan=lifespan)
     app.state.db, app.state.jobs, app.state.settings = db, jobs, settings
+    app.state.downloads = downloads
 
     def project_dir(pid: int) -> Path:
         return settings.data_dir / "projects" / str(pid)
@@ -228,6 +231,75 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             "separation_available": separation_available(),
         }
 
+    # ----- models ------------------------------------------------------------------------
+    def models_view() -> dict[str, Any]:
+        packages = model_catalog.optional_packages_available()
+        states = downloads.state()
+        rows = []
+        for spec in model_catalog.SPECS:
+            needs_packages = spec.group in ("separation", "cloning")
+            rows.append(
+                {
+                    "id": spec.id,
+                    "title": spec.title,
+                    "description": spec.description,
+                    "size_bytes": spec.size_bytes,
+                    "required": spec.required,
+                    "group": spec.group,
+                    "installed": model_catalog.is_installed(spec, settings),
+                    "available": packages or not needs_packages,
+                    "download": states.get(spec.id),
+                }
+            )
+        missing = [r["id"] for r in rows if r["required"] and not r["installed"]]
+        return {"models": rows, "required_missing": missing, "busy": downloads.busy()}
+
+    def require_models() -> None:
+        if not settings.require_models_before_jobs:
+            return
+        missing = [
+            s.title
+            for s in model_catalog.SPECS
+            if s.required and not model_catalog.is_installed(s, settings)
+        ]
+        if missing:
+            raise HTTPException(
+                409,
+                "Required models are missing: "
+                + "; ".join(missing)
+                + ". Download them first (Models page).",
+            )
+
+    @app.get("/api/models")
+    async def list_models() -> dict[str, Any]:
+        return await asyncio.to_thread(models_view)
+
+    @app.post("/api/models/download", status_code=202)
+    async def download_models(body: dict[str, list[str]] | None = None) -> dict[str, Any]:
+        ids = (body or {}).get("ids") or [s.id for s in model_catalog.SPECS if s.required]
+        unknown = [i for i in ids if i not in model_catalog.BY_ID]
+        if unknown:
+            raise HTTPException(422, f"Unknown model(s): {unknown}")
+        packages = model_catalog.optional_packages_available()
+        blocked = [
+            i
+            for i in ids
+            if model_catalog.BY_ID[i].group in ("separation", "cloning") and not packages
+        ]
+        if blocked:
+            raise HTTPException(
+                409, "These models need the optional PyTorch packages (see Install docs)."
+            )
+        todo = [
+            i
+            for i in ids
+            if not await asyncio.to_thread(
+                model_catalog.is_installed, model_catalog.BY_ID[i], settings
+            )
+        ]
+        downloads.start(todo)
+        return {"started": todo}
+
     # ----- projects ----------------------------------------------------------------------
     @app.get("/api/projects")
     def list_projects() -> list[ProjectOut]:
@@ -255,6 +327,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             )
         if source_lang not in SOURCE_LANGS:
             raise HTTPException(422, f"Unsupported source language '{source_lang}'")
+        if start:
+            await asyncio.to_thread(require_models)
         voice = voice or settings.tts_voice
         if voice not in VOICES:
             raise HTTPException(422, f"Unknown voice '{voice}'")
@@ -352,6 +426,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         require_project(pid)
         if db.active_job(pid):
             raise HTTPException(409, "A job is already queued or running for this project")
+        require_models()
         job_id = jobs.submit(pid, req.from_stage if req else None)
         return job_out(db.get_job(job_id)) or {}
 
@@ -398,6 +473,26 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             stream(),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.get("/api/jobs/{job_id}/log/download")
+    def job_log_download(job_id: int) -> Response:
+        """The whole job log plus the error, as a text file the user can send to support."""
+        job = db.get_job(job_id)
+        if job is None:
+            raise HTTPException(404, "Job not found")
+        path = settings.data_dir / "logs" / f"job-{job_id}.log"
+        body = (
+            path.read_text(encoding="utf-8", errors="replace") if path.is_file() else "(no log)\n"
+        )
+        header = (
+            f"LocalDub Studio job {job_id}  status={job['status']}  stage={job['stage']}\n"
+            f"error: {job['error'] or '-'}\n{'=' * 72}\n"
+        )
+        return Response(
+            header + body,
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="localdub-job-{job_id}.log"'},
         )
 
     @app.get("/api/jobs/{job_id}/log")

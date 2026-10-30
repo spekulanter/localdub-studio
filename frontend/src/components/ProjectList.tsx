@@ -3,7 +3,7 @@ import { formatTime, statusLabel } from "../lib/format";
 
 interface Props {
   projects: Project[];
-  selected: number | "new";
+  selected: number | "new" | "models";
   onSelect: (id: number) => void;
   onNew: () => void;
 }

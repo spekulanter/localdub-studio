@@ -45,13 +45,10 @@ Name: "custom"; Description: "Custom installation"; Flags: iscustom
 
 [Components]
 Name: "core"; Description: "LocalDub Studio"; Types: full standard custom; Flags: fixed
-Name: "diarization"; Description: "Speaker detection (46 MB download, experimental)"; Types: full
-Name: "experimental"; Description: "Speech removal and voice cloning (about 3 GB download, experimental)"; Types: full
+Name: "experimental"; Description: "Speech removal and voice cloning packages (about 3 GB download, experimental)"; Types: full
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"
-Name: "models"; Description: "Download the speech and voice models now (about 3.4 GB)"; GroupDescription: "Downloads:"
-Name: "ollamamodel"; Description: "Download the translation model {#OllamaModel} with Ollama (about 3.3 GB)"; GroupDescription: "Downloads:"
 
 [Files]
 Source: "..\localdub\*"; DestDir: "{app}\localdub"; Excludes: "__pycache__,*.pyc"; Flags: recursesubdirs ignoreversion; Components: core
@@ -243,7 +240,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Uv, Extra, Fetch, EnvPrefix: String;
+  Uv, Extra, EnvPrefix: String;
 begin
   if CurStep = ssDone then
     Log('Setup is done');
@@ -259,19 +256,13 @@ begin
     InstallWithWinget('Ollama (runs the translation models)', 'Ollama.Ollama', 'the winget repository');
 
   Extra := '';
-  Fetch := '';
   if WizardIsComponentSelected('experimental') then
-  begin
     Extra := ' --extra experimental';
-    Fetch := Fetch + ' --experimental';
-  end;
-  if WizardIsComponentSelected('diarization') then
-    Fetch := Fetch + ' --diarization';
 
   { Always use uv's own Python (never whatever is on this PC), kept inside the install folder rather than
-    in one user's profile; models/data go to the user's
-    %LOCALAPPDATA%, because Program Files is read-only for normal users. }
-  EnvPrefix := 'set "UV_PYTHON_PREFERENCE=only-managed" && set "UV_PYTHON_INSTALL_DIR=' + ExpandConstant('{app}\python') + '" && set "LOCALDUB_MODELS_DIR=' + ExpandConstant('{#UserData}\models') + '" && ';
+    in one user's profile. The AI models are downloaded later inside the app, as the user, with visible
+    progress (an elevated installer would leave them unreadable for the normal user). }
+  EnvPrefix := 'set "UV_PYTHON_PREFERENCE=only-managed" && set "UV_PYTHON_INSTALL_DIR=' + ExpandConstant('{app}\python') + '" && ';
 
   RunStep('Installing Python 3.12 and the program libraries...', 'About 2.5 GB (6 GB with the experimental features). Python comes from python-build-standalone, libraries from PyPI.',
     EnvPrefix + Uv + ' sync --frozen --no-dev' + Extra, False);
@@ -284,14 +275,6 @@ begin
     RunStep('Installing Python 3.12 and the program libraries (second attempt)...', 'Starting from a clean environment.',
       EnvPrefix + Uv + ' sync --frozen --no-dev' + Extra, False);
   end;
-
-  if AppInstalled and WizardIsTaskSelected('models') then
-    RunStep('Downloading the speech and voice models...', 'About 3.4 GB from Hugging Face. Optional models are checksum-verified.',
-      EnvPrefix + Uv + ' run --no-sync localdub fetch-models' + Fetch, False);
-
-  if WizardIsTaskSelected('ollamamodel') and OllamaPresent then
-    RunStep('Downloading the translation model {#OllamaModel}...', 'About 3.3 GB from the Ollama registry.',
-      '"' + OllamaExe + '" pull {#OllamaModel}', True);
 
   if not AppInstalled then
     Problems := Problems + #13#10 + '- LocalDub Studio could not be set up: the program files are missing. See install.log.';

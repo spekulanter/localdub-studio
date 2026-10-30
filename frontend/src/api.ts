@@ -93,6 +93,33 @@ export interface Preview {
   window: number;
 }
 
+export interface ModelDownload {
+  status: "queued" | "running" | "done" | "error";
+  done: number;
+  total: number;
+  message: string;
+  error: string | null;
+}
+
+export interface ModelInfo {
+  id: string;
+  title: string;
+  description: string;
+  size_bytes: number;
+  required: boolean;
+  group: string;
+  installed: boolean;
+  /** false when the optional PyTorch packages are missing */
+  available: boolean;
+  download: ModelDownload | null;
+}
+
+export interface ModelsResponse {
+  models: ModelInfo[];
+  required_missing: string[];
+  busy: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -126,6 +153,11 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   health: () => request<Health>("/api/health"),
+  models: () => request<ModelsResponse>("/api/models"),
+  downloadModels: (ids?: string[]) =>
+    request<{ started: string[] }>("/api/models/download", json("POST", ids ? { ids } : {})),
+  jobLogFull: (jobId: number) => fetch(`/api/jobs/${jobId}/log/download`).then((r) => r.text()),
+  jobLogUrl: (jobId: number) => `/api/jobs/${jobId}/log/download`,
   options: () => request<Options>("/api/options"),
   projects: () => request<Project[]>("/api/projects"),
   project: (id: number) => request<Project>(`/api/projects/${id}`),

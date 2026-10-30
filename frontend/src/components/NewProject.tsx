@@ -6,11 +6,13 @@ interface Props {
   options: Options;
   health: Health | null;
   onCreated: (p: Project) => void;
+  /** Required AI models are not downloaded yet. */
+  modelsMissing?: boolean;
 }
 
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 
-export function NewProject({ options, health, onCreated }: Props) {
+export function NewProject({ options, health, onCreated, modelsMissing = false }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>({
@@ -122,9 +124,12 @@ export function NewProject({ options, health, onCreated }: Props) {
         </p>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={files.length === 0 || tooBig.length > 0 || busy || (settings.clone_voice && !settings.clone_consent)} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        <button type="submit" disabled={modelsMissing || files.length === 0 || tooBig.length > 0 || busy || (settings.clone_voice && !settings.clone_consent)} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
           {busy ? (progress ?? "Uploading…") : files.length > 1 ? `Upload and dub ${files.length} videos` : "Upload and start dubbing"}
         </button>
+        {modelsMissing && (
+          <span className="text-xs text-amber-700 dark:text-amber-300">Download the AI models first (see the notice above).</span>
+        )}
         <span className="text-xs text-slate-500">The video is copied into this app's local data folder and never leaves your computer.</span>
       </div>
     </form>

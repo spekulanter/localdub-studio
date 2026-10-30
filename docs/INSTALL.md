@@ -21,10 +21,19 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
 |---|---|---|
 | FFmpeg and Ollama, if missing (asks first) | `winget` (`Gyan.FFmpeg`, `Ollama.Ollama`) | 100-200 MB each |
 | Python 3.12 and the app libraries | uv (bundled), python-build-standalone, PyPI | about 2.5 GB |
-| Speech recognition (faster-whisper large-v3) and Slovak voice (Supertonic 3) | Hugging Face | about 3.4 GB |
-| Translation model `translategemma:4b` | Ollama registry | about 3.3 GB |
-| Optional: speaker detection | GitHub release, SHA-256 verified | 46 MB |
-| Optional: speech removal and voice cloning (PyTorch, Demucs, OpenVoice) | PyTorch index, Hugging Face | about 3 GB + 210 MB |
+| Optional: speech removal and voice cloning packages (PyTorch) | PyTorch index | about 3 GB |
+
+   **The AI models are not part of the setup.** On first start the program shows a notice and an
+   *AI models* page where you download them with a progress bar, under your own account:
+
+| Model | Source | Size |
+|---|---|---|
+| Speech recognition (faster-whisper large-v3), required | Hugging Face | about 3.1 GB |
+| Slovak voice (Supertonic 3), required | Hugging Face | about 0.4 GB |
+| Translation model `translategemma:4b`, required | Ollama registry (Ollama must be running) | about 3.3 GB |
+| Speaker detection, optional | GitHub release, SHA-256 verified | 46 MB |
+| Speech removal (htdemucs), optional | Hugging Face | 80 MB |
+| Voice cloning (OpenVoice V2), optional | Hugging Face | 131 MB |
 
 3. Start **LocalDub Studio** from the Start menu or the desktop shortcut. The program opens in its
    own window; closing the window quits it. If a dubbing job is running you are asked first: the

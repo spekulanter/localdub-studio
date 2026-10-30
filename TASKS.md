@@ -49,3 +49,4 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Batch processing: several videos in one upload, queued and dubbed one after another (UI test; real multi-job queue only tested with a fake worker)
 - [x] Desktop window (pywebview/WebView2, icon, close-confirm while a job runs, browser fallback): run and screenshot-verified
 - [~] Windows installer: Inno Setup wizard script written (packaging/localdub.iss) but NOT compiled/tested (Inno Setup not installed); PowerShell installer + ZIP tested
+- [x] In-app model manager: required models downloaded inside the app with progress (installer no longer downloads models); failed jobs: copy error / copy log / download log

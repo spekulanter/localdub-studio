@@ -5,9 +5,10 @@ This setup will:
 
   * copy the program (about 100 MB) to the folder you choose
   * download Python 3.12 and the program's libraries (about 2.5 GB, takes a few minutes)
-  * optionally download the speech and voice models (about 3.4 GB) from Hugging Face
   * optionally install FFmpeg and Ollama with winget (you are asked first)
-  * optionally download the translation model translategemma:4b with Ollama (about 3.3 GB)
+
+The AI models (about 6.7 GB: speech recognition, Slovak voice, translation) are NOT downloaded by
+this setup. LocalDub Studio downloads them the first time you start it, with a progress display.
 
 Needed on your computer:
 

@@ -118,7 +118,7 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
     try:
         pipe.run(from_stage=job["from_stage"])
     except PipelineError as exc:
-        db.finish_job(job_id, "failed", f"[{exc.stage}] {exc}")
+        db.finish_job(job_id, "failed", str(exc))
         return 1
     except Exception as exc:  # noqa: BLE001 - report anything to the user instead of dying silently
         log.error("Unexpected failure:\n%s", traceback.format_exc())
