@@ -52,10 +52,10 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
       });
   };
 
-  if (!data) return <p className="text-xs text-slate-500">Checking…</p>;
+  if (!data) return <p className="text-xs text-muted">Checking…</p>;
   if (allInstalled) {
     return (
-      <p className="text-xs text-emerald-700 dark:text-emerald-300" role="status">
+      <p className="text-xs text-ok" role="status">
         ✓ Installed. This option is ready to use.
       </p>
     );
@@ -69,7 +69,7 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
   const problem = error ?? failed?.download?.error ?? null;
 
   return (
-    <div className="mt-1 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+    <div className="mt-1 space-y-1 text-xs text-muted">
       {!running && (
         <p>
           {intro(formatBytes(total))} It is installed into your own user folder; no administrator rights and no
@@ -84,9 +84,9 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={pct}
-            className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+            className="meter"
           >
-            <div className="h-full bg-indigo-500 transition-all" style={{ width: `${pct}%` }} />
+            <span data-live="true" style={{ width: `${pct}%` }} />
           </div>
           <p>
             {pct}%
@@ -96,7 +96,7 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
         </>
       )}
       {problem && (
-        <p className="text-red-700 dark:text-red-300" role="alert">
+        <p className="text-bad" role="alert">
           {problem}
         </p>
       )}
@@ -104,7 +104,7 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
         <button
           type="button"
           onClick={start}
-          className="rounded-md bg-indigo-600 px-3 py-1 text-sm text-white"
+          className="btn-primary btn-sm"
         >
           {problem ? "Try again" : `Install now (${formatBytes(total)})`}
         </button>

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type Health, type ModelsResponse, type Options, type Project } from "./api";
+import { Cpu, Plus } from "lucide-react";
+import { Logo } from "./components/Logo";
 import { ModelsPanel } from "./components/ModelsPanel";
 import { NewProject } from "./components/NewProject";
 import { ProjectList } from "./components/ProjectList";
@@ -68,103 +70,109 @@ export default function App() {
   }, []);
 
   const ollamaOk = health?.ollama.reachable ?? false;
+  const modelsNeeded = (models?.required_missing.length ?? 0) > 0;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 p-4 lg:flex-row">
-      <aside className="w-full shrink-0 lg:w-72">
-        <h1 className="text-xl font-semibold">LocalDub Studio</h1>
-        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-          English → Slovak dubbing. Everything runs on this computer.
-        </p>
+    <div className="grid min-h-screen lg:grid-cols-[304px_minmax(0,1fr)]">
+      <aside className="flex flex-col gap-5 border-b border-line bg-surface/70 p-5 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <header className="flex items-center gap-3">
+          <Logo size={40} />
+          <div className="leading-tight">
+            <h1 className="font-display text-[22px] font-semibold">LocalDub</h1>
+            <p className="eyebrow">Studio</p>
+          </div>
+        </header>
+        <p className="-mt-2 text-[13px] leading-snug text-muted">English → Slovak dubbing. Everything runs on this computer.</p>
+
+        <div className="space-y-1.5">
+          <button onClick={() => setSelected("new")} className={`${selected === "new" ? "btn-primary" : "btn-secondary"} w-full justify-start`}>
+            <Plus className="size-4" /> New dub
+          </button>
+          <button
+            onClick={() => setSelected("models")}
+            aria-current={selected === "models"}
+            className={`${selected === "models" ? "btn-primary" : "btn-ghost"} w-full justify-start`}
+          >
+            <Cpu className="size-4" /> AI models
+            {modelsNeeded && (
+              <span className="chip chip-warn ml-auto">{models?.busy ? "downloading…" : "download needed"}</span>
+            )}
+          </button>
+        </div>
+
+        <ProjectList projects={projects} selected={selected} onSelect={setSelected} />
+
         <div
-          className={`mb-3 rounded-md border px-3 py-2 text-xs ${
-            health === null
-              ? "border-slate-300 text-slate-500 dark:border-slate-700"
-              : ollamaOk
-                ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-                : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+          className={`mt-auto flex items-center gap-2 rounded-[10px] border px-3 py-2 text-xs ${
+            health === null ? "border-line text-muted" : ollamaOk ? "border-ok/30 bg-ok-soft text-ok" : "border-warn/40 bg-warn-soft text-warn"
           }`}
           role="status"
         >
-          {health === null
-            ? "Cannot reach the LocalDub server."
-            : ollamaOk
-              ? `Ollama connected (${health.ollama.models.length} models)`
-              : "Ollama is not running. Translation will fail until you start it."}
-          <button className="ml-2 underline" onClick={refreshHealth}>
+          <span className={`size-2 shrink-0 rounded-full ${health === null ? "bg-line-strong" : ollamaOk ? "bg-ok" : "bg-warn"}`} />
+          <span className="min-w-0 flex-1">
+            {health === null
+              ? "Cannot reach the LocalDub server."
+              : ollamaOk
+                ? `Ollama connected · ${health.ollama.models.length} models`
+                : "Ollama is not running. Translation will fail until you start it."}
+          </span>
+          <button className="underline underline-offset-2" onClick={refreshHealth}>
             recheck
           </button>
         </div>
-        <button
-          onClick={() => setSelected("models")}
-          className={`mb-2 w-full rounded-md border px-3 py-2 text-left text-sm ${
-            selected === "models" ? "border-indigo-500 bg-white dark:bg-slate-900" : "border-slate-300 dark:border-slate-700"
-          }`}
-        >
-          AI models
-          {models && models.required_missing.length > 0 && (
-            <span className="ml-2 rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-              {models.busy ? "downloading…" : "download needed"}
-            </span>
-          )}
-        </button>
-        <ProjectList
-          projects={projects}
-          selected={selected}
-          onSelect={setSelected}
-          onNew={() => setSelected("new")}
-        />
       </aside>
-      <main className="min-w-0 flex-1">
-        {loadError && (
-          <p className="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" role="alert">
-            {loadError}
-          </p>
-        )}
-        {models && models.required_missing.length > 0 && selected !== "models" && (
-          <div
-            className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
-            role="status"
-          >
-            <span>
-              {models.busy
-                ? "Downloading the AI models… dubbing starts when they are ready."
-                : "The AI models are not downloaded yet. They are needed before the first dub."}
-            </span>
-            <button onClick={() => setSelected("models")} className="rounded-md bg-amber-600 px-3 py-1 text-white">
-              {models.busy ? "Show progress" : "Download models"}
-            </button>
+
+      <main className="min-w-0 px-5 py-7 lg:px-10">
+        <div className="mx-auto max-w-5xl space-y-5">
+          {loadError && (
+            <p className="alert alert-bad" role="alert">
+              {loadError}
+            </p>
+          )}
+          {modelsNeeded && selected !== "models" && (
+            <div className="alert alert-warn flex flex-wrap items-center justify-between gap-3" role="status">
+              <span>
+                {models?.busy
+                  ? "Downloading the AI models… dubbing starts when they are ready."
+                  : "The AI models are not downloaded yet. They are needed before the first dub."}
+              </span>
+              <button onClick={() => setSelected("models")} className="btn-primary btn-sm">
+                {models?.busy ? "Show progress" : "Download models"}
+              </button>
+            </div>
+          )}
+          <div key={String(selected)} className="rise">
+            {options === null ? (
+              <p className="text-muted">Loading…</p>
+            ) : selected === "models" ? (
+              <ModelsPanel data={models} onChanged={refreshModels} />
+            ) : selected === "new" ? (
+              <NewProject
+                options={options}
+                health={health}
+                modelsMissing={modelsNeeded}
+                onOptionsChanged={refreshOptions}
+                onCreated={(p) => {
+                  void refreshProjects();
+                  setSelected(p.id);
+                }}
+              />
+            ) : (
+              <ProjectView
+                key={selected}
+                projectId={selected}
+                options={options}
+                health={health}
+                onChanged={refreshProjects}
+                onOptionsChanged={refreshOptions}
+                onDeleted={() => {
+                  void refreshProjects();
+                  setSelected("new");
+                }}
+              />
+            )}
           </div>
-        )}
-        {options === null ? (
-          <p className="text-slate-500">Loading…</p>
-        ) : selected === "models" ? (
-          <ModelsPanel data={models} onChanged={refreshModels} />
-        ) : selected === "new" ? (
-          <NewProject
-            options={options}
-            health={health}
-            modelsMissing={(models?.required_missing.length ?? 0) > 0}
-            onOptionsChanged={refreshOptions}
-            onCreated={(p) => {
-              void refreshProjects();
-              setSelected(p.id);
-            }}
-          />
-        ) : (
-          <ProjectView
-            key={selected}
-            projectId={selected}
-            options={options}
-            health={health}
-            onChanged={refreshProjects}
-            onOptionsChanged={refreshOptions}
-            onDeleted={() => {
-              void refreshProjects();
-              setSelected("new");
-            }}
-          />
-        )}
+        </div>
       </main>
     </div>
   );

@@ -105,9 +105,13 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="text-lg font-semibold">New dub</h2>
-      <div role="tablist" aria-label="Where is the video?" className="inline-flex overflow-hidden rounded-md border border-slate-300 text-sm dark:border-slate-700">
+    <form onSubmit={submit} className="card space-y-5">
+      <div>
+        <p className="eyebrow mb-1.5">New dub</p>
+        <h2 className="font-display text-[30px] font-semibold leading-tight">Dub a video into Slovak</h2>
+        <p className="mt-1 text-sm text-muted">Pick a file or paste a YouTube link. Speech recognition, translation and the Slovak voice all run on this computer.</p>
+      </div>
+      <div role="tablist" aria-label="Where is the video?" className="seg">
         {(["file", "youtube"] as const).map((k) => (
           <button
             key={k}
@@ -116,7 +120,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
             aria-selected={source === k}
             disabled={busy}
             onClick={() => setSource(k)}
-            className={`px-4 py-1.5 ${source === k ? "bg-indigo-600 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+            className=""
           >
             {k === "file" ? "Video file" : "YouTube link"}
           </button>
@@ -135,8 +139,8 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
           setDragging(false);
           if (e.dataTransfer.files.length > 0) setFiles(Array.from(e.dataTransfer.files));
         }}
-        className={`flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center ${
-          dragging ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950" : "border-slate-300 dark:border-slate-700"
+        className={`flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-9 text-center transition-colors ${
+          dragging ? "border-accent bg-accent-soft" : "border-line-strong bg-inset/50 hover:bg-inset"
         }`}
       >
         {files.length > 0 ? (
@@ -148,7 +152,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
             ) : (
               <>
                 <p className="font-medium">{files.length} videos — they are dubbed one after another</p>
-                <ul className="mt-1 max-h-28 overflow-auto text-xs text-slate-500">
+                <ul className="mt-1 max-h-28 overflow-auto text-xs text-muted">
                   {files.map((f) => (
                     <li key={f.name + f.size}>{f.name}</li>
                   ))}
@@ -157,24 +161,24 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
             )}
           </div>
         ) : (
-          <p className="text-sm text-slate-500">Drop one or more MP4 files here, or</p>
+          <p className="text-sm text-muted">Drop one or more MP4 files here, or</p>
         )}
-        <button type="button" className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700" onClick={() => input.current?.click()}>
+        <button type="button" className="btn-secondary" onClick={() => input.current?.click()}>
           {files.length > 0 ? "Choose other files" : "Choose videos"}
         </button>
         <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => setFiles(Array.from(e.target.files ?? []))} aria-label="Video file" />
-        {tooBig.length > 0 && <p className="text-sm text-red-600">{tooBig.map((f) => f.name).join(", ")} is larger than {options.max_upload_mb} MB.</p>}
+        {tooBig.length > 0 && <p className="text-sm text-bad">{tooBig.map((f) => f.name).join(", ")} is larger than {options.max_upload_mb} MB.</p>}
       </div>
 
       <OptionFields options={options} health={health} value={settings} onChange={setSettings} disabled={busy} onPackagesInstalled={onOptionsChanged} />
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" role="alert">
+        <p className="alert alert-bad" role="alert">
           {error}
         </p>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={modelsMissing || (source === "file" ? files.length === 0 || tooBig.length > 0 : youtube === null) || busy || (settings.clone_voice && !settings.clone_consent)} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        <button type="submit" disabled={modelsMissing || (source === "file" ? files.length === 0 || tooBig.length > 0 : youtube === null) || busy || (settings.clone_voice && !settings.clone_consent)} className="btn-primary">
           {source === "youtube"
             ? busy
               ? "Starting…"
@@ -186,9 +190,9 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
                 : "Upload and start dubbing"}
         </button>
         {modelsMissing && (
-          <span className="text-xs text-amber-700 dark:text-amber-300">Download the AI models first (see the notice above).</span>
+          <span className="text-xs text-warn">Download the AI models first (see the notice above).</span>
         )}
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-muted">
           {source === "youtube"
             ? "The video is downloaded into this app's local data folder; dubbing happens on your computer."
             : "The video is copied into this app's local data folder and never leaves your computer."}

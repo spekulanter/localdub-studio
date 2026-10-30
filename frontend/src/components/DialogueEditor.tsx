@@ -3,13 +3,13 @@ import { api, type Options, type SegmentRow, type SegmentsResponse } from "../ap
 import { formatTime } from "../lib/format";
 
 const FIT: Record<string, { label: string; cls: string; hint: string }> = {
-  ok: { label: "fits", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200", hint: "Fits its time slot." },
-  stretched: { label: "sped up", cls: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200", hint: "Spoken slightly faster to fit." },
-  shifted: { label: "shifted", cls: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200", hint: "Starts a little late so lines do not overlap." },
-  overflow: { label: "too long", cls: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200", hint: "Too long for the slot even at top speed; shorten the text or widen the timing." },
+  ok: { label: "fits", cls: "bg-ok-soft text-ok", hint: "Fits its time slot." },
+  stretched: { label: "sped up", cls: "bg-dub-soft text-dub", hint: "Spoken slightly faster to fit." },
+  shifted: { label: "shifted", cls: "bg-warn-soft text-warn", hint: "Starts a little late so lines do not overlap." },
+  overflow: { label: "too long", cls: "bg-bad-soft text-bad", hint: "Too long for the slot even at top speed; shorten the text or widen the timing." },
 };
 
-const input = "rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900";
+const input = "field";
 
 interface Props {
   projectId: number;
@@ -52,7 +52,7 @@ export function DialogueEditor({ projectId, data, options, editable, selectedId 
   const [error, setError] = useState<string | null>(null);
 
   if (!data || data.segments.length === 0) {
-    return <p className="text-sm text-slate-500">Dialogue appears here once speech has been recognised.</p>;
+    return <p className="text-sm text-muted">Dialogue appears here once speech has been recognised.</p>;
   }
   const tight = data.segments.filter((s) => s.fit_status === "overflow" || s.fit_status === "shifted").length;
   const edited = data.segments.filter((s) => s.edited).length;
@@ -60,33 +60,33 @@ export function DialogueEditor({ projectId, data, options, editable, selectedId 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-muted">
           {data.segments.length} lines{tight > 0 && ` · ${tight} where timing is tight`}
           {edited > 0 && ` · ${edited} edited by you`}
         </p>
         {editable && data.edits_pending && (
-          <button onClick={onRerender} disabled={busy} className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white disabled:opacity-50">
+          <button onClick={onRerender} disabled={busy} className="btn-primary">
             Re-render changed lines
           </button>
         )}
       </div>
       {!editable && data.stage !== null && (
-        <p className="text-xs text-slate-500">Editing unlocks when the translation has finished and no job is running.</p>
+        <p className="text-xs text-muted">Editing unlocks when the translation has finished and no job is running.</p>
       )}
       {error && (
-        <p className="rounded-md bg-red-50 p-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" role="alert">
+        <p className="alert alert-bad" role="alert">
           {error}
         </p>
       )}
       {speakers.length > 1 && editable && (
-        <fieldset className="rounded-md border border-slate-200 p-3 dark:border-slate-800">
+        <fieldset className="rounded-md border border-line p-3">
           <legend className="px-1 text-sm font-medium">Voice per speaker</legend>
           <div className="flex flex-wrap gap-3">
             {speakers.map((sp) => (
               <label key={sp} className="text-sm">
                 <span className="mr-2">{sp}</span>
                 <select
-                  className={input}
+                  className={`${input} w-auto`}
                   value={data.speaker_voices[sp] ?? ""}
                   onChange={(e) => {
                     const next = { ...data.speaker_voices };
@@ -178,23 +178,23 @@ function Row({ seg, projectId, options, editable, renderVersion, play, onChange,
     <li
       ref={item}
       onClick={() => onSelect?.(seg.id)}
-      className={`rounded-md border p-3 ${seg.stale_edit ? "border-amber-400" : "border-slate-200 dark:border-slate-800"} ${selected ? "ring-2 ring-indigo-500" : ""}`}
+      className={`rounded-md border p-3 ${seg.stale_edit ? "border-warn" : "border-line"} ${selected ? "ring-2 ring-accent" : ""}`}
     >
-      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted">
         <span className="tabular-nums">
           {formatTime(seg.start)}–{formatTime(seg.end)}
         </span>
-        {multiSpeaker && <span className="rounded bg-slate-100 px-1.5 dark:bg-slate-800">{seg.speaker_id}</span>}
+        {multiSpeaker && <span className="rounded bg-inset px-1.5">{seg.speaker_id}</span>}
         {fit && (
           <span title={fit.hint} className={`rounded px-1.5 py-0.5 ${fit.cls}`}>
             {fit.label}
           </span>
         )}
-        {seg.edited && <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">edited</span>}
-        {seg.review_status === "approved" && <span className="text-emerald-600">✓ approved</span>}
-        {seg.stale_edit && <span className="text-amber-600">the recognised English changed; your edit was ignored</span>}
+        {seg.edited && <span className="chip chip-accent">edited</span>}
+        {seg.review_status === "approved" && <span className="text-ok">✓ approved</span>}
+        {seg.stale_edit && <span className="text-warn">the recognised English changed; your edit was ignored</span>}
       </div>
-      <p className="mb-2 text-sm text-slate-600 dark:text-slate-300">{seg.source_text}</p>
+      <p className="mb-2 text-sm text-muted">{seg.source_text}</p>
       <textarea
         aria-label={`Slovak text for line ${seg.id}`}
         className={`${input} w-full`}
@@ -204,17 +204,17 @@ function Row({ seg, projectId, options, editable, renderVersion, play, onChange,
         onChange={(e) => setText(e.target.value)}
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select aria-label={`Voice for line ${seg.id}`} className={input} value={voice} disabled={!editable || working} onChange={(e) => setVoice(e.target.value)}>
+        <select aria-label={`Voice for line ${seg.id}`} className={`${input} w-auto`} value={voice} disabled={!editable || working} onChange={(e) => setVoice(e.target.value)}>
           <option value="">{seg.effective_voice ? `default (${seg.effective_voice})` : "default voice"}</option>
           {options.voices.map((v) => (
             <option key={v}>{v}</option>
           ))}
         </select>
-        <button type="button" onClick={() => void preview()} disabled={working || !text.trim()} className="rounded-md border border-slate-300 px-2 py-1 text-sm disabled:opacity-50 dark:border-slate-700">
+        <button type="button" onClick={() => void preview()} disabled={working || !text.trim()} className="btn-secondary btn-sm">
           ▶ Try this text
         </button>
         {seg.has_audio && !dirty && (
-          <button type="button" onClick={() => play(api.segmentAudioUrl(projectId, seg.id, renderVersion))} className="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700">
+          <button type="button" onClick={() => play(api.segmentAudioUrl(projectId, seg.id, renderVersion))} className="btn-secondary btn-sm">
             ▶ Rendered
           </button>
         )}
@@ -233,11 +233,11 @@ function Row({ seg, projectId, options, editable, renderVersion, play, onChange,
         )}
         <span className="ml-auto flex gap-2">
           {seg.edited && editable && (
-            <button type="button" disabled={working} onClick={() => void run(async () => { await api.revertSegment(projectId, seg.id); onChange(); })} className="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700">
+            <button type="button" disabled={working} onClick={() => void run(async () => { await api.revertSegment(projectId, seg.id); onChange(); })} className="btn-secondary btn-sm">
               Revert
             </button>
           )}
-          <button type="button" onClick={() => void save()} disabled={!dirty || !editable || working} className="rounded-md bg-indigo-600 px-3 py-1 text-sm text-white disabled:opacity-40">
+          <button type="button" onClick={() => void save()} disabled={!dirty || !editable || working} className="btn-primary btn-sm">
             Save
           </button>
         </span>
@@ -250,10 +250,10 @@ function Row({ seg, projectId, options, editable, renderVersion, play, onChange,
           <label>
             End (s) <input className={`${input} w-24`} type="number" step="0.05" min="0" value={end} disabled={!editable} onChange={(e) => setEnd(e.target.value)} />
           </label>
-          <span className="text-xs text-slate-500">Moves when this line is spoken. Lines cannot overlap their neighbours.</span>
+          <span className="text-xs text-muted">Moves when this line is spoken. Lines cannot overlap their neighbours.</span>
         </div>
       )}
-      {hint && <p className="mt-1 text-xs text-slate-500" role="status">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-muted" role="status">{hint}</p>}
     </li>
   );
 }

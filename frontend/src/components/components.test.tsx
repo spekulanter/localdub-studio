@@ -79,7 +79,7 @@ describe("ProgressPanel", () => {
     const onCancel = vi.fn();
     render(<ProgressPanel job={job({})} onCancel={onCancel} onRetry={vi.fn()} busy={false} />);
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("50");
-    expect(screen.getByText("Generating Slovak voice")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Generating Slovak voice/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalledOnce();
   });

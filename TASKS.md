@@ -53,3 +53,4 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Optional PyTorch packages install from inside the app (Install now button + AI models page; no commands, no admin rights): tested as a normal user from the Program Files Python
 - [x] Timeline editor: waveform of the original, English lines (drag/resize/keyboard, snapping, neighbour limits) and the Slovak dub lane that shows speech running past its window; verified in real Edge (`npm run e2e:timeline`)
 - [x] YouTube import: link tab, tools installed on request (SHA-256), download as the first pipeline stage; tested with a real CC video end to end and in real Edge (`npm run e2e:youtube`)
+- [x] UI redesign ("dubbing booth": paper/ink light theme, console dark theme, signal accent, Fraunces + IBM Plex, meter-style progress, new shell); checked on screenshots in light and dark in real Edge

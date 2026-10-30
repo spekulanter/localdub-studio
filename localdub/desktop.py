@@ -29,10 +29,12 @@ ICON = Path(__file__).resolve().parent / "assets" / "localdub.ico"
 SPLASH = """<!doctype html><meta charset="utf-8"><title>LocalDub Studio</title>
 <style>
   html,body{height:100%;margin:0;font-family:Segoe UI,system-ui,sans-serif}
-  body{display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0}
-  .box{text-align:center} h1{font-weight:600;margin:0 0 .4rem} p{color:#94a3b8;margin:0}
+  body{display:flex;align-items:center;justify-content:center;background:#12100d;color:#efe8d9}
+  .box{text-align:center}
+  h1{font-weight:600;margin:0 0 .4rem;font-family:Georgia,serif}
+  p{color:#a39a87;margin:0}
   .dot{display:inline-block;width:10px;height:10px;margin:18px 4px 0;border-radius:50%;
-       background:#6366f1;animation:b 1.2s infinite ease-in-out}
+       background:#ff6b3d;animation:b 1.2s infinite ease-in-out}
   .dot:nth-child(2){animation-delay:.2s}
   .dot:nth-child(3){animation-delay:.4s}
   @keyframes b{0%,80%,100%{opacity:.2}40%{opacity:1}}
@@ -41,9 +43,9 @@ SPLASH = """<!doctype html><meta charset="utf-8"><title>LocalDub Studio</title>
 <span class="dot"></span><span class="dot"></span><span class="dot"></span></div>"""
 
 ERROR_PAGE = """<!doctype html><meta charset="utf-8"><title>LocalDub Studio</title>
-<body style="font-family:Segoe UI,sans-serif;background:#0f172a;color:#e2e8f0;padding:3rem">
+<body style="font-family:Segoe UI,sans-serif;background:#12100d;color:#efe8d9;padding:3rem">
 <h2>LocalDub Studio could not start</h2>
-<pre style="white-space:pre-wrap;color:#fca5a5">{message}</pre>
+<pre style="white-space:pre-wrap;color:#ff8a80">{message}</pre>
 <p>Details are in <code>{log}</code>.</p>"""
 
 
@@ -169,7 +171,7 @@ def run_app(settings: Settings | None = None) -> int:
     webview.settings["ALLOW_DOWNLOADS"] = True
     webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True
     window = webview.create_window(
-        TITLE, html=SPLASH, width=1360, height=900, min_size=(1000, 700), background_color="#0f172a"
+        TITLE, html=SPLASH, width=1360, height=900, min_size=(1000, 700), background_color="#12100d"
     )
     assert window is not None
 

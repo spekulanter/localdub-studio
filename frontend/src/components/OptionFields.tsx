@@ -28,7 +28,7 @@ interface Props {
   onPackagesInstalled?: () => void;
 }
 
-const field = "w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900";
+const field = "field";
 
 export function OptionFields({ options, health, value, onChange, lockSource, disabled, onPackagesInstalled }: Props) {
   const packagesInstalled = onPackagesInstalled ?? (() => undefined);
@@ -80,13 +80,13 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
             />
             {ORIGINAL_AUDIO_LABELS[k]}
             {k === "background" && (
-              <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">experimental</span>
+              <span className="chip chip-warn">experimental</span>
             )}
           </label>
         ))}
         {!options.separation_available && <InstallNotice ids={["packages", "separation"]} intro={PYTORCH_INTRO} onInstalled={packagesInstalled} />}
         {value.original_audio === "background" && options.separation_available && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-muted">
             Uses the GPU for about half the video length and downloads an 80 MB model on first use. Singing and
             speech mixed into music may not separate cleanly.
           </p>
@@ -96,15 +96,18 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
           Also keep the untouched original as a 2nd audio track
         </label>
         {value.original_audio === "mute" && (
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-muted">
             Muting also removes music and sound effects from the dubbed track.
           </p>
         )}
       </div>
+      <div className="sm:col-span-2 border-t border-line pt-4">
+        <p className="eyebrow">Experimental</p>
+      </div>
       <div className="text-sm sm:col-span-2">
         <label className="flex items-center gap-2 py-0.5">
           <input type="checkbox" checked={value.diarize} onChange={(e) => set("diarize", e.target.checked)} />
-          Detect different speakers and give each its own voice <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">experimental</span>
+          Detect different speakers and give each its own voice <span className="chip chip-warn">experimental</span>
         </label>
         {value.diarize && (
           <div className="ml-6 mt-1 space-y-1">
@@ -114,12 +117,12 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
                 type="number"
                 min={1}
                 max={10}
-                className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
+                className="btn-secondary btn-sm w-20"
                 value={value.num_speakers ?? ""}
                 onChange={(e) => set("num_speakers", e.target.value === "" ? null : Number(e.target.value))}
               />
             </label>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-muted">
               Runs on the CPU. The first use downloads two small model files (about 46 MB) from GitHub. Giving the
               exact speaker count is much more reliable than automatic detection.
             </p>
@@ -135,7 +138,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
             onChange={(e) => onChange({ ...value, clone_voice: e.target.checked, clone_consent: e.target.checked ? value.clone_consent : false })}
           />
           Make the Slovak voice sound like the original speaker{" "}
-          <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">experimental</span>
+          <span className="chip chip-warn">experimental</span>
         </label>
         {value.clone_voice && (
           <div className="ml-6 mt-1 space-y-1">
@@ -143,7 +146,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
               <input type="checkbox" className="mt-1" checked={value.clone_consent} onChange={(e) => set("clone_consent", e.target.checked)} />
               <span>I have the right to imitate the voices in this video (they are my own, or I have the speakers&apos; permission).</span>
             </label>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-muted">
               Runs locally on your GPU. It shifts the timbre of the generated voice towards the speaker; it is not a perfect
               copy. The finished file is marked as AI-generated.
             </p>

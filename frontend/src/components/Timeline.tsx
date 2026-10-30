@@ -50,10 +50,10 @@ interface Drag {
 }
 
 const STATUS_BORDER: Record<string, string> = {
-  ok: "border-emerald-500/70",
-  stretched: "border-sky-500/70",
-  shifted: "border-amber-500/80",
-  overflow: "border-red-500/80",
+  ok: "border-ok/70",
+  stretched: "border-dub/70",
+  shifted: "border-warn/80",
+  overflow: "border-bad/80",
 };
 
 export function Timeline({
@@ -321,19 +321,19 @@ export function Timeline({
           <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} />
           Snap to neighbours and playhead
         </label>
-        <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+        <span className="ml-auto text-xs text-muted">
           {editable ? "Drag a block to move it, drag its edges to resize. Ctrl + wheel zooms." : "Editing unlocks when no job is running."}
         </span>
       </div>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" role="alert">
+        <p className="alert alert-bad" role="alert">
           {error}
         </p>
       )}
 
-      <div className="flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950">
-        <div className="shrink-0 border-r border-slate-200 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400" style={{ width: GUTTER }}>
+      <div className="flex overflow-hidden rounded-xl border border-line bg-inset/60">
+        <div className="shrink-0 border-r border-line text-xs text-muted dark:text-muted/70" style={{ width: GUTTER }}>
           <div style={{ height: H_RULER }} />
           <div className="flex items-center px-2" style={{ height: H_WAVE }}>
             Original audio
@@ -357,9 +357,9 @@ export function Timeline({
         >
           <div className="relative" style={{ width, height: H_RULER + H_WAVE + H_EN + H_SK }}>
             {/* ruler */}
-            <div className="absolute inset-x-0 top-0 cursor-pointer border-b border-slate-200 dark:border-slate-800" style={{ height: H_RULER }} onClick={seekFromClick}>
+            <div className="absolute inset-x-0 top-0 cursor-pointer border-b border-line" style={{ height: H_RULER }} onClick={seekFromClick}>
               {ticks.map((t) => (
-                <div key={t} className="absolute top-0 h-full border-l border-slate-300 pl-1 text-[10px] leading-6 text-slate-500 dark:border-slate-700 dark:text-slate-400" style={{ left: t * zoom }}>
+                <div key={t} className="absolute top-0 h-full border-l border-line-strong pl-1 text-[10px] leading-6 text-muted dark:text-muted/70" style={{ left: t * zoom }}>
                   {formatTick(t, step)}
                 </div>
               ))}
@@ -370,11 +370,11 @@ export function Timeline({
               <canvas
                 ref={canvas}
                 aria-label="Waveform of the original audio"
-                className="sticky left-0 text-indigo-400/80 dark:text-indigo-300/70"
+                className="sticky left-0 text-ink/60"
                 style={{ width: viewWidth, height: H_WAVE }}
               />
               {waveState === "missing" && (
-                <span className="pointer-events-none absolute left-2 top-1 text-[11px] text-slate-400">The waveform appears once the audio was extracted.</span>
+                <span className="pointer-events-none absolute left-2 top-1 text-[11px] text-muted/70">The waveform appears once the audio was extracted.</span>
               )}
             </div>
 
@@ -397,16 +397,16 @@ export function Timeline({
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
                     onPointerCancel={() => setDrag(null)}
-                    className={`absolute top-1 flex select-none items-center overflow-hidden rounded-md border bg-white/90 px-2 text-xs shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-slate-800/90 ${
-                      STATUS_BORDER[raw.fit_status ?? ""] ?? "border-slate-300 dark:border-slate-600"
-                    } ${selected ? "ring-2 ring-indigo-500" : ""} ${raw.edited ? "bg-indigo-50 dark:bg-indigo-950/70" : ""} ${editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
+                    className={`absolute top-1 flex select-none items-center overflow-hidden rounded-md border bg-surface/90 px-2 text-xs shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      STATUS_BORDER[raw.fit_status ?? ""] ?? "border-line-strong"
+                    } ${selected ? "ring-2 ring-accent" : ""} ${raw.edited ? "bg-accent-soft/70" : ""} ${editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
                     style={{ left, width: w, height: H_EN - 8, touchAction: "none" }}
                   >
                     {editable && (
                       <>
                         <span
                           data-handle="start"
-                          className="absolute inset-y-0 left-0 cursor-col-resize bg-indigo-500/0 hover:bg-indigo-500/30"
+                          className="absolute inset-y-0 left-0 cursor-col-resize bg-accent/0 hover:bg-accent/30"
                           style={{ width: HANDLE }}
                           onPointerDown={(e) => onPointerDown(e, raw, "start")}
                           onPointerMove={onPointerMove}
@@ -415,7 +415,7 @@ export function Timeline({
                         />
                         <span
                           data-handle="end"
-                          className="absolute inset-y-0 right-0 cursor-col-resize bg-indigo-500/0 hover:bg-indigo-500/30"
+                          className="absolute inset-y-0 right-0 cursor-col-resize bg-accent/0 hover:bg-accent/30"
                           style={{ width: HANDLE }}
                           onPointerDown={(e) => onPointerDown(e, raw, "end")}
                           onPointerMove={onPointerMove}
@@ -445,11 +445,10 @@ export function Timeline({
                       onSeek(start);
                     }}
                     title={`${s.translated_text}\n${formatSpan(start, start + s.audio_duration)}${late ? "\nRuns past its window" : ""}`}
+                    data-late={late}
                     className={`absolute top-1 overflow-hidden truncate rounded-md border px-2 text-left text-xs ${
-                      late
-                        ? "border-red-500/70 bg-red-100/80 text-red-900 dark:bg-red-950/70 dark:text-red-100"
-                        : "border-emerald-500/60 bg-emerald-100/80 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-100"
-                    } ${s.id === selectedId ? "ring-2 ring-indigo-500" : ""}`}
+                      late ? "border-bad/70 bg-bad-soft text-bad" : "border-dub/50 bg-dub-soft text-dub"
+                    } ${s.id === selectedId ? "ring-2 ring-accent" : ""}`}
                     style={{ left: start * zoom, width: Math.max(s.audio_duration * zoom, 6), height: H_SK - 8 }}
                   >
                     {s.translated_text}
@@ -461,7 +460,7 @@ export function Timeline({
             {/* time label while dragging */}
             {dragging && drag && (
               <div
-                className="pointer-events-none absolute z-20 -translate-y-full rounded bg-slate-900 px-2 py-0.5 text-[11px] text-white shadow"
+                className="pointer-events-none absolute z-20 -translate-y-full rounded-md bg-ink px-2 py-0.5 font-mono text-[11px] text-paper shadow-lg"
                 style={{ left: Math.max(drag.start * zoom, 0), top: H_RULER + H_WAVE + 2 }}
               >
                 {formatSpan(drag.start, drag.end)}
@@ -470,11 +469,11 @@ export function Timeline({
 
             {/* playhead */}
             <div
-              className="pointer-events-none absolute top-0 z-10 w-px bg-rose-500"
+              className="pointer-events-none absolute top-0 z-10 w-[2px] bg-accent shadow-[0_0_8px_var(--accent)]"
               data-testid="playhead"
               style={{ left: currentTime * zoom, height: H_RULER + H_WAVE + H_EN + H_SK }}
             >
-              <span className="absolute -left-1 top-0 size-2 rotate-45 bg-rose-500" />
+              <span className="absolute -left-[5px] top-0 size-[11px] rotate-45 rounded-[2px] bg-accent" />
             </div>
           </div>
         </div>

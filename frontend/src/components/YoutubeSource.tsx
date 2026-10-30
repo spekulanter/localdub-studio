@@ -16,7 +16,7 @@ const BROWSER_LABELS: Record<string, string> = {
   chrome: "Google Chrome",
   firefox: "Mozilla Firefox",
 };
-const field = "w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900";
+const field = "field";
 
 interface Props {
   /** The checked link and its options, or null while there is nothing valid to download. */
@@ -94,14 +94,14 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
     }
   }
 
-  if (!status) return <p className="text-sm text-slate-500">Checking the YouTube tools…</p>;
+  if (!status) return <p className="text-sm text-muted">Checking the YouTube tools…</p>;
 
   if (!status.installed) {
     return (
-      <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+      <div className="rounded-lg border border-line p-4">
         <h3 className="mb-1 font-medium">One-time setup for YouTube links</h3>
         <InstallNotice ids={["youtube"]} intro={TOOLS_INTRO} onInstalled={loadStatus} />
-        {error && <p className="mt-2 text-sm text-red-700 dark:text-red-300" role="alert">{error}</p>}
+        {error && <p className="mt-2 text-sm text-bad" role="alert">{error}</p>}
       </div>
     );
   }
@@ -133,7 +133,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
             type="button"
             onClick={() => void check()}
             disabled={!url.trim() || checking}
-            className="shrink-0 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+            className="btn-secondary shrink-0"
           >
             {checking ? "Checking…" : "Check link"}
           </button>
@@ -141,22 +141,22 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
       </label>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" role="alert">
+        <p className="alert alert-bad" role="alert">
           {error}
         </p>
       )}
 
       {info && (
-        <div className="flex gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-950/40" data-testid="youtube-card">
+        <div className="flex gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3" data-testid="youtube-card">
           {info.thumbnail && (
-            <img src={info.thumbnail} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-20 w-36 shrink-0 rounded-md bg-slate-200 object-cover" />
+            <img src={info.thumbnail} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-20 w-36 shrink-0 rounded-md bg-inset object-cover" />
           )}
           <div className="min-w-0 text-sm">
             <p className="line-clamp-2 font-medium">{info.title}</p>
-            <p className="text-slate-600 dark:text-slate-300">
+            <p className="text-muted">
               {[info.uploader, info.duration ? formatTime(info.duration) : null].filter(Boolean).join(" · ")}
             </p>
-            <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-300">✓ The link works.</p>
+            <p className="mt-1 text-xs text-ok">✓ The link works.</p>
           </div>
         </div>
       )}
@@ -178,7 +178,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">Dubbing does not need more than 1080p.</span>
+          <span className="mt-1 block text-xs text-muted">Dubbing does not need more than 1080p.</span>
         </label>
         <details className="text-sm">
           <summary className="cursor-pointer font-medium">Age-restricted or members-only video?</summary>
@@ -199,16 +199,16 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
               ))}
             </select>
           </label>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-muted">
             yt-dlp reads your own browser's sign-in on this computer. The cookies are not stored or sent anywhere else.
           </p>
         </details>
       </div>
 
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="text-xs text-muted">
         Only use videos you have the right to download and dub. Downloading can be against YouTube's terms of service.
       </p>
-      <p className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
         yt-dlp {status.yt_dlp.version ?? "?"}
         <button type="button" onClick={() => void update()} disabled={updating} className="underline disabled:opacity-50">
           {updating ? "Updating…" : "Update yt-dlp"}

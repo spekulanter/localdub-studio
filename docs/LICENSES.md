@@ -201,3 +201,13 @@ truncated downloads but not a compromised release. Updates (`yt-dlp --update-to 
 yt-dlp's own updater, not by LocalDub. The versions are not pinned, because yt-dlp must follow
 YouTube's changes. Downloading from YouTube can be against its terms of service and copyright law;
 the form says so, and the feature is meant for videos the user may download and dub.
+
+## Web UI fonts and icons (bundled, offline)
+| Component | Version | Licence |
+|---|---|---|
+| Fraunces (variable) via `@fontsource-variable/fraunces` | 5.3.0 | SIL Open Font License 1.1 |
+| IBM Plex Sans / IBM Plex Mono via `@fontsource/ibm-plex-*` | 5.3.0 | SIL Open Font License 1.1 |
+| Lucide icons via `lucide-react` | 1.65.0 | ISC |
+
+The font files (Latin and Latin Extended subsets, so Slovak diacritics work) are part of the built UI; the
+app never loads fonts from the internet. React, Tailwind CSS and the other front-end tools are MIT.

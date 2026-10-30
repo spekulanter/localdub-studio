@@ -93,7 +93,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
   }
 
   if (!project || !draft) {
-    return error ? <p className="text-red-600" role="alert">{error}</p> : <p className="text-slate-500">Loading…</p>;
+    return error ? <p className="text-bad" role="alert">{error}</p> : <p className="text-muted">Loading…</p>;
   }
 
   const active = isActive(job);
@@ -102,11 +102,12 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
   const editable = !active && !busy && segments !== null && segments.stage !== null && segments.stage !== "asr";
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-start justify-between gap-2">
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-semibold">{project.name}</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="eyebrow mb-1.5">{project.source_url ? "Dub from YouTube" : "Dub from a file"}</p>
+          <h2 className="font-display line-clamp-2 text-[30px] font-semibold leading-[1.1]">{project.name}</h2>
+          <p className="mt-2 font-mono text-xs text-muted">
             {project.source_url ? (
               <>
                 <a href={project.source_url} target="_blank" rel="noreferrer noopener" className="underline">
@@ -130,14 +131,14 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
             }
           }}
           disabled={busy}
-          className="rounded-md border border-red-300 px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+          className="btn-danger btn-sm"
         >
           Delete
         </button>
       </header>
 
       {error && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" role="alert">
+        <p className="alert alert-bad" role="alert">
           {error}
         </p>
       )}
@@ -151,18 +152,18 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
           onRetry={() => void act(() => api.startJob(projectId))}
         />
       ) : (
-        <button onClick={() => void act(() => api.startJob(projectId))} disabled={busy} className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">
+        <button onClick={() => void act(() => api.startJob(projectId))} disabled={busy} className="btn-primary">
           Start dubbing
         </button>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-medium">Preview</h3>
+      <section className="card">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="eyebrow">Preview</h3>
           {done && (
-            <div className="flex overflow-hidden rounded-md border border-slate-300 text-sm dark:border-slate-700" role="group" aria-label="Preview version">
+            <div className="seg" role="group" aria-label="Preview version">
               {(["dub", "original"] as const).map((v) => (
-                <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={`px-3 py-1 ${view === v ? "bg-indigo-600 text-white" : ""}`}>
+                <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className="">
                   {v === "dub" ? "Slovak dub" : "Original"}
                 </button>
               ))}
@@ -176,36 +177,36 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
             key={`${view}-${done}-${job?.finished_at ?? 0}-${project.has_input}`}
             controls
             preload="metadata"
-            className="max-h-[28rem] w-full rounded-md bg-black"
+            className="max-h-[28rem] w-full rounded-xl bg-black shadow-lg"
             src={done && view === "dub" ? `${api.fileUrl(projectId, "video", true)}&t=${job?.finished_at ?? 0}` : api.sourceUrl(projectId)}
           />
         ) : (
-          <div className="flex h-40 items-center justify-center rounded-md bg-slate-100 text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400" role="status">
+          <div className="flex h-40 items-center justify-center rounded-md bg-inset text-sm text-muted" role="status">
             {active ? "The video is being downloaded from YouTube…" : "The video was not downloaded. Use Retry above to try again."}
           </div>
         )}
         {done && (
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-xs text-muted">
             The dub is the first audio track. {project.keep_original_track ? "The original is the second track (switch tracks in a desktop player such as VLC)." : "The original audio track was not kept."}
           </p>
         )}
         {done && (
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
-            <a className="rounded-md bg-emerald-600 px-3 py-1.5 font-medium text-white" href={api.fileUrl(projectId, "video")}>
+            <a className="btn-primary" href={api.fileUrl(projectId, "video")}>
               Download MP4
             </a>
-            <a className="rounded-md border border-slate-300 px-3 py-1.5 dark:border-slate-700" href={api.fileUrl(projectId, "srt")}>
+            <a className="btn-secondary" href={api.fileUrl(projectId, "srt")}>
               Slovak subtitles (.srt)
             </a>
-            <a className="rounded-md border border-slate-300 px-3 py-1.5 dark:border-slate-700" href={api.fileUrl(projectId, "srt_en")}>
+            <a className="btn-secondary" href={api.fileUrl(projectId, "srt_en")}>
               English subtitles (.srt)
             </a>
           </div>
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="mb-3 font-medium">Settings</h3>
+      <section className="card">
+        <h3 className="eyebrow mb-4">Settings</h3>
         <OptionFields options={options} health={health} value={draft} onChange={setDraft} lockSource disabled={active || busy} onPackagesInstalled={onOptionsChanged} />
         {stage && !active && !(draft.clone_voice && !draft.clone_consent) && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -226,11 +227,11 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
                   await api.startJob(projectId, stage);
                 })
               }
-              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="btn-primary"
             >
               Apply and re-render
             </button>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-muted">
               Re-runs from “{stage}” — earlier steps are reused.
             </span>
           </div>
@@ -238,8 +239,8 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
       </section>
 
       {segments !== null && segments.segments.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="mb-3 font-medium">Timeline</h3>
+        <section className="card">
+          <h3 className="eyebrow mb-4">Timeline</h3>
           <Timeline
             projectId={projectId}
             segments={segments.segments}
@@ -261,8 +262,8 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
         </section>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="mb-3 font-medium">Dialogue</h3>
+      <section className="card">
+        <h3 className="eyebrow mb-4">Dialogue</h3>
         <DialogueEditor
           projectId={projectId}
           data={segments}

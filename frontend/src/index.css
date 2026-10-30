@@ -1,15 +1,304 @@
 @import "tailwindcss";
 
+/*
+  LocalDub Studio design system: a dubbing booth.
+  Warm paper and ink by day, a dim console by night. One loud colour (signal orange-red) is kept for
+  what is live: the playhead, the primary action, the progress meter. Slovak speech is deep teal.
+*/
+
 :root {
   color-scheme: light dark;
+  --paper: #f2eee5;
+  --surface: #fbf9f3;
+  --inset: #ece6d8;
+  --line: #ded6c4;
+  --line-strong: #c7bda5;
+  --ink: #1d1a14;
+  --muted: #6b6455;
+  --accent: #de4a1c;
+  --accent-hover: #c43d13;
+  --accent-fg: #ffffff;
+  --accent-soft: #fbe3d9;
+  --dub: #0d6a61;
+  --dub-soft: #d5ebe6;
+  --ok: #2e7d4e;
+  --ok-soft: #dcefe2;
+  --warn: #a8690a;
+  --warn-soft: #f8e8c6;
+  --bad: #b3261e;
+  --bad-soft: #f8dcd8;
+  --shadow: 0 1px 0 rgb(255 255 255 / 0.7) inset, 0 10px 30px -18px rgb(60 40 10 / 0.35);
+  --grain-opacity: 0.22;
 }
 
-@layer components {
-  .tl-btn {
-    @apply rounded-md border border-slate-300 bg-white px-2.5 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12100d;
+    --surface: #1b1814;
+    --inset: #24201a;
+    --line: #342f27;
+    --line-strong: #4b443a;
+    --ink: #efe8d9;
+    --muted: #a39a87;
+    --accent: #ff6b3d;
+    --accent-hover: #ff8660;
+    --accent-fg: #1a0d07;
+    --accent-soft: #3b2016;
+    --dub: #52cbbc;
+    --dub-soft: #123631;
+    --ok: #6fcf93;
+    --ok-soft: #15301f;
+    --warn: #e8b04a;
+    --warn-soft: #3a2b0e;
+    --bad: #ff8a80;
+    --bad-soft: #3c1814;
+    --shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 12px 32px -18px rgb(0 0 0 / 0.8);
+    --grain-opacity: 0.1;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-inset: var(--inset);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-dub: var(--dub);
+  --color-dub-soft: var(--dub-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --font-sans: "IBM Plex Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Fraunces Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+html {
+  background: var(--paper);
+}
+
 body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  @apply bg-paper font-sans text-ink antialiased;
+  min-height: 100vh;
+  background-image: radial-gradient(1100px 520px at 12% -10%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* paper grain: its own layer, so the strength can differ between light and dark */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35  0 0 0 0 .3  0 0 0 0 .22  0 0 0 1.2 -.2'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+select.field {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 12px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%236b6455' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4.5 6 8l3.5-3.5'/></svg>");
+}
+
+@media (prefers-color-scheme: dark) {
+  select.field {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23a39a87' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4.5 6 8l3.5-3.5'/></svg>");
+  }
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .font-display {
+    font-variation-settings: "opsz" 72, "SOFT" 30;
+    letter-spacing: -0.01em;
+  }
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-muted;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-surface p-5;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    @apply font-display text-xl font-semibold text-ink;
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger,
+  .tl-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-[10px] border border-transparent px-3.5 py-2 text-sm font-medium transition-[background,border-color,transform,box-shadow] duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn:not(:disabled):active,
+  .btn-primary:not(:disabled):active,
+  .btn-secondary:not(:disabled):active,
+  .btn-ghost:not(:disabled):active,
+  .btn-danger:not(:disabled):active {
+    transform: translateY(1px);
+  }
+  .btn-primary {
+    @apply bg-accent text-accent-fg hover:bg-accent-hover;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.25) inset, 0 6px 14px -8px var(--accent);
+  }
+  .btn-secondary,
+  .tl-btn {
+    @apply border-line-strong bg-surface text-ink hover:bg-inset;
+  }
+  .btn-ghost {
+    @apply text-muted hover:bg-inset hover:text-ink;
+  }
+  .btn-danger {
+    @apply border-line-strong bg-surface text-bad hover:bg-bad-soft;
+  }
+  .btn-sm,
+  .tl-btn {
+    @apply px-2.5 py-1 text-[13px];
+  }
+
+  .field {
+    @apply w-full rounded-[10px] border border-line-strong bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted/70 disabled:opacity-60;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  .alert {
+    @apply rounded-[10px] border p-3 text-sm;
+  }
+  .alert-bad {
+    @apply border-bad/30 bg-bad-soft text-bad;
+  }
+  .alert-warn {
+    @apply border-warn/40 bg-warn-soft text-warn;
+  }
+  .alert-ok {
+    @apply border-ok/30 bg-ok-soft text-ok;
+  }
+
+  .seg {
+    @apply inline-flex rounded-[11px] border border-line-strong bg-inset p-0.5 text-sm;
+  }
+  .seg > button {
+    @apply rounded-[9px] px-3.5 py-1.5 font-medium text-muted transition-colors hover:text-ink disabled:opacity-50;
+  }
+  .seg > button[aria-selected="true"],
+  .seg > button[aria-pressed="true"] {
+    @apply bg-surface text-ink;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 0 0 1px var(--line);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-line bg-inset px-2 py-0.5 text-xs text-muted;
+  }
+  .chip-ok {
+    @apply border-transparent bg-ok-soft text-ok;
+  }
+  .chip-warn {
+    @apply border-transparent bg-warn-soft text-warn;
+  }
+  .chip-bad {
+    @apply border-transparent bg-bad-soft text-bad;
+  }
+  .chip-dub {
+    @apply border-transparent bg-dub-soft text-dub;
+  }
+  .chip-accent {
+    @apply border-transparent bg-accent-soft text-accent;
+  }
+
+  /* progress as a level meter: a track with tick marks and a glowing signal */
+  .meter {
+    @apply relative h-2.5 overflow-hidden rounded-full bg-inset;
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.12);
+  }
+  .meter::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(90deg, transparent 0 9px, color-mix(in srgb, var(--paper) 70%, transparent) 9px 10px);
+    pointer-events: none;
+  }
+  .meter > span {
+    @apply block h-full rounded-full transition-[width] duration-500 ease-out;
+    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #f2b233));
+  }
+  .meter > span[data-state="done"] {
+    background: linear-gradient(90deg, var(--ok), color-mix(in srgb, var(--ok) 70%, #9bd8b0));
+  }
+  .meter > span[data-state="failed"] {
+    background: var(--bad);
+  }
+  .meter > span[data-live="true"] {
+    background-size: 200% 100%;
+    animation: meter-glow 1.6s linear infinite;
+    background-image: linear-gradient(90deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, #f2b233) 45%, var(--accent) 90%);
+  }
+
+}
+
+@keyframes meter-glow {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .meter > span[data-live="true"] {
+    animation: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

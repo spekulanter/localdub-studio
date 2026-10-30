@@ -53,8 +53,8 @@ describe("Timeline", () => {
     setup();
     const late = screen.getByTitle(/Druhá veta/);
     expect(late.getAttribute("title")).toContain("Runs past its window");
-    expect(late.className).toContain("red");
-    expect(screen.getByTitle(/Ahoj/).className).toContain("emerald");
+    expect(late.getAttribute("data-late")).toBe("true");
+    expect(screen.getByTitle(/Ahoj/).getAttribute("data-late")).toBe("false");
   });
 
   it("puts the playhead at the current time", () => {
