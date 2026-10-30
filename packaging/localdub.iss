@@ -268,9 +268,10 @@ begin
   if WizardIsComponentSelected('diarization') then
     Fetch := Fetch + ' --diarization';
 
-  { Python lives inside the install folder (not in one user's profile) and models/data in the user's
+  { Always use uv's own Python (never whatever is on this PC), kept inside the install folder rather than
+    in one user's profile; models/data go to the user's
     %LOCALAPPDATA%, because Program Files is read-only for normal users. }
-  EnvPrefix := 'set "UV_PYTHON_INSTALL_DIR=' + ExpandConstant('{app}\python') + '" && set "LOCALDUB_MODELS_DIR=' + ExpandConstant('{#UserData}\models') + '" && ';
+  EnvPrefix := 'set "UV_PYTHON_PREFERENCE=only-managed" && set "UV_PYTHON_INSTALL_DIR=' + ExpandConstant('{app}\python') + '" && set "LOCALDUB_MODELS_DIR=' + ExpandConstant('{#UserData}\models') + '" && ';
 
   RunStep('Installing Python 3.12 and the program libraries...', 'About 2.5 GB (6 GB with the experimental features). Python comes from python-build-standalone, libraries from PyPI.',
     EnvPrefix + Uv + ' sync --frozen --no-dev' + Extra, False);
