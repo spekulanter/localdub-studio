@@ -2,7 +2,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Health, Job, ModelInfo, ModelsResponse, Options, SegmentRow, SegmentsResponse } from "../api";
 import { ModelsPanel } from "./ModelsPanel";
-import { PackagesNotice } from "./PackagesNotice";
+import { InstallNotice } from "./InstallNotice";
+
+const INTRO = (size: string) => `This needs an extra download of about ${size} (PyTorch).`;
 import { NewProject } from "./NewProject";
 import { ProgressPanel } from "./ProgressPanel";
 import { DialogueEditor } from "./DialogueEditor";
@@ -251,7 +253,7 @@ describe("start is blocked while required models are missing", () => {
   });
 });
 
-describe("PackagesNotice (install the optional packages without commands)", () => {
+describe("InstallNotice (install the optional packages without commands)", () => {
   const row = (over: Partial<ModelInfo>): ModelInfo => ({
     id: "packages", title: "Optional packages", description: "d", size_bytes: 2_900_000_000, required: false,
     group: "packages", installed: false, available: true, download: null, ...over,
@@ -270,7 +272,7 @@ describe("PackagesNotice (install the optional packages without commands)", () =
       }
       return reply([row({}), sep()]);
     }));
-    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    render(<InstallNotice intro={INTRO} ids={["packages", "separation"]} onInstalled={vi.fn()} />);
     const button = await screen.findByRole("button", { name: /Install now \(3\.0 GB\)/ });
     expect(screen.getByText(/no administrator rights and no commands are needed/)).toBeTruthy();
     fireEvent.click(button);
@@ -281,7 +283,7 @@ describe("PackagesNotice (install the optional packages without commands)", () =
   it("shows live progress in bytes while installing", async () => {
     const dl = { status: "running" as const, done: 1_500_000_000, total: 2_900_000_000, message: "Downloading torch", error: null };
     vi.stubGlobal("fetch", vi.fn(async () => reply([row({ download: dl }), sep()])));
-    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    render(<InstallNotice intro={INTRO} ids={["packages", "separation"]} onInstalled={vi.fn()} />);
     const bar = await screen.findByRole("progressbar", { name: /Installing the optional packages/ });
     expect(Number(bar.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(49);
     expect(screen.getByText(/1\.5 GB of 3\.0 GB · Downloading torch/)).toBeTruthy();
@@ -295,7 +297,7 @@ describe("PackagesNotice (install the optional packages without commands)", () =
       message: "Downloading torch (1.2 GB of 2.9 GB)", error: null, show_bytes: false,
     };
     vi.stubGlobal("fetch", vi.fn(async () => reply([row({ download: dl }), sep({ installed: true })])));
-    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    render(<InstallNotice intro={INTRO} ids={["packages", "separation"]} onInstalled={vi.fn()} />);
     expect(await screen.findByText("40% · Downloading torch (1.2 GB of 2.9 GB)")).toBeTruthy();
     expect(screen.queryByText(/7\.4 GB/)).toBeNull(); // no misleading byte totals
     vi.unstubAllGlobals();
@@ -304,7 +306,7 @@ describe("PackagesNotice (install the optional packages without commands)", () =
   it("shows why it failed and lets the user try again", async () => {
     const dl = { status: "error" as const, done: 0, total: 1, message: "Failed", error: "Not enough free disk space" };
     vi.stubGlobal("fetch", vi.fn(async () => reply([row({ download: dl }), sep()])));
-    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    render(<InstallNotice intro={INTRO} ids={["packages", "separation"]} onInstalled={vi.fn()} />);
     expect((await screen.findByRole("alert")).textContent).toContain("Not enough free disk space");
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
     vi.unstubAllGlobals();
@@ -313,9 +315,48 @@ describe("PackagesNotice (install the optional packages without commands)", () =
   it("tells the page once when everything is installed", async () => {
     const onInstalled = vi.fn();
     vi.stubGlobal("fetch", vi.fn(async () => reply([row({ installed: true }), sep({ installed: true, available: true })])));
-    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={onInstalled} />);
+    render(<InstallNotice intro={INTRO} ids={["packages", "separation"]} onInstalled={onInstalled} />);
     expect(await screen.findByText(/Installed\. This option is ready to use\./)).toBeTruthy();
     await waitFor(() => expect(onInstalled).toHaveBeenCalledTimes(1));
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("DialogueEditor audio", () => {
+  const row = (over: Partial<SegmentRow> = {}): SegmentRow => ({
+    id: 1, start: 0, end: 2, source_text: "Hello", translated_text: "Ahoj", fit_status: "ok", speaker_id: "S1",
+    voice_id: null, effective_voice: "F1", review_status: "pending", edited: false, stale_edit: false,
+    has_audio: false, placed_start: null, audio_duration: null, ...over,
+  });
+
+  it("frees the previewed clips and stops talking when the page is left", async () => {
+    let n = 0;
+    const created: string[] = [];
+    const revoked: string[] = [];
+    vi.stubGlobal("URL", Object.assign(URL, {
+      createObjectURL: () => { const u = `blob:clip-${++n}`; created.push(u); return u; },
+      revokeObjectURL: (u: string) => { revoked.push(u); },
+    }));
+    const pause = vi.fn();
+    class FakeAudio {
+      constructor(public src: string) {}
+      play = vi.fn().mockResolvedValue(undefined);
+      pause = pause;
+    }
+    vi.stubGlobal("Audio", FakeAudio);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Blob(["x"]), { headers: { "X-Audio-Duration": "1.0", "X-Window": "2.0" } })));
+    const { unmount } = render(
+      <DialogueEditor projectId={1} data={data([row()])} options={options} editable renderVersion={0} onChange={vi.fn()} onRerender={vi.fn()} busy={false} />,
+    );
+    const tryText = screen.getByRole("button", { name: /Try this text/ });
+    fireEvent.click(tryText);
+    await waitFor(() => expect(created).toEqual(["blob:clip-1"]));
+    fireEvent.click(tryText);
+    await waitFor(() => expect(created).toEqual(["blob:clip-1", "blob:clip-2"]));
+    expect(revoked).toEqual(["blob:clip-1"]); // the first clip was freed when the second one played
+    unmount();
+    expect(revoked).toEqual(["blob:clip-1", "blob:clip-2"]);
+    expect(pause).toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });

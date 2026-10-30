@@ -3,16 +3,18 @@ import { api, type ModelsResponse } from "../api";
 import { formatBytes, percent } from "../lib/bytes";
 
 interface Props {
-  /** What to install: the packages plus the model the feature needs, e.g. ["packages", "separation"]. */
+  /** What to install, e.g. ["packages", "separation"] or ["youtube"]. */
   ids: string[];
+  /** Explains what is downloaded; gets the size, e.g. "3.0 GB". */
+  intro: (size: string) => string;
   /** Called once everything in `ids` is installed, so the page can unlock the feature. */
   onInstalled: () => void;
 }
 
 const BUSY = ["queued", "running"];
 
-/** One-click installation of the optional PyTorch packages (and a model), with progress. */
-export function PackagesNotice({ ids, onInstalled }: Props) {
+/** One-click installation of optional components (packages, tools, models) with progress. */
+export function InstallNotice({ ids, onInstalled, intro }: Props) {
   const [data, setData] = useState<ModelsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const notified = useRef(false);
@@ -70,8 +72,8 @@ export function PackagesNotice({ ids, onInstalled }: Props) {
     <div className="mt-1 space-y-1 text-xs text-slate-600 dark:text-slate-300">
       {!running && (
         <p>
-          This needs an extra download of about {formatBytes(total)} (PyTorch). It is installed into your own
-          user folder; no administrator rights and no commands are needed.
+          {intro(formatBytes(total))} It is installed into your own user folder; no administrator rights and no
+          commands are needed.
         </p>
       )}
       {running && (

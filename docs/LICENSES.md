@@ -186,3 +186,18 @@ The checkpoint is loaded with `torch.load(weights_only=True)`. Same optional ins
 that the user may imitate the voices; generated MP4s keep the AI-disclosure metadata. Cloning
 people's voices can be illegal or harmful without their consent; this feature is meant for your own
 voice or voices you have permission to use.
+
+## YouTube import (optional, installed on request)
+| Component | Source | Licence | Status |
+|---|---|---|---|
+| yt-dlp (`yt-dlp.exe`) | `github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe`, checked against the release's `SHA2-256SUMS` | Unlicense (the official executable also bundles third-party components, listed in the project's `THIRD_PARTY_LICENSES.txt`) | verified from the project's published licence |
+| Deno (`deno.exe`) | `github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip`, checked against its `.sha256sum` | MIT | verified from the project's published licence |
+| FFmpeg | the one LocalDub already uses (not downloaded again) | see the FFmpeg entry above | - |
+
+LocalDub Studio does **not** redistribute these programs: the user's own app downloads them from the
+publishers when the user clicks *Install now*, into `%LOCALAPPDATA%\LocalDub Studio\youtube-tools`.
+The SHA-256 is the publisher's own, fetched from the same release page, so it detects corrupted or
+truncated downloads but not a compromised release. Updates (`yt-dlp --update-to stable`) are done by
+yt-dlp's own updater, not by LocalDub. The versions are not pinned, because yt-dlp must follow
+YouTube's changes. Downloading from YouTube can be against its terms of service and copyright law;
+the form says so, and the feature is meant for videos the user may download and dub.

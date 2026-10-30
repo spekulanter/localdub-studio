@@ -12,28 +12,12 @@ from collections.abc import Callable
 
 from localdub.api.db import Database
 from localdub.config import Settings
-from localdub.core.platform import pid_alive
+from localdub.core.platform import kill_tree, pid_alive
 
 log = logging.getLogger(__name__)
 
 HEARTBEAT_STALE_S = 15.0
 CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
-
-
-def kill_tree(pid: int) -> None:
-    """Terminate a process and its children (ffmpeg) without a shell."""
-    if sys.platform == "win32":
-        subprocess.run(  # noqa: S603
-            ["taskkill", "/PID", str(pid), "/T", "/F"],  # noqa: S607
-            capture_output=True,
-            creationflags=CREATE_NO_WINDOW,
-            check=False,
-        )
-    else:
-        try:
-            os.kill(pid, 9)
-        except ProcessLookupError:
-            pass
 
 
 class JobManager:

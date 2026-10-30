@@ -238,3 +238,91 @@ def test_install_reports_a_network_failure_in_plain_words(tmp_path, monkeypatch)
     client = httpx.Client(transport=httpx.MockTransport(boom))
     with pytest.raises(ExtrasError, match="Check your internet connection"):
         extras.install(lambda *a: None, client=client, uv=Path("uv.exe"))
+
+
+def test_a_file_that_was_written_completely_but_never_renamed_is_verified_not_downloaded_again(
+    tmp_path,
+):
+    payload = b"complete wheel" * 100
+    w = wheel_for(payload)
+    (tmp_path / (w.filename + ".part")).write_bytes(payload)
+    calls: list = []
+    path = extras.download_wheel(
+        w, len(payload), tmp_path, make_client(payload, record=calls), lambda n: None
+    )
+    assert path.read_bytes() == payload and calls == []
+
+
+def test_a_restarted_download_never_pulls_the_progress_back(tmp_path, monkeypatch):
+    payload = b"w" * 40_000
+    w = wheel_for(payload, "pkg-1.0-py3-none-any.whl")
+    (tmp_path / "extras-download").mkdir()
+    (tmp_path / "extras-download" / (w.filename + ".part")).write_bytes(payload[:30_000])
+    monkeypatch.setattr(extras, "build_plan", lambda **kw: [w])
+    monkeypatch.setenv(extras.EXTRAS_ENV, str(tmp_path / "extras"))
+    monkeypatch.setattr(
+        extras,
+        "_run",
+        lambda cmd, **kw: (Path(str(cmd[cmd.index("--target") + 1])).mkdir(parents=True), "")[1],
+    )
+    events: list[int] = []
+    saved = list(sys.path)
+    try:
+        # this server ignores Range requests, so the download starts again from byte 0
+        extras.install(
+            lambda d, t, m: events.append(d),
+            client=make_client(payload, ranges=False),
+            uv=Path("uv.exe"),
+        )
+    finally:
+        sys.path[:] = saved
+    assert events == sorted(events)
+
+
+def test_a_failed_unpack_removes_the_half_written_folder_but_keeps_the_wheels(
+    tmp_path, monkeypatch
+):
+    payload = b"w" * 1000
+    w = wheel_for(payload, "pkg-1.0-py3-none-any.whl")
+    monkeypatch.setattr(extras, "build_plan", lambda **kw: [w])
+    monkeypatch.setenv(extras.EXTRAS_ENV, str(tmp_path / "extras"))
+
+    def failing_uv(cmd, **kw):
+        target = Path(str(cmd[cmd.index("--target") + 1]))
+        (target / "torch").mkdir(parents=True)
+        raise ExtrasError("uv failed: disk full")
+
+    monkeypatch.setattr(extras, "_run", failing_uv)
+    with pytest.raises(ExtrasError, match="disk full"):
+        extras.install(lambda *a: None, client=make_client(payload), uv=Path("uv.exe"))
+    assert not (tmp_path / "extras-new").exists()  # no multi-GB leftovers
+    assert (tmp_path / "extras-download" / w.filename).is_file()  # a retry does not download again
+
+
+def test_replacing_an_installation_that_is_in_use_fails_cleanly_and_keeps_the_old_one(
+    tmp_path, monkeypatch
+):
+    payload = b"w" * 1000
+    w = wheel_for(payload, "pkg-1.0-py3-none-any.whl")
+    folder = tmp_path / "extras"
+    folder.mkdir()
+    (folder / "old.txt").write_text("old install", encoding="utf-8")
+    monkeypatch.setattr(extras, "build_plan", lambda **kw: [w])
+    monkeypatch.setenv(extras.EXTRAS_ENV, str(folder))
+    monkeypatch.setattr(
+        extras,
+        "_run",
+        lambda cmd, **kw: (Path(str(cmd[cmd.index("--target") + 1])).mkdir(parents=True), "")[1],
+    )
+    real_replace = Path.replace
+
+    def locked(self, target):
+        if self == folder:  # Windows refuses to rename a folder with loaded DLLs
+            raise PermissionError("[WinError 5] Access is denied")
+        return real_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", locked)
+    with pytest.raises(ExtrasError, match="still in use"):
+        extras.install(lambda *a: None, client=make_client(payload), uv=Path("uv.exe"))
+    monkeypatch.undo()
+    assert (folder / "old.txt").read_text(encoding="utf-8") == "old install"  # nothing was lost

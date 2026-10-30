@@ -2,19 +2,22 @@ import { useEffect, useState } from "react";
 import { api, type Job, type Stage } from "../api";
 import { STAGE_LABELS, statusLabel } from "../lib/format";
 
-const ORDER: Stage[] = ["probe", "extract", "asr", "diarize", "translate", "tts", "separate", "convert", "assemble", "export"];
+const ORDER: Stage[] = ["download", "probe", "extract", "asr", "diarize", "translate", "tts", "separate", "convert", "assemble", "export"];
 
 interface Props {
   job: Job;
+  /** The video comes from a link, so downloading is the first step. */
+  hasDownload?: boolean;
   onCancel: () => void;
   onRetry: () => void;
   busy: boolean;
 }
 
-export function ProgressPanel({ job, onCancel, onRetry, busy }: Props) {
+export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = false }: Props) {
+  const order = hasDownload ? ORDER : ORDER.filter((s) => s !== "download");
   const active = job.status === "queued" || job.status === "running";
   const pct = Math.round(job.progress * 100);
-  const current = job.stage === "" ? -1 : ORDER.indexOf(job.stage);
+  const current = job.stage === "" ? -1 : order.indexOf(job.stage);
   const [log, setLog] = useState<string[] | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -70,7 +73,7 @@ export function ProgressPanel({ job, onCancel, onRetry, busy }: Props) {
         />
       </div>
       <ol className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-        {ORDER.map((s, i) => {
+        {order.map((s, i) => {
           const done = job.status === "done" || i < current;
           const now = job.status === "running" && i === current;
           return (

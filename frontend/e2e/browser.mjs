@@ -10,6 +10,11 @@ export async function launch(viewport = { width: 1360, height: 1000 }) {
   return { browser, page };
 }
 
+/** browser.close() can hang on a page that is still playing video: never wait for it for long. */
+export async function closeBrowser(browser) {
+  await Promise.race([browser.close().catch(() => undefined), new Promise((r) => setTimeout(r, 5000))]);
+}
+
 export async function api(path, init) {
   const res = await fetch(`${BASE}${path}`, init);
   if (!res.ok && res.status !== 204) throw new Error(`${init?.method ?? "GET"} ${path} -> ${res.status}`);

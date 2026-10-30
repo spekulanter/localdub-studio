@@ -124,6 +124,25 @@ describe("Timeline", () => {
     finish();
   });
 
+  it("forgets a drag that the system cancelled (pointercancel)", () => {
+    const p = setup();
+    fireEvent.pointerDown(block(1), { button: 0, clientX: 200, pointerId: 1 });
+    fireEvent.pointerMove(block(1), { clientX: 260, pointerId: 1 });
+    expect(block(1).style.left).not.toBe("80px"); // it follows the pointer
+    fireEvent.pointerCancel(block(1), { pointerId: 1 });
+    expect(block(1).style.left).toBe("80px"); // and snaps back
+    fireEvent.pointerUp(block(1), { clientX: 260, pointerId: 1 });
+    expect(p.onTimingChange).not.toHaveBeenCalled();
+  });
+
+  it("marks the selected line with aria-current and can be scrolled with the keyboard", () => {
+    setup({ selectedId: 2 });
+    expect(block(2).getAttribute("aria-current")).toBe("true");
+    expect(block(1).getAttribute("aria-current")).toBeNull();
+    const region = screen.getByRole("region", { name: /Timeline/ });
+    expect(region.getAttribute("tabindex")).toBe("0");
+  });
+
   it("is read-only while a job runs", () => {
     const p = setup({ editable: false });
     expect(block(1).querySelector("[data-handle]")).toBeNull();

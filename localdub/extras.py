@@ -252,21 +252,14 @@ def resolve_sizes(wheels: list[Wheel], client: Any) -> dict[str, int]:
     return sizes
 
 
-def download_wheel(
-    w: Wheel, size: int, dest: Path, client: Any, on_bytes: Callable[[int], None]
-) -> Path:
-    """Download one wheel (resuming a partial file), verify its SHA-256, return its path."""
-    final = dest / w.filename
-    part = dest / (w.filename + ".part")
-    if final.is_file() and _sha256_file(final) == w.sha256:
-        on_bytes(final.stat().st_size)
-        return final
-    final.unlink(missing_ok=True)
-    have = part.stat().st_size if part.is_file() else 0
+def _fetch_into(
+    w: Wheel, part: Path, have: int, client: Any, on_bytes: Callable[[int], None]
+) -> None:
+    """Stream the wheel into `part`, continuing at `have` bytes when the server allows it."""
     for _ in range(2):
         headers = {"Range": f"bytes={have}-"} if have else {}
         with client.stream("GET", w.url, headers=headers, follow_redirects=True) as resp:
-            if resp.status_code == 416:  # nothing left to fetch, or the partial file is invalid
+            if resp.status_code == 416:  # the partial file is longer than the real one
                 part.unlink(missing_ok=True)
                 have = 0
                 continue
@@ -280,9 +273,25 @@ def download_wheel(
                     fh.write(chunk)
                     done += len(chunk)
                     on_bytes(done)
-        break
+        return
+    raise ExtrasError(f"Could not download {w.filename}")
+
+
+def download_wheel(
+    w: Wheel, size: int, dest: Path, client: Any, on_bytes: Callable[[int], None]
+) -> Path:
+    """Download one wheel (resuming a partial file), verify its SHA-256, return its path."""
+    final = dest / w.filename
+    part = dest / (w.filename + ".part")
+    if final.is_file() and _sha256_file(final) == w.sha256:
+        on_bytes(final.stat().st_size)
+        return final
+    final.unlink(missing_ok=True)
+    have = part.stat().st_size if part.is_file() else 0
+    if part.is_file() and have == size:
+        on_bytes(have)  # it was written completely but never renamed: just verify it below
     else:
-        raise ExtrasError(f"Could not download {w.filename}")
+        _fetch_into(w, part, have, client, on_bytes)
     digest = _sha256_file(part)
     if digest != w.sha256:
         part.unlink(missing_ok=True)
@@ -333,6 +342,12 @@ def install(progress: Progress, *, client: Any | None = None, uv: Path | None = 
     fresh = folder.parent / (folder.name + "-new")
     staging.mkdir(parents=True, exist_ok=True)
 
+    best = [0]  # a restarted download must not pull the bar back
+
+    def steady(done: int, total: int, message: str) -> None:
+        best[0] = max(best[0], done)
+        progress(best[0], total, message)
+
     progress(0, 0, "Preparing...")
     wheels = build_plan(uv=uv)
     own = client is None
@@ -354,7 +369,7 @@ def install(progress: Progress, *, client: Any | None = None, uv: Path | None = 
             base = done_before
 
             def on_bytes(n: int, base: int = base, name: str = w.name) -> None:
-                progress(
+                steady(
                     base + n, grand_total, f"Downloading {name} ({_gb(base + n)} of {_gb(total)})"
                 )
 
@@ -379,7 +394,7 @@ def install(progress: Progress, *, client: Any | None = None, uv: Path | None = 
         # uv gives no progress: follow the growth of its cache and of the target folder instead.
         while not stop.wait(1.0):
             grown = max(_dir_size(cache), _dir_size(fresh))
-            progress(
+            steady(
                 total + min(grown, int(unpack * 0.99)),
                 grand,
                 "Unpacking and installing (a few minutes)...",
@@ -393,6 +408,11 @@ def install(progress: Progress, *, client: Any | None = None, uv: Path | None = 
              "--no-index", "--no-progress", *files],
             env={**os.environ, "UV_CACHE_DIR": str(cache)},
         )  # fmt: skip
+    except BaseException:
+        shutil.rmtree(
+            fresh, ignore_errors=True
+        )  # keep the downloaded wheels, drop the half-unpacked
+        raise
     finally:
         stop.set()
         watcher.join(timeout=3)
@@ -406,8 +426,20 @@ def install(progress: Progress, *, client: Any | None = None, uv: Path | None = 
         ),
         encoding="utf-8",
     )
-    shutil.rmtree(folder, ignore_errors=True)
-    fresh.replace(folder)
+    old = folder.parent / (folder.name + "-old")
+    shutil.rmtree(old, ignore_errors=True)
+    try:
+        if folder.exists():
+            folder.replace(old)  # one rename: it fails cleanly if a program still uses its files
+        fresh.replace(folder)
+    except OSError as exc:
+        if old.exists() and not folder.exists():
+            old.replace(folder)  # put the previous installation back
+        raise ExtrasError(
+            "The old optional packages are still in use. Close running dubbing jobs and try "
+            f"again ({exc})."
+        ) from exc
+    shutil.rmtree(old, ignore_errors=True)
     shutil.rmtree(staging, ignore_errors=True)
     activate()
-    progress(grand, grand, "Done")
+    steady(grand, grand, "Done")

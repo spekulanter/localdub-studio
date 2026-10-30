@@ -263,3 +263,31 @@ project: the block was dragged with the mouse, the server saved the new time (th
 at the neighbouring line and kept the length), the line was marked as edited, the Shift+Arrow nudge worked
 and the waveform canvas was painted. Not tested: touch screens, very long videos (the waveform
 of 1 hour is about 360 000 bytes, but a 1-hour timeline was not tried), screen readers.
+
+## YouTube import (2026-10-30)
+Ported from the logic of the YouTube Downloader app (yt-dlp + Deno + FFmpeg, enumerated options, no
+user-supplied flags). The download is the first pipeline stage (`download`), so it uses the same queue,
+progress, cancellation, restart recovery and logs as the rest.
+
+Measured with Blender's *Sintel* trailer (CC-BY, 52 s) on this PC and connection:
+- Installing yt-dlp 2026.10.26 and Deno 2.9.8 with SHA-256 verification: 17 s (66 MB).
+- Link check (title, length, thumbnail): 4-6 s. Download at 720p: about 5 s, 6.7 MB, H.264 + Opus in one
+  `source.mp4`, no leftovers.
+- The whole job from a link (download, speech recognition, translation, voice, export): **24 s**.
+  `verify`: PASS (duration delta 0.000 s, video stream identical, back-transcription 1.000).
+- Real Edge click-through (`npm run e2e:youtube`): tab, link, *Check link*, card with thumbnail, start,
+  download step shown, finished, link back to YouTube: all PASS.
+- A link to a video that does not exist is reported as unavailable; cancelling during a download of a
+  14-minute video (at 12.9 %) left no yt-dlp or Deno process behind.
+- Real bugs found by these runs and fixed: the Deno checksum file has a different format (Windows
+  `Get-FileHash` output); text statuses such as "Merging formats" reset the progress bar to 0; video and
+  audio are fetched one after the other, so the bar went 0-100 % twice.
+
+Independent review by a second model (read-only) and what was done with it: added rejection of links with
+spaces or line breaks and a `--` before the link; a registry that stops a running yt-dlp if the worker has to
+exit; a download that is already there is only trusted if ffprobe can read it. Not changed: yt-dlp's own
+updater is used for updates (it does its own verification).
+
+**Not tested:** age-restricted or members-only videos and the cookies option (needs an account), videos behind
+a PO-token requirement, region-locked videos, very long videos, Firefox/Chrome cookie access (Chrome may block
+it), and YouTube changes after today (yt-dlp has to be updated then).

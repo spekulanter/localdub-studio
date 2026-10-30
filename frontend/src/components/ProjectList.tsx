@@ -44,7 +44,7 @@ export function ProjectList({ projects, selected, onSelect, onNew }: Props) {
               <span className="block truncate font-medium">{p.name}</span>
               <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span className={`inline-block size-2 rounded-full ${DOT[p.latest_job?.status ?? ""] ?? "bg-slate-300"}`} />
-                {statusLabel(p.latest_job)} · {formatTime(p.duration)}
+                {p.source_url ? "YouTube · " : ""}{statusLabel(p.latest_job)}{p.duration > 0 ? ` · ${formatTime(p.duration)}` : ""}
               </span>
             </button>
           </li>

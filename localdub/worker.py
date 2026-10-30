@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -19,12 +20,15 @@ from localdub.api.db import Database
 from localdub.config import Settings
 from localdub.core.gpu import register_cuda_dlls
 from localdub.core.platform import disable_power_throttling, pid_alive
+from localdub.core.youtube import ytdlp
+from localdub.core.youtube.remote import make_remote
 from localdub.pipeline import STAGES, Pipeline, PipelineError
 
 log = logging.getLogger("localdub.worker")
 
 # Rough share of total wall time per stage, used only for the progress bar.
 STAGE_WEIGHTS = {
+    "download": 0.12,  # only counted for projects that came from a link
     "probe": 0.01,
     "extract": 0.02,
     "asr": 0.18,
@@ -38,23 +42,24 @@ STAGE_WEIGHTS = {
 }
 
 
-def progress_fraction(stage: str, state: str) -> float:
-    """Progress at the moment `stage` reports `state` ('running', 'done' or 'n/m')."""
+def progress_fraction(stage: str, state: str, *, has_download: bool = False) -> float:
+    """Progress at the moment `stage` reports `state` ('running', 'done', 'n/m' or '37.5% ...')."""
+    weights = {k: v for k, v in STAGE_WEIGHTS.items() if has_download or k != "download"}
+    total = sum(weights.values()) or 1.0
     before = 0.0
     for s in STAGES:
         if s == stage:
             break
-        before += STAGE_WEIGHTS[s]
-    weight = STAGE_WEIGHTS.get(stage, 0.0)
+        before += weights.get(s, 0.0)
+    weight = weights.get(stage, 0.0)
+    fraction = 0.0
     if state == "done":
-        return min(before + weight, 1.0)
-    if "/" in state:
-        try:
-            n, m = (int(x) for x in state.split("/"))
-            return min(before + weight * (n - 1) / max(m, 1), 1.0)
-        except ValueError:
-            pass
-    return before
+        fraction = 1.0
+    elif m := re.match(r"\s*(\d+(?:\.\d+)?)%", state):  # "37.5% - 2MiB/s" (a download)
+        fraction = float(m.group(1)) / 100.0
+    elif m := re.fullmatch(r"(\d+)/(\d+)", state):  # "3/10" (item n of m)
+        fraction = (int(m.group(1)) - 1) / max(int(m.group(2)), 1)
+    return min((before + weight * min(max(fraction, 0.0), 1.0)) / total, 1.0)
 
 
 def project_settings(base: Settings, project: dict[str, object]) -> Settings:
@@ -77,6 +82,7 @@ def _watch(db: Database, job_id: int, parent_pid: int) -> None:
         job = db.get_job(job_id)
         if job is None or job["status"] != "running" or not pid_alive(parent_pid):
             log.warning("Server gone or job no longer running; exiting")
+            ytdlp.terminate_active()  # os._exit would leave a running download behind
             os._exit(3)
         db.update_job(job_id, heartbeat=time.time())
 
@@ -95,12 +101,19 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
     db.update_job(job_id, pid=os.getpid(), heartbeat=time.time())
     threading.Thread(target=_watch, args=(db, job_id, parent_pid), daemon=True).start()
 
+    has_download = bool(project["source_url"])
+    best = [0.0]  # progress never goes back: a text status ("Merging...") carries no number
+
+    def best_progress(stage: str, state: str) -> float:
+        best[0] = max(best[0], progress_fraction(stage, state, has_download=has_download))
+        return best[0]
+
     def on_progress(stage: str, state: str) -> None:
         db.update_job(
             job_id,
             stage=stage,
             message=state if state != "running" else "",
-            progress=round(progress_fraction(stage, state), 4),
+            progress=round(best_progress(stage, state), 4),
             heartbeat=time.time(),
         )
 
@@ -114,6 +127,7 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
         source_lang=None if project["source_lang"] == "auto" else str(project["source_lang"]),
         voice=str(project["voice"]),
         on_progress=on_progress,
+        remote=make_remote(project, base) if has_download else None,
     )
     try:
         pipe.run(from_stage=job["from_stage"])
@@ -124,6 +138,10 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
         log.error("Unexpected failure:\n%s", traceback.format_exc())
         db.finish_job(job_id, "failed", f"{type(exc).__name__}: {exc}")
         return 1
+    try:  # the length of a downloaded video is only known exactly now
+        db.update_project(project["id"], duration=pipe.info().duration)
+    except Exception:  # noqa: BLE001 - cosmetic; the job itself succeeded
+        log.debug("Could not update the project duration", exc_info=True)
     db.update_job(job_id, stage="export", progress=1.0, message="")
     db.finish_job(job_id, "done")
     return 0

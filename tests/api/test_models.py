@@ -32,7 +32,8 @@ def test_models_listed_with_status_and_required_missing(client: TestClient):
     data = client.get("/api/models").json()
     ids = [m["id"] for m in data["models"]]
     assert ids == [
-        "whisper", "supertonic", "translation", "diarization", "packages", "separation", "cloning",
+        "whisper", "supertonic", "translation", "diarization", "youtube", "packages",
+        "separation", "cloning",
     ]  # fmt: skip
     assert set(data["required_missing"]) == {"whisper", "supertonic", "translation"}
     # (separation lives in the shared Hugging Face cache, so it depends on the machine)
@@ -225,3 +226,13 @@ def test_model_fetch_module_rejects_unknown_ids(capsys):
     with pytest.raises(SystemExit) as exc:
         runpy.run_module("localdub.core.model_fetch", run_name="__main__", alter_sys=True)
     assert "usage: model_fetch" in str(exc.value)
+
+
+def test_no_job_can_start_while_the_packages_are_being_installed(
+    client: TestClient, sample_mp4, monkeypatch
+):
+    client.app.state.downloads._state["packages"] = {"status": "running"}  # type: ignore[attr-defined]
+    with sample_mp4.open("rb") as fh:
+        r = client.post("/api/projects", files={"file": (sample_mp4.name, fh, "video/mp4")})
+    assert r.status_code == 409 and "being installed" in r.json()["detail"]
+    client.app.state.downloads._state["packages"] = {"status": "done"}  # type: ignore[attr-defined]

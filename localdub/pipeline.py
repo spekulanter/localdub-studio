@@ -40,6 +40,7 @@ from localdub.core.tts.base import TTSProvider, default_speaker_voices
 log = logging.getLogger(__name__)
 
 STAGES = [
+    "download",
     "probe",
     "extract",
     "asr",
@@ -59,6 +60,14 @@ class PipelineError(RuntimeError):
     def __init__(self, stage: str, message: str) -> None:
         super().__init__(f"[{stage}] {message}")
         self.stage = stage
+
+
+@dataclass(frozen=True)
+class RemoteSource:
+    """A video that must be fetched before processing (e.g. from YouTube)."""
+
+    key: str  # goes into the stage fingerprint (link, quality): a different link downloads again
+    fetch: Callable[[Path, Callable[[str], None]], None]  # (destination file, say(progress text))
 
 
 @dataclass
@@ -129,7 +138,9 @@ class Pipeline:
         providers: Providers | None = None,
         ffmpeg: FFmpeg | None = None,
         on_progress: ProgressFn | None = None,
+        remote: RemoteSource | None = None,
     ) -> None:
+        self.remote = remote
         self.input = input_path.resolve()
         self.wd = workdir.resolve()
         self.wd.mkdir(parents=True, exist_ok=True)
@@ -164,7 +175,7 @@ class Pipeline:
 
         Returns {stage: "ran" | "skipped"}.
         """
-        if not self.input.is_file():
+        if self.remote is None and not self.input.is_file():
             raise PipelineError("probe", f"Input video not found: {self.input}")
         if from_stage is not None:
             self.store.invalidate(STAGES[STAGES.index(from_stage) :])
@@ -203,6 +214,7 @@ class Pipeline:
     def _spec(self, stage: str) -> tuple[dict[str, Any], list[Path], Callable[[], list[Path]]]:
         s = self.s
         specs: dict[str, tuple[dict[str, Any], list[Path], Callable[[], list[Path]]]] = {
+            "download": ({"source": self.remote.key if self.remote else None}, [], self._download),
             "probe": ({}, [self.input], self._probe),
             "extract": ({"sr": s.sample_rate}, [self.input], self._extract),
             "asr": (
@@ -294,6 +306,28 @@ class Pipeline:
         return specs[stage]
 
     # ----- stages ------------------------------------------------------------------------
+    def _download(self) -> list[Path]:
+        """Fetch the video when the project came from a link; a no-op for uploaded files."""
+        if self.remote is None:
+            return []
+        if self.input.is_file():
+            try:
+                self.ff.probe(self.input)
+                return []  # an earlier attempt already finished the download
+            except MediaError:
+                log.warning("%s is not a playable video; downloading it again", self.input.name)
+                self.input.unlink(missing_ok=True)
+        self.input.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.remote.fetch(self.input, lambda text: self.on_progress("download", text))
+        except PipelineError:
+            raise
+        except Exception as exc:
+            raise PipelineError("download", str(exc)) from exc
+        if not self.input.is_file():
+            raise PipelineError("download", "The download finished but the video file is missing")
+        return []  # the file is outside the work folder; probe fails clearly if it disappears
+
     def _probe(self) -> list[Path]:
         info = self.ff.probe(self.input)
         if not info.video_streams:

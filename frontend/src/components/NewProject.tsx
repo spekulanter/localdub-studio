@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { api, type Health, type Options, type Project } from "../api";
+import { api, type Health, type Options, type Project, type YoutubeChoice } from "../api";
 import { OptionFields, type Settings } from "./OptionFields";
+import { YoutubeSource } from "./YoutubeSource";
 
 interface Props {
   options: Options;
@@ -15,6 +16,8 @@ interface Props {
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 
 export function NewProject({ options, health, onCreated, modelsMissing = false, onOptionsChanged }: Props) {
+  const [source, setSource] = useState<"file" | "youtube">("file");
+  const [youtube, setYoutube] = useState<YoutubeChoice | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>({
@@ -36,8 +39,36 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
   const limit = options.max_upload_mb * 1024 * 1024;
   const tooBig = files.filter((f) => f.size > limit);
 
+  async function submitYoutube() {
+    if (!youtube) return;
+    setBusy(true);
+    setError(null);
+    try {
+      onCreated(
+        await api.createFromYoutube({
+          url: youtube.url,
+          quality: youtube.quality,
+          cookies_browser: youtube.cookies_browser,
+          source_lang: settings.source_lang,
+          voice: settings.voice,
+          llm_model: settings.llm_model,
+          original_audio: settings.original_audio,
+          keep_original_track: settings.keep_original_track,
+          diarize: settings.diarize,
+          num_speakers: settings.diarize ? settings.num_speakers : null,
+          clone_voice: settings.clone_voice,
+          clone_consent: settings.clone_consent,
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (source === "youtube") return submitYoutube();
     if (files.length === 0 || tooBig.length > 0) return;
     setBusy(true);
     setError(null);
@@ -76,7 +107,24 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
   return (
     <form onSubmit={submit} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <h2 className="text-lg font-semibold">New dub</h2>
+      <div role="tablist" aria-label="Where is the video?" className="inline-flex overflow-hidden rounded-md border border-slate-300 text-sm dark:border-slate-700">
+        {(["file", "youtube"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={source === k}
+            disabled={busy}
+            onClick={() => setSource(k)}
+            className={`px-4 py-1.5 ${source === k ? "bg-indigo-600 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+          >
+            {k === "file" ? "Video file" : "YouTube link"}
+          </button>
+        ))}
+      </div>
+      {source === "youtube" && <YoutubeSource onChoice={setYoutube} disabled={busy} />}
       <div
+        hidden={source !== "file"}
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -126,13 +174,25 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
         </p>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={modelsMissing || files.length === 0 || tooBig.length > 0 || busy || (settings.clone_voice && !settings.clone_consent)} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-          {busy ? (progress ?? "Uploading…") : files.length > 1 ? `Upload and dub ${files.length} videos` : "Upload and start dubbing"}
+        <button type="submit" disabled={modelsMissing || (source === "file" ? files.length === 0 || tooBig.length > 0 : youtube === null) || busy || (settings.clone_voice && !settings.clone_consent)} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {source === "youtube"
+            ? busy
+              ? "Starting…"
+              : "Download and start dubbing"
+            : busy
+              ? (progress ?? "Uploading…")
+              : files.length > 1
+                ? `Upload and dub ${files.length} videos`
+                : "Upload and start dubbing"}
         </button>
         {modelsMissing && (
           <span className="text-xs text-amber-700 dark:text-amber-300">Download the AI models first (see the notice above).</span>
         )}
-        <span className="text-xs text-slate-500">The video is copied into this app's local data folder and never leaves your computer.</span>
+        <span className="text-xs text-slate-500">
+          {source === "youtube"
+            ? "The video is downloaded into this app's local data folder; dubbing happens on your computer."
+            : "The video is copied into this app's local data folder and never leaves your computer."}
+        </span>
       </div>
     </form>
   );

@@ -1,5 +1,5 @@
 export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
-export type Stage = "probe" | "extract" | "asr" | "diarize" | "translate" | "tts" | "separate" | "convert" | "assemble" | "export";
+export type Stage = "download" | "probe" | "extract" | "asr" | "diarize" | "translate" | "tts" | "separate" | "convert" | "assemble" | "export";
 export type OriginalAudio = "duck" | "mute" | "background";
 
 export interface Job {
@@ -33,6 +33,10 @@ export interface Project {
   created_at: number;
   latest_job: Job | null;
   has_output: boolean;
+  /** false while a video from a link is still being downloaded */
+  has_input: boolean;
+  source_url: string | null;
+  download_quality: string;
 }
 
 export interface Options {
@@ -124,6 +128,37 @@ export interface ModelsResponse {
   busy: boolean;
 }
 
+export interface ToolState {
+  available: boolean;
+  version: string | null;
+  error: string | null;
+}
+
+export interface YoutubeStatus {
+  installed: boolean;
+  yt_dlp: ToolState;
+  deno: ToolState;
+  qualities: string[];
+  browsers: string[];
+}
+
+export interface YoutubeInfo {
+  id: string;
+  title: string;
+  uploader: string | null;
+  thumbnail: string | null;
+  duration: number | null;
+  is_live: boolean;
+}
+
+/** What the YouTube tab hands to the form once a link was checked. */
+export interface YoutubeChoice {
+  url: string;
+  quality: string;
+  cookies_browser: string;
+  info: YoutubeInfo;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -158,6 +193,12 @@ const json = (method: string, body?: unknown): RequestInit => ({
 export const api = {
   health: () => request<Health>("/api/health"),
   models: () => request<ModelsResponse>("/api/models"),
+  youtubeStatus: () => request<YoutubeStatus>("/api/youtube/status"),
+  youtubeInfo: (url: string, cookies_browser: string) =>
+    request<YoutubeInfo>("/api/youtube/info", json("POST", { url, cookies_browser })),
+  updateYtdlp: () => request<{ message: string }>("/api/youtube/update", json("POST")),
+  createFromYoutube: (body: Record<string, unknown>) =>
+    request<Project>("/api/projects/from-youtube", json("POST", body)),
   downloadModels: (ids?: string[]) =>
     request<{ started: string[] }>("/api/models/download", json("POST", ids ? { ids } : {})),
   jobLogFull: (jobId: number) => fetch(`/api/jobs/${jobId}/log/download`).then((r) => r.text()),

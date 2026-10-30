@@ -19,6 +19,7 @@ import httpx
 from localdub import extras
 from localdub.config import Settings
 from localdub.core.models import ensure_model, is_readable
+from localdub.core.youtube import tools as youtube_tools
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,11 @@ SPECS: list[ModelSpec] = [
     ModelSpec("diarization", "Speaker detection",
               "Tells speakers apart (experimental). GitHub, checksum-verified.",
               46_000_000, False, "diarization"),
+    ModelSpec("youtube", "YouTube import tools (yt-dlp and Deno)",
+              "Lets you paste a YouTube link instead of choosing a file. Programs, not AI models: "
+              "downloaded from their official GitHub releases and checked against the "
+              "publishers' SHA-256. Needs FFmpeg, which is already installed.",
+              youtube_tools.ESTIMATED_BYTES, False, "youtube"),
     ModelSpec("packages", "Optional packages (PyTorch and Demucs)",
               "Program libraries (not an AI model) that speech removal and voice cloning need. "
               "Installed into your user folder; no administrator rights needed.",
@@ -117,6 +123,8 @@ def is_installed(spec: ModelSpec, settings: Settings) -> bool:
         return is_readable(path / "model.bin")
     if spec.id == "packages":
         return extras.packages_available()
+    if spec.id == "youtube":
+        return youtube_tools.is_installed()
     if spec.id == "supertonic":
         base = d / settings.tts_model.replace("-", "")
         onnx = list((base / "onnx").glob("*.onnx")) if (base / "onnx").is_dir() else []
@@ -210,6 +218,8 @@ def download(spec: ModelSpec, settings: Settings, progress: Progress) -> None:
             done_before += size
     elif spec.id == "packages":
         extras.install(progress)
+    elif spec.id == "youtube":
+        youtube_tools.install(progress)
     elif spec.id == "separation":
         hub = Path.home() / ".cache" / "huggingface" / "hub"
         _with_polling(hub, spec, progress, lambda: _fetch_in_subprocess(spec.id))
@@ -288,6 +298,10 @@ class Downloads:
     def state(self) -> dict[str, dict[str, Any]]:
         with self._lock:
             return {k: dict(v) for k, v in self._state.items()}
+
+    def installing(self, model_id: str) -> bool:
+        with self._lock:
+            return self._state.get(model_id, {}).get("status") in ("queued", "running")
 
     def busy(self) -> bool:
         with self._lock:

@@ -22,7 +22,7 @@ import soundfile as sf
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from localdub import extras
 from localdub.api.db import Database
@@ -44,6 +44,8 @@ from localdub.core.timeline.fit import available_windows
 from localdub.core.timeline.models import DialogueSegment, ReviewStatus
 from localdub.core.translation.prompts import normalize_punctuation
 from localdub.core.tts.base import VOICES, default_speaker_voices
+from localdub.core.youtube import tools as youtube_tools
+from localdub.core.youtube import ytdlp
 from localdub.pipeline import STAGES, default_providers
 
 log = logging.getLogger(__name__)
@@ -74,6 +76,9 @@ class ProjectOut(BaseModel):
     diarize: bool = False
     clone_voice: bool = False
     num_speakers: int | None = None
+    source_url: str | None = None
+    download_quality: str = "auto"
+    has_input: bool = True
     created_at: float
     latest_job: dict[str, Any] | None = None
     has_output: bool = False
@@ -117,6 +122,29 @@ class SegmentPatch(BaseModel):
     start: float | None = None
     end: float | None = None
     review_status: Literal["pending", "edited", "approved"] | None = None
+
+
+class YoutubeInfoRequest(BaseModel):
+    url: str
+    cookies_browser: str = "none"
+
+
+class FromYoutube(BaseModel):
+    """Create a project from a YouTube link (same dubbing options as an upload)."""
+
+    url: str
+    quality: str = "auto"
+    cookies_browser: str = "none"
+    source_lang: str = "en"
+    voice: str = ""
+    llm_model: str = ""
+    original_audio: Literal["duck", "mute", "background"] = "duck"
+    keep_original_track: bool = True
+    diarize: bool = False
+    num_speakers: int | None = Field(default=None, ge=1, le=10)
+    clone_voice: bool = False
+    clone_consent: bool = False
+    start: bool = True
 
 
 class SpeakerVoices(BaseModel):
@@ -194,6 +222,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             **{k: v for k, v in row.items() if k not in ("input_rel",)},
             latest_job=job_out(latest[0]) if latest else None,
             has_output=done,
+            has_input=(project_dir(row["id"]) / row["input_rel"]).is_file(),
         )
 
     # ----- meta --------------------------------------------------------------------------
@@ -258,6 +287,10 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         return {"models": rows, "required_missing": missing, "busy": downloads.busy()}
 
     def require_models() -> None:
+        if downloads.installing("packages"):
+            raise HTTPException(
+                409, "The optional packages are being installed. Wait until that has finished."
+            )
         if not settings.require_models_before_jobs:
             return
         missing = [
@@ -390,6 +423,101 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             shutil.rmtree(pdir, ignore_errors=True)
             raise
         if start:
+            jobs.submit(pid)
+        return project_out(require_project(pid))
+
+    # ----- YouTube import ----------------------------------------------------------------
+    def youtube_error(exc: ytdlp.YoutubeError) -> HTTPException:
+        status = 409 if exc.code == "missing_tools" else 422
+        return HTTPException(status, str(exc))
+
+    @app.get("/api/youtube/status")
+    async def youtube_status() -> dict[str, Any]:
+        st = await asyncio.to_thread(youtube_tools.status)
+
+        def row(info: youtube_tools.ToolInfo) -> dict[str, Any]:
+            return {"available": info.available, "version": info.version, "error": info.error}
+
+        return {
+            "installed": all(i.available for i in st.values()),
+            "yt_dlp": row(st["yt_dlp"]),
+            "deno": row(st["deno"]),
+            "qualities": list(ytdlp.QUALITIES),
+            "browsers": list(ytdlp.COOKIE_BROWSERS),
+        }
+
+    @app.post("/api/youtube/info")
+    async def youtube_info(req: YoutubeInfoRequest) -> dict[str, Any]:
+        try:
+            url = ytdlp.validate_youtube_url(req.url)
+            ytdlp.validate_options("auto", req.cookies_browser)
+            info = await asyncio.to_thread(ytdlp.fetch_info, url, req.cookies_browser)
+        except ytdlp.YoutubeError as exc:
+            raise youtube_error(exc) from exc
+        return {
+            "id": info.id,
+            "title": info.title,
+            "uploader": info.uploader,
+            "thumbnail": info.thumbnail,
+            "duration": info.duration,
+            "is_live": info.is_live,
+        }
+
+    @app.post("/api/youtube/update")
+    async def youtube_update() -> dict[str, str]:
+        if db.any_active():
+            raise HTTPException(409, "Wait for the running dubbing job to finish before updating.")
+        try:
+            text = await asyncio.to_thread(youtube_tools.update_ytdlp)
+        except youtube_tools.ToolsError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        return {"message": text}
+
+    @app.post("/api/projects/from-youtube", status_code=201)
+    async def create_from_youtube(body: FromYoutube) -> ProjectOut:
+        try:
+            url = ytdlp.validate_youtube_url(body.url)
+            ytdlp.validate_options(body.quality, body.cookies_browser)
+        except ytdlp.YoutubeError as exc:
+            raise youtube_error(exc) from exc
+        if body.source_lang not in SOURCE_LANGS:
+            raise HTTPException(422, f"Unsupported source language '{body.source_lang}'")
+        voice = body.voice or settings.tts_voice
+        if voice not in VOICES:
+            raise HTTPException(422, f"Unknown voice '{voice}'")
+        if body.clone_voice and not body.clone_consent:
+            raise HTTPException(
+                422, "Voice cloning needs your confirmation that you may imitate these voices"
+            )
+        if body.start:
+            await asyncio.to_thread(require_models)
+        try:  # also proves the link works before anything is created
+            info = await asyncio.to_thread(ytdlp.fetch_info, url, body.cookies_browser)
+        except ytdlp.YoutubeError as exc:
+            raise youtube_error(exc) from exc
+        if info.is_live:
+            raise HTTPException(422, "Live streams cannot be dubbed. Use a finished video.")
+        if info.duration and info.duration > ytdlp.MAX_DURATION_S:
+            raise HTTPException(422, "This video is longer than 4 hours.")
+        pid = db.create_project(
+            name=info.title[:200],
+            original_name=info.title[:200],
+            input_rel="input/source.mp4",
+            duration=float(info.duration or 0.0),
+            source_lang=body.source_lang,
+            voice=voice,
+            llm_model=body.llm_model.strip() or settings.translation_model,
+            original_audio=body.original_audio,
+            keep_original_track=int(body.keep_original_track),
+            diarize=int(body.diarize),
+            clone_voice=int(body.clone_voice),
+            num_speakers=body.num_speakers,
+            source_url=url,
+            download_quality=body.quality,
+            cookies_browser=body.cookies_browser,
+        )
+        (project_dir(pid) / "input").mkdir(parents=True, exist_ok=True)
+        if body.start:
             jobs.submit(pid)
         return project_out(require_project(pid))
 
@@ -781,6 +909,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
     def source_video(pid: int) -> FileResponse:
         project = require_project(pid)
         path = project_dir(pid) / project["input_rel"]
+        if not path.is_file():
+            raise HTTPException(404, "The video is not there yet (it may still be downloading)")
         return FileResponse(path, filename=path.name, content_disposition_type="inline")
 
     dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"

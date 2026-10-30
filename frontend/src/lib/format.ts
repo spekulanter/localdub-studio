@@ -8,6 +8,7 @@ export function formatTime(seconds: number): string {
 }
 
 export const STAGE_LABELS: Record<Stage, string> = {
+  download: "Downloading from YouTube",
   probe: "Inspecting video",
   extract: "Extracting audio",
   asr: "Recognising speech",

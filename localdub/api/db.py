@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS projects (
     keep_original_track INTEGER NOT NULL DEFAULT 1,
     diarize INTEGER NOT NULL DEFAULT 0,
     clone_voice INTEGER NOT NULL DEFAULT 0,
+    source_url TEXT,
+    download_quality TEXT NOT NULL DEFAULT 'auto',
+    cookies_browser TEXT NOT NULL DEFAULT 'none',
     num_speakers INTEGER,
     created_at REAL NOT NULL
 );
@@ -51,6 +54,9 @@ MIGRATIONS = {
     "diarize": "INTEGER NOT NULL DEFAULT 0",
     "num_speakers": "INTEGER",
     "clone_voice": "INTEGER NOT NULL DEFAULT 0",
+    "source_url": "TEXT",
+    "download_quality": "TEXT NOT NULL DEFAULT 'auto'",
+    "cookies_browser": "TEXT NOT NULL DEFAULT 'none'",
 }
 ACTIVE = ("queued", "running")
 TERMINAL = ("done", "failed", "cancelled")

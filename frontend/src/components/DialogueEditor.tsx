@@ -29,8 +29,18 @@ interface Props {
 /** Plays one clip at a time across all rows. */
 function useSinglePlayer() {
   const audio = useRef<HTMLAudioElement | null>(null);
+  const blob = useRef<string | null>(null); // object URL of the last "Try this text" clip
+  useEffect(
+    () => () => {
+      audio.current?.pause(); // leaving the page must not leave a voice talking
+      if (blob.current) URL.revokeObjectURL(blob.current);
+    },
+    [],
+  );
   return (url: string) => {
     audio.current?.pause();
+    if (blob.current && blob.current !== url) URL.revokeObjectURL(blob.current);
+    blob.current = url.startsWith("blob:") ? url : null;
     audio.current = new Audio(url);
     void audio.current.play();
   };

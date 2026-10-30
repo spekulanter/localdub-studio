@@ -27,7 +27,7 @@ Model weights (Whisper large-v3, Supertonic 3) download from Hugging Face on fir
 `models/`. Projects, uploads and results are stored in `data/` (git-ignored).
 
 ## Using the web UI
-Choose an MP4, pick the Slovak voice, translation model and what happens to the original voice
+Choose an MP4 (or paste a YouTube link), pick the Slovak voice, translation model and what happens to the original voice
 (quiet under the dub, or muted completely), then start. Progress is live; you can cancel, and a
 job that is interrupted (crash, restart) resumes from its finished steps. When done, preview the
 dub, download the MP4 and the Slovak/English `.srt`, or change settings and re-render (only the

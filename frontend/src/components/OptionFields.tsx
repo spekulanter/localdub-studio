@@ -1,6 +1,8 @@
 import type { Health, Options, OriginalAudio } from "../api";
 import { ORIGINAL_AUDIO_LABELS } from "../lib/format";
-import { PackagesNotice } from "./PackagesNotice";
+import { InstallNotice } from "./InstallNotice";
+
+const PYTORCH_INTRO = (size: string) => `This needs an extra download of about ${size} (PyTorch).`;
 
 export interface Settings {
   source_lang: string;
@@ -82,7 +84,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
             )}
           </label>
         ))}
-        {!options.separation_available && <PackagesNotice ids={["packages", "separation"]} onInstalled={packagesInstalled} />}
+        {!options.separation_available && <InstallNotice ids={["packages", "separation"]} intro={PYTORCH_INTRO} onInstalled={packagesInstalled} />}
         {value.original_audio === "background" && options.separation_available && (
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Uses the GPU for about half the video length and downloads an 80 MB model on first use. Singing and
@@ -149,7 +151,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
         )}
         {!options.separation_available && (
           <div className="ml-6">
-            <PackagesNotice ids={["packages", "cloning"]} onInstalled={packagesInstalled} />
+            <InstallNotice ids={["packages", "cloning"]} intro={PYTORCH_INTRO} onInstalled={packagesInstalled} />
           </div>
         )}
       </div>

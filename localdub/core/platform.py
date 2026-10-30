@@ -81,3 +81,21 @@ def pid_alive(pid: int) -> bool:
         return bool(ok) and code.value == still_active
     finally:
         kernel32.CloseHandle(handle)
+
+
+def kill_tree(pid: int) -> None:
+    """Terminate a process and all its children (ffmpeg, yt-dlp, ...) without a shell."""
+    if sys.platform == "win32":
+        import subprocess
+
+        subprocess.run(  # noqa: S603
+            ["taskkill", "/PID", str(pid), "/T", "/F"],  # noqa: S607
+            capture_output=True,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+            check=False,
+        )
+    else:
+        try:
+            os.kill(pid, 9)
+        except ProcessLookupError:
+            pass

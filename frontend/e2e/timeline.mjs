@@ -1,7 +1,7 @@
 // Real-browser check of the timeline: drag a line, see it saved, revert it.
 // Usage: node e2e/timeline.mjs <project id> [screenshot dir]   (server must be running on BASE_URL)
 import { mkdirSync } from "node:fs";
-import { api, BASE, launch } from "./browser.mjs";
+import { api, BASE, closeBrowser, launch } from "./browser.mjs";
 
 setTimeout(() => {
   console.log("TIMEOUT: the browser test did not finish in 90 s");
@@ -31,9 +31,11 @@ try {
   await page.screenshot({ path: `${shots}/timeline_before.png`, fullPage: false });
 
   const before = (await api(`/api/projects/${pid}/segments`)).segments;
-  const target = before[3];
+  const target = before[Math.min(3, before.length - 1)];
   const block = page.getByRole("button", { name: new RegExp(`^English line ${target.id}:`) });
   log('const box = await block.boundingBox();'.slice(6, 40));
+  await block.scrollIntoViewIfNeeded(); // long videos scroll sideways
+  await page.waitForTimeout(300);
   const box = await block.boundingBox();
   check(box !== null && box.width > 10, `block of line ${target.id} is visible (${Math.round(box?.width ?? 0)} px wide)`);
 
@@ -70,8 +72,28 @@ try {
   check(after.edited === true, "the line is marked as edited");
   await page.screenshot({ path: `${shots}/timeline_after.png` });
 
+  // resize with the right-hand handle of a line in the middle (so the handle is fully in view):
+  // the end must move, the start must not (a drag on the handle must not become a move)
+  const mid = before[Math.min(1, before.length - 1)];
+  const midBlock = page.getByRole("button", { name: new RegExp(`^English line ${mid.id}:`) });
+  await midBlock.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const hb = await midBlock.locator('[data-handle="end"]').boundingBox();
+  const beforeResize = (await api(`/api/projects/${pid}/segments`)).segments.find((s) => s.id === mid.id);
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x - 20, hb.y + hb.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(800);
+  const resized = (await api(`/api/projects/${pid}/segments`)).segments.find((s) => s.id === mid.id);
+  check(
+    resized.end < beforeResize.end - 0.2 && Math.abs(resized.start - beforeResize.start) < 0.011,
+    `the right handle resizes: end ${beforeResize.end} -> ${resized.end}, start unchanged (${beforeResize.start} -> ${resized.start})`,
+  );
+
   // keyboard nudge
   log('await block.focus();'.slice(6, 40));
+  await block.scrollIntoViewIfNeeded();
   await block.focus();
   await page.keyboard.press("Shift+ArrowLeft");
   await page.waitForTimeout(800);
@@ -91,7 +113,7 @@ try {
   // leave the project as we found it
   const segs = (await api(`/api/projects/${pid}/segments`)).segments;
   for (const s of segs.filter((x) => x.edited)) await api(`/api/projects/${pid}/segments/${s.id}/edit`, { method: "DELETE" });
-  await browser.close();
+  await closeBrowser(browser);
 }
 console.log(failures.length ? `\n${failures.length} FAILED` : "\nALL PASSED");
 process.exit(failures.length ? 1 : 0);

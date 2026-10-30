@@ -46,6 +46,17 @@ PyTorch and Demucs (about 2.9 GB, resumable if the connection drops) and install
 commands, no restart. The same can be done from the *AI models* page. Needs about 9 GB of free disk
 space while installing (about 4.5 GB afterwards). It cannot run while a dubbing job is running.
 
+### YouTube links
+*New dub → YouTube link* accepts a link instead of a file. The first time it offers **Install now** for two
+small programs, yt-dlp and Deno (about 70 MB, from their official GitHub pages, checked against the
+publishers' SHA-256, installed into `%LOCALAPPDATA%\LocalDub Studio\youtube-tools`). After that you paste a
+link, press *Check link* (it shows the title, channel, length and thumbnail), choose a quality (default: up
+to 1080p) and start. Downloading is the first step of the job, so it has progress, can be cancelled and is
+resumed after a crash. For age-restricted or members-only videos you can let yt-dlp read the sign-in of your
+own Edge, Chrome or Firefox (*Age-restricted or members-only video?*). If downloads suddenly stop working,
+*Update yt-dlp* in the same form usually fixes it. Only YouTube https links are accepted; playlists and live
+streams are not.
+
 ## Where things are
 The program (with its own Python) is in the install folder, which is read-only for normal users.
 Your projects and results are in `%LOCALAPPDATA%\LocalDub Studio\data`, the models in

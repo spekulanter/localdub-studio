@@ -107,7 +107,17 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
         <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold">{project.name}</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {project.original_name} · {formatTime(project.duration)}
+            {project.source_url ? (
+              <>
+                <a href={project.source_url} target="_blank" rel="noreferrer noopener" className="underline">
+                  YouTube
+                </a>
+                {" · "}
+              </>
+            ) : (
+              <>{project.original_name} · </>
+            )}
+            {formatTime(project.duration)}
           </p>
         </div>
         <button
@@ -135,6 +145,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
       {job ? (
         <ProgressPanel
           job={job}
+          hasDownload={project.source_url !== null}
           busy={busy}
           onCancel={() => void act(() => api.cancelJob(job.id))}
           onRetry={() => void act(() => api.startJob(projectId))}
@@ -158,15 +169,21 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
             </div>
           )}
         </div>
-        {/* key forces a fresh element when the source changes */}
-        <video
-          ref={setVideo}
-          key={`${view}-${done}-${job?.finished_at ?? 0}`}
-          controls
-          preload="metadata"
-          className="max-h-[28rem] w-full rounded-md bg-black"
-          src={done && view === "dub" ? `${api.fileUrl(projectId, "video", true)}&t=${job?.finished_at ?? 0}` : api.sourceUrl(projectId)}
-        />
+        {project.has_input || done ? (
+          /* key forces a fresh element when the source changes */
+          <video
+            ref={setVideo}
+            key={`${view}-${done}-${job?.finished_at ?? 0}-${project.has_input}`}
+            controls
+            preload="metadata"
+            className="max-h-[28rem] w-full rounded-md bg-black"
+            src={done && view === "dub" ? `${api.fileUrl(projectId, "video", true)}&t=${job?.finished_at ?? 0}` : api.sourceUrl(projectId)}
+          />
+        ) : (
+          <div className="flex h-40 items-center justify-center rounded-md bg-slate-100 text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400" role="status">
+            {active ? "The video is being downloaded from YouTube…" : "The video was not downloaded. Use Retry above to try again."}
+          </div>
+        )}
         {done && (
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
             The dub is the first audio track. {project.keep_original_track ? "The original is the second track (switch tracks in a desktop player such as VLC)." : "The original audio track was not kept."}

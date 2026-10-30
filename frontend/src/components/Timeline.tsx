@@ -348,6 +348,9 @@ export function Timeline({
 
         <div
           ref={scroller}
+          tabIndex={0}
+          role="region"
+          aria-label="Timeline: scroll with the arrow keys, Tab moves between lines"
           className="relative min-w-0 flex-1 overflow-x-auto"
           onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}
           onWheel={onWheel}
@@ -388,11 +391,12 @@ export function Timeline({
                     role="button"
                     tabIndex={0}
                     aria-label={`English line ${s.id}: ${s.source_text}. ${formatSpan(s.start, s.end)}`}
-                    aria-pressed={selected}
+                    aria-current={selected ? "true" : undefined}
                     onKeyDown={(e) => onKeyDown(e, raw)}
                     onPointerDown={(e) => onPointerDown(e, raw, "move")}
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
+                    onPointerCancel={() => setDrag(null)}
                     className={`absolute top-1 flex select-none items-center overflow-hidden rounded-md border bg-white/90 px-2 text-xs shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-slate-800/90 ${
                       STATUS_BORDER[raw.fit_status ?? ""] ?? "border-slate-300 dark:border-slate-600"
                     } ${selected ? "ring-2 ring-indigo-500" : ""} ${raw.edited ? "bg-indigo-50 dark:bg-indigo-950/70" : ""} ${editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
@@ -407,6 +411,7 @@ export function Timeline({
                           onPointerDown={(e) => onPointerDown(e, raw, "start")}
                           onPointerMove={onPointerMove}
                           onPointerUp={onPointerUp}
+                    onPointerCancel={() => setDrag(null)}
                         />
                         <span
                           data-handle="end"
@@ -415,6 +420,7 @@ export function Timeline({
                           onPointerDown={(e) => onPointerDown(e, raw, "end")}
                           onPointerMove={onPointerMove}
                           onPointerUp={onPointerUp}
+                    onPointerCancel={() => setDrag(null)}
                         />
                       </>
                     )}

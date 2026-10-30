@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e:timeline": "node e2e/timeline.mjs"
+    "e2e:timeline": "node e2e/timeline.mjs",
+    "e2e:youtube": "node e2e/youtube.mjs"
   },
   "dependencies": {
     "react": "19.3.1",
