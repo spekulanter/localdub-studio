@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type Options, type SegmentRow, type SegmentsResponse } from "../api";
 import { formatTime } from "../lib/format";
 
@@ -17,6 +17,9 @@ interface Props {
   options: Options;
   /** Editing is only possible when no job runs and translation exists. */
   editable: boolean;
+  /** The line highlighted in the timeline (and the other way round). */
+  selectedId?: number | null;
+  onSelect?: (id: number) => void;
   renderVersion: number;
   onChange: () => void;
   onRerender: () => void;
@@ -33,7 +36,7 @@ function useSinglePlayer() {
   };
 }
 
-export function DialogueEditor({ projectId, data, options, editable, renderVersion, onChange, onRerender, busy }: Props) {
+export function DialogueEditor({ projectId, data, options, editable, selectedId = null, onSelect, renderVersion, onChange, onRerender, busy }: Props) {
   const play = useSinglePlayer();
   const speakers = useMemo(() => Array.from(new Set(data?.segments.map((s) => s.speaker_id) ?? [])), [data]);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +97,7 @@ export function DialogueEditor({ projectId, data, options, editable, renderVersi
       )}
       <ul className="max-h-[40rem] space-y-2 overflow-auto pr-1">
         {data.segments.map((s) => (
-          <Row key={`${s.id}-${s.translated_text}-${s.voice_id}-${s.start}-${s.end}`} seg={s} projectId={projectId} options={options} editable={editable} renderVersion={renderVersion} play={play} onChange={onChange} onError={setError} multiSpeaker={speakers.length > 1} />
+          <Row key={`${s.id}-${s.translated_text}-${s.voice_id}-${s.start}-${s.end}`} seg={s} projectId={projectId} options={options} editable={editable} renderVersion={renderVersion} play={play} onChange={onChange} onError={setError} multiSpeaker={speakers.length > 1} selected={s.id === selectedId} onSelect={onSelect} />
         ))}
       </ul>
     </div>
@@ -111,9 +114,15 @@ interface RowProps {
   onChange: () => void;
   onError: (msg: string | null) => void;
   multiSpeaker: boolean;
+  selected: boolean;
+  onSelect?: (id: number) => void;
 }
 
-function Row({ seg, projectId, options, editable, renderVersion, play, onChange, onError, multiSpeaker }: RowProps) {
+function Row({ seg, projectId, options, editable, renderVersion, play, onChange, onError, multiSpeaker, selected, onSelect }: RowProps) {
+  const item = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (selected) item.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [selected]);
   const [text, setText] = useState(seg.translated_text);
   const [voice, setVoice] = useState(seg.voice_id ?? "");
   const [start, setStart] = useState(String(seg.start));
@@ -156,7 +165,11 @@ function Row({ seg, projectId, options, editable, renderVersion, play, onChange,
     });
 
   return (
-    <li className={`rounded-md border p-3 ${seg.stale_edit ? "border-amber-400" : "border-slate-200 dark:border-slate-800"}`}>
+    <li
+      ref={item}
+      onClick={() => onSelect?.(seg.id)}
+      className={`rounded-md border p-3 ${seg.stale_edit ? "border-amber-400" : "border-slate-200 dark:border-slate-800"} ${selected ? "ring-2 ring-indigo-500" : ""}`}
+    >
       <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
         <span className="tabular-nums">
           {formatTime(seg.start)}–{formatTime(seg.end)}

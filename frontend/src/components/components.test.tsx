@@ -95,7 +95,7 @@ describe("ProgressPanel", () => {
 
 const segment = (over: Partial<SegmentRow>): SegmentRow => ({
   id: 1, start: 0, end: 2, source_text: "Hello", translated_text: "Ahoj", fit_status: "ok", speaker_id: "S1",
-  voice_id: null, effective_voice: "F1", review_status: "pending", edited: false, stale_edit: false, has_audio: false, ...over,
+  voice_id: null, effective_voice: "F1", review_status: "pending", edited: false, stale_edit: false, has_audio: false, placed_start: null, audio_duration: null, ...over,
 });
 const data = (segments: SegmentRow[], pending = false): SegmentsResponse => ({
   stage: "segments", segments, edits_pending: pending, speaker_voices: {}, speaker_defaults: { S1: "F1", S2: "M1" }, speaker_gender_estimate: {},

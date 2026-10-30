@@ -216,3 +216,36 @@ def test_preview_uses_unsaved_text_and_voice_and_speeds_up_to_fit(
     assert client.post(url(project, "/1/preview"), json={"text": "   "}).status_code == 422
     assert client.post(url(project, "/1/preview"), json={"voice": "ZZ"}).status_code == 422
     assert client.post(url(project, "/7/preview"), json={}).status_code == 404
+
+
+def test_waveform_endpoint_computes_caches_and_reports_missing_audio(
+    client: TestClient, project: dict
+):
+    import base64
+
+    assert client.get(f"/api/projects/{project['id']}/waveform").json() == {"available": False}
+    wd = project["wd"]
+    sf.write(wd / "audio_orig.wav", np.full(48000, 0.5, np.float32), 48000)
+    data = client.get(f"/api/projects/{project['id']}/waveform").json()
+    assert data["available"] is True and data["duration"] == 1.0 and data["bins_per_second"] == 100
+    peaks = base64.b64decode(data["peaks"])
+    assert len(peaks) == 100 and set(peaks) == {128}
+    assert (wd / "waveform-original.json").is_file()
+    assert (
+        client.get(f"/api/projects/{project['id']}/waveform").json() == data
+    )  # served from the cache
+    assert client.get(f"/api/projects/{project['id']}/waveform?kind=dub").json() == {
+        "available": False
+    }
+    assert client.get(f"/api/projects/{project['id']}/waveform?kind=bogus").status_code == 422
+
+
+def test_segment_rows_tell_where_the_slovak_speech_actually_sits(client: TestClient, project: dict):
+    wd = project["wd"]
+    (wd / "tts" / "clips").mkdir(parents=True)
+    sf.write(wd / "tts" / "clips" / "seg_0001.wav", np.zeros(48000 * 2, np.float32), 48000)
+    first = dict(SEGS[0], audio_path="tts/clips/seg_0001.wav", audio_duration=2.0, placed_start=0.2)
+    write_stage(wd, "segments.json", [first, *SEGS[1:]])
+    row = client.get(url(project)).json()["segments"][0]
+    assert (row["placed_start"], row["audio_duration"]) == (0.2, 2.0)
+    assert client.get(url(project)).json()["segments"][1]["audio_duration"] is None

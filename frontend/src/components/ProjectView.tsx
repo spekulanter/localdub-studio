@@ -3,7 +3,9 @@ import { api, watchJob, type Health, type Job, type Options, type Project, type 
 import { formatTime, isActive, restartStage } from "../lib/format";
 import { OptionFields, type Settings } from "./OptionFields";
 import { ProgressPanel } from "./ProgressPanel";
+import { useVideoClock } from "../lib/useVideoClock";
 import { DialogueEditor } from "./DialogueEditor";
+import { Timeline } from "./Timeline";
 
 interface Props {
   projectId: number;
@@ -35,6 +37,9 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lastStage = useRef<string>("");
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  const clock = useVideoClock(video);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +99,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
   const active = isActive(job);
   const stage = restartStage(toSettings(project), draft);
   const done = project.has_output;
+  const editable = !active && !busy && segments !== null && segments.stage !== null && segments.stage !== "asr";
 
   return (
     <div className="space-y-4">
@@ -154,6 +160,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
         </div>
         {/* key forces a fresh element when the source changes */}
         <video
+          ref={setVideo}
           key={`${view}-${done}-${job?.finished_at ?? 0}`}
           controls
           preload="metadata"
@@ -213,13 +220,39 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
         )}
       </section>
 
+      {segments !== null && segments.segments.length > 0 && (
+        <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <h3 className="mb-3 font-medium">Timeline</h3>
+          <Timeline
+            projectId={projectId}
+            segments={segments.segments}
+            duration={project.duration}
+            editable={editable}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            currentTime={clock.time}
+            playing={clock.playing}
+            onSeek={(t) => {
+              if (video) video.currentTime = t;
+            }}
+            onTimingChange={async (id, start, end) => {
+              await api.patchSegment(projectId, id, { start, end });
+              setSegments(await api.segments(projectId));
+            }}
+            renderVersion={job?.finished_at ?? 0}
+          />
+        </section>
+      )}
+
       <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="mb-3 font-medium">Dialogue</h3>
         <DialogueEditor
           projectId={projectId}
           data={segments}
           options={options}
-          editable={!active && !busy && segments !== null && segments.stage !== null && segments.stage !== "asr"}
+          editable={editable}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
           renderVersion={job?.finished_at ?? 0}
           onChange={() => void api.segments(projectId).then(setSegments)}
           onRerender={() => void act(() => api.startJob(projectId, "tts"))}

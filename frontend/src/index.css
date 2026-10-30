@@ -4,6 +4,12 @@
   color-scheme: light dark;
 }
 
+@layer components {
+  .tl-btn {
+    @apply rounded-md border border-slate-300 bg-white px-2.5 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800;
+  }
+}
+
 body {
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
 }

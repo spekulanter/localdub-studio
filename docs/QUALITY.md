@@ -249,3 +249,17 @@ Measured on this PC (RTX 5060 laptop, about 30 MB/s):
 (resume is covered by unit tests with a mock server, not by a real interruption), antivirus
 interference with 14 000 new files, and the installed program's own window clicking the button
 (the API calls and the page it renders were run; the button itself was exercised in component tests).
+
+## Timeline editor (2026-10-30)
+A waveform of the original audio (peak per 10 ms, computed in blocks and cached), the English lines as
+draggable blocks (move, resize by the edges, arrow keys, Ctrl + wheel zoom, snapping to neighbours and
+the playhead) and a second lane for the generated Slovak speech at its real position, red where it runs
+past its window. Limits are the same as the server's (0.3 s minimum, no overlap, inside the video) and
+the server stays the authority. Selecting a block selects its row in the dialogue list and the other way round.
+
+Verified: 15 unit tests of the drag/zoom maths, 12 component tests (pointer drag, handles, keys, read-only,
+server refusal), 4 waveform tests, 2 API tests, and `npm run e2e:timeline` in real Microsoft Edge on a real
+project: the block was dragged with the mouse, the server saved the new time (the move stopped exactly
+at the neighbouring line and kept the length), the line was marked as edited, the Shift+Arrow nudge worked
+and the waveform canvas was painted. Not tested: touch screens, very long videos (the waveform
+of 1 hour is about 360 000 bytes, but a 1-hour timeline was not tried), screen readers.

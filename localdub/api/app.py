@@ -29,6 +29,7 @@ from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
 from localdub.core import model_catalog
+from localdub.core.audio.waveform import peaks_payload
 from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.media.ffmpeg import FFmpeg, MediaError
 from localdub.core.timeline.edits import (
@@ -569,6 +570,9 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
                     "edited": seg.id in report["applied"],
                     "stale_edit": seg.id in report["stale"],
                     "has_audio": bool(clip and clip.is_file()),
+                    # where the generated Slovak speech actually sits (can differ from the window)
+                    "placed_start": seg.placed_start,
+                    "audio_duration": seg.audio_duration if clip and clip.is_file() else None,
                 }
             )
         return {
@@ -588,6 +592,22 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         if stage in (None, "asr"):
             raise HTTPException(409, "Nothing to edit yet: translation has not finished")
         return project_dir(pid) / "work" / "edits.json", segs
+
+    @app.get("/api/projects/{pid}/waveform")
+    async def waveform(pid: int, kind: Literal["original", "dub"] = "original") -> dict[str, Any]:
+        """Peak overview of the original or the dubbed audio for the timeline (cached on disk)."""
+        require_project(pid)
+        wd = project_dir(pid) / "work"
+        source = wd / ("audio_orig.wav" if kind == "original" else "dub.wav")
+        if not source.is_file():
+            return {"available": False}
+        cache = wd / f"waveform-{kind}.json"
+        if cache.is_file() and cache.stat().st_mtime >= source.stat().st_mtime:
+            cached: dict[str, Any] = json.loads(cache.read_text(encoding="utf-8"))
+            return cached
+        payload = await asyncio.to_thread(peaks_payload, source)
+        cache.write_text(json.dumps(payload), encoding="utf-8")
+        return payload
 
     @app.get("/api/projects/{pid}/segments")
     def segments(pid: int) -> dict[str, Any]:

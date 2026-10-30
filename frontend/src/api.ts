@@ -67,6 +67,8 @@ export interface SegmentRow {
   edited: boolean;
   stale_edit: boolean;
   has_audio: boolean;
+  placed_start: number | null;
+  audio_duration: number | null;
 }
 
 export interface SegmentsResponse {
