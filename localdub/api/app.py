@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from localdub import extras
 from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
@@ -128,9 +129,7 @@ class PreviewRequest(BaseModel):
 
 def separation_available() -> bool:
     """True when the optional PyTorch + Demucs packages are installed."""
-    import importlib.util
-
-    return all(importlib.util.find_spec(m) is not None for m in ("torch", "demucs"))
+    return extras.packages_available()
 
 
 def safe_filename(name: str, fallback: str = "video.mp4") -> str:
@@ -234,6 +233,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
     # ----- models ------------------------------------------------------------------------
     def models_view() -> dict[str, Any]:
         packages = model_catalog.optional_packages_available()
+        package_size = extras.estimated_total_bytes()
         states = downloads.state()
         rows = []
         for spec in model_catalog.SPECS:
@@ -243,7 +243,9 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
                     "id": spec.id,
                     "title": spec.title,
                     "description": spec.description,
-                    "size_bytes": spec.size_bytes,
+                    "size_bytes": package_size
+                    if spec.id == "packages" and package_size
+                    else spec.size_bytes,
                     "required": spec.required,
                     "group": spec.group,
                     "installed": model_catalog.is_installed(spec, settings),
@@ -280,15 +282,18 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         unknown = [i for i in ids if i not in model_catalog.BY_ID]
         if unknown:
             raise HTTPException(422, f"Unknown model(s): {unknown}")
+        ids = sorted(dict.fromkeys(ids), key=lambda i: i != "packages")  # packages first
         packages = model_catalog.optional_packages_available()
         blocked = [
             i
             for i in ids
-            if model_catalog.BY_ID[i].group in ("separation", "cloning") and not packages
+            if model_catalog.BY_ID[i].group in ("separation", "cloning")
+            and not packages
+            and "packages" not in ids
         ]
         if blocked:
             raise HTTPException(
-                409, "These models need the optional PyTorch packages (see Install docs)."
+                409, "These models need the optional packages: install them first (or together)."
             )
         todo = [
             i
@@ -297,6 +302,10 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
                 model_catalog.is_installed, model_catalog.BY_ID[i], settings
             )
         ]
+        if "packages" in todo and db.any_active():
+            raise HTTPException(
+                409, "Wait for the running dubbing job to finish before installing packages."
+            )
         downloads.start(todo)
         return {"started": todo}
 

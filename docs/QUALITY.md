@@ -216,3 +216,36 @@ ears), how it handles several speakers (tested only with one speaker per clip), 
 noisy references, or very short references (under 5 s the speaker keeps the plain TTS voice). The
 similarity measure is the same kind of model family as the diarization embedder, so it rates
 timbre, not "does it sound like them" to a human. Do not describe this as production quality.
+
+## In-app installation of the optional packages (2026-10-30)
+Speech removal and voice cloning need PyTorch (about 2.9 GB). Until now that meant a command
+(`uv sync --extra experimental`). Now the form shows an **Install now** button (also on the *AI
+models* page): `localdub/extras.py` takes the wheels and their SHA-256 from `uv.lock`, downloads them
+with byte-level progress (resumable), unpacks them with `uv pip install --no-deps --no-index --target`
+into `%LOCALAPPDATA%\LocalDub Studio\extras` and appends that folder to the *end* of `sys.path`.
+
+Measured on this PC (RTX 5060 laptop, about 30 MB/s):
+- Plan from the lock: 13 wheels, 2.87 GB (torch 2.9.1+cu128 is 2.86 GB; its size comes from a HEAD request).
+- Run as a **normal user from the Python in `C:\Program Files\LocalDub Studio`** (read-only for
+  users, no torch there): cold cache, **147 s** end to end (about 100 s download, 45 s unpacking);
+  4.25 GB on disk afterwards in 14 442 files; peak disk use about 7 GB; nothing left in the staging folder.
+  With forced file copies instead of hard links it took 223 s.
+- Afterwards `import torch` comes from the extras folder (`2.9.1+cu128`, **CUDA available, RTX 5060**),
+  `numpy` still from the program folder (nothing shadowed).
+- Demucs (htdemucs) loaded on CUDA and split 12 s of audio in 10 s; the OpenVoice converter loaded
+  and converted a clip, both from that interpreter.
+- A real dubbing job (cuisine vlog with music, "remove the speech") on a server started from that
+  interpreter with an empty extras folder: the packages were installed through the API call the button
+  makes, and the worker then ran the `separate` stage with PyTorch from the extras folder. Result: job done; the original
+  speech weight in the final mix is **-76 dB (none)**, the background music stays at -2.7 dB as configured,
+  back-transcription similarity 0.975. `verify` as a whole said FAIL on its timing gate (3 of 10 lines
+  overflow = 30 %): the LLM wrote longer lines in this run than in earlier runs of the same clip; this is
+  the known translation-length problem, unrelated to the packages.
+- Found by this test and fixed: at the end of the install the byte counters changed meaning
+  (the total includes an estimate for unpacking), so the UI now shows a percentage and a text step
+  ("Downloading torch (1.2 GB of 2.9 GB)", "Unpacking and installing...") for this one item.
+
+**Not tested:** a machine without NVIDIA drivers, Windows 10, a connection that drops mid-download
+(resume is covered by unit tests with a mock server, not by a real interruption), antivirus
+interference with 14 000 new files, and the installed program's own window clicking the button
+(the API calls and the page it renders were run; the button itself was exercised in component tests).

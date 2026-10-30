@@ -1,5 +1,6 @@
 import type { Health, Options, OriginalAudio } from "../api";
 import { ORIGINAL_AUDIO_LABELS } from "../lib/format";
+import { PackagesNotice } from "./PackagesNotice";
 
 export interface Settings {
   source_lang: string;
@@ -21,11 +22,14 @@ interface Props {
   /** The source language is fixed once a project exists. */
   lockSource?: boolean;
   disabled?: boolean;
+  /** Called after the optional packages were installed from inside the app. */
+  onPackagesInstalled?: () => void;
 }
 
 const field = "w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900";
 
-export function OptionFields({ options, health, value, onChange, lockSource, disabled }: Props) {
+export function OptionFields({ options, health, value, onChange, lockSource, disabled, onPackagesInstalled }: Props) {
+  const packagesInstalled = onPackagesInstalled ?? (() => undefined);
   const set = <K extends keyof Settings>(key: K, v: Settings[K]) => onChange({ ...value, [key]: v });
   const llmChoices = Array.from(new Set([value.llm_model, ...(health?.ollama.models ?? [])]));
   return (
@@ -78,11 +82,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
             )}
           </label>
         ))}
-        {!options.separation_available && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Speech removal needs an optional download of about 3 GB: run <code>uv sync --extra experimental</code> and restart.
-          </p>
-        )}
+        {!options.separation_available && <PackagesNotice ids={["packages", "separation"]} onInstalled={packagesInstalled} />}
         {value.original_audio === "background" && options.separation_available && (
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Uses the GPU for about half the video length and downloads an 80 MB model on first use. Singing and
@@ -148,7 +148,9 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
           </div>
         )}
         {!options.separation_available && (
-          <p className="ml-6 text-xs text-slate-500 dark:text-slate-400">Needs the optional download: <code>uv sync --extra experimental</code>.</p>
+          <div className="ml-6">
+            <PackagesNotice ids={["packages", "cloning"]} onInstalled={packagesInstalled} />
+          </div>
         )}
       </div>
     </fieldset>

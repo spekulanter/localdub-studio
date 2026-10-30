@@ -99,6 +99,8 @@ export interface ModelDownload {
   total: number;
   message: string;
   error: string | null;
+  /** false: only a percentage is meaningful (the package install adds an unpacking estimate) */
+  show_bytes?: boolean;
 }
 
 export interface ModelInfo {

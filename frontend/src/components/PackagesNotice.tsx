@@ -1,0 +1,112 @@
+import { useEffect, useRef, useState } from "react";
+import { api, type ModelsResponse } from "../api";
+import { formatBytes, percent } from "../lib/bytes";
+
+interface Props {
+  /** What to install: the packages plus the model the feature needs, e.g. ["packages", "separation"]. */
+  ids: string[];
+  /** Called once everything in `ids` is installed, so the page can unlock the feature. */
+  onInstalled: () => void;
+}
+
+const BUSY = ["queued", "running"];
+
+/** One-click installation of the optional PyTorch packages (and a model), with progress. */
+export function PackagesNotice({ ids, onInstalled }: Props) {
+  const [data, setData] = useState<ModelsResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const notified = useRef(false);
+
+  const rows = (data?.models ?? []).filter((m) => ids.includes(m.id));
+  const running = rows.some((m) => m.download && BUSY.includes(m.download.status));
+  const failed = rows.find((m) => m.download?.status === "error");
+  const allInstalled = rows.length > 0 && rows.every((m) => m.installed);
+
+  const refresh = () => {
+    api.models().then(setData).catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  };
+
+  useEffect(refresh, []);
+  useEffect(() => {
+    if (!running) return;
+    const t = window.setInterval(refresh, 1000);
+    return () => window.clearInterval(t);
+  }, [running]);
+  useEffect(() => {
+    if (allInstalled && !notified.current) {
+      notified.current = true;
+      onInstalled();
+    }
+  }, [allInstalled, onInstalled]);
+
+  const start = () => {
+    setError(null);
+    api
+      .downloadModels(ids)
+      .then(refresh)
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e));
+        refresh();
+      });
+  };
+
+  if (!data) return <p className="text-xs text-slate-500">Checking…</p>;
+  if (allInstalled) {
+    return (
+      <p className="text-xs text-emerald-700 dark:text-emerald-300" role="status">
+        ✓ Installed. This option is ready to use.
+      </p>
+    );
+  }
+
+  const size = (m: (typeof rows)[number]) => m.download?.total || m.size_bytes;
+  const total = rows.filter((m) => !m.installed).reduce((a, m) => a + size(m), 0);
+  const done = rows.filter((m) => !m.installed).reduce((a, m) => a + (m.download?.done ?? 0), 0);
+  const pct = percent(done, total);
+  const current = rows.find((m) => m.download && BUSY.includes(m.download.status) && m.download.message);
+  const problem = error ?? failed?.download?.error ?? null;
+
+  return (
+    <div className="mt-1 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+      {!running && (
+        <p>
+          This needs an extra download of about {formatBytes(total)} (PyTorch). It is installed into your own
+          user folder; no administrator rights and no commands are needed.
+        </p>
+      )}
+      {running && (
+        <>
+          <div
+            role="progressbar"
+            aria-label="Installing the optional packages"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+            className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+          >
+            <div className="h-full bg-indigo-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <p>
+            {pct}%
+            {current?.download?.show_bytes === false ? "" : ` · ${formatBytes(done)} of ${formatBytes(total)}`}
+            {current?.download?.message ? ` · ${current.download.message}` : ""}
+          </p>
+        </>
+      )}
+      {problem && (
+        <p className="text-red-700 dark:text-red-300" role="alert">
+          {problem}
+        </p>
+      )}
+      {!running && (
+        <button
+          type="button"
+          onClick={start}
+          className="rounded-md bg-indigo-600 px-3 py-1 text-sm text-white"
+        >
+          {problem ? "Try again" : `Install now (${formatBytes(total)})`}
+        </button>
+      )}
+    </div>
+  );
+}

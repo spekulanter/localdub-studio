@@ -2,25 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-# Written by the Windows installer next to the program (usually in Program Files, which a normal
-# user cannot write to): user data then lives in %LOCALAPPDATA% instead of the install folder.
-INSTALLED_MARKER = REPO_ROOT / ".installed"
-
-
-def user_dir(name: str) -> Path:
-    """Where projects (`data`) and downloaded models (`models`) go."""
-    if INSTALLED_MARKER.is_file():
-        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
-        return base / "LocalDub Studio" / name
-    return REPO_ROOT / name
+from localdub.paths import REPO_ROOT, user_dir
 
 
 class Settings(BaseSettings):

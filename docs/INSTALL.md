@@ -21,9 +21,8 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
 |---|---|---|
 | FFmpeg and Ollama, if missing (asks first) | `winget` (`Gyan.FFmpeg`, `Ollama.Ollama`) | 100-200 MB each |
 | Python 3.12 and the app libraries | uv (bundled), python-build-standalone, PyPI | about 2.5 GB |
-| Optional: speech removal and voice cloning packages (PyTorch) | PyTorch index | about 3 GB |
 
-   **The AI models are not part of the setup.** On first start the program shows a notice and an
+   **The AI models and the optional packages are not part of the setup.** On first start the program shows a notice and an
    *AI models* page where you download them with a progress bar, under your own account:
 
 | Model | Source | Size |
@@ -32,6 +31,7 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
 | Slovak voice (Supertonic 3), required | Hugging Face | about 0.4 GB |
 | Translation model `translategemma:4b`, required | Ollama registry (Ollama must be running) | about 3.3 GB |
 | Speaker detection, optional | GitHub release, SHA-256 verified | 46 MB |
+| Optional packages for speech removal and voice cloning (PyTorch 2.9 with CUDA 12.8, Demucs) | pytorch.org and PyPI; every file is checked against the SHA-256 in `uv.lock` | about 2.9 GB (about 4.5 GB on disk) |
 | Speech removal (htdemucs), optional | Hugging Face | 80 MB |
 | Voice cloning (OpenVoice V2), optional | Hugging Face | 131 MB |
 
@@ -39,15 +39,22 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
    own window; closing the window quits it. If a dubbing job is running you are asked first: the
    job is paused and continues the next time you open the program.
 
+### Optional features (speech removal, voice cloning)
+Choosing one of them in the form shows an **Install now** button with a progress bar. It downloads
+PyTorch and Demucs (about 2.9 GB, resumable if the connection drops) and installs them into
+`%LOCALAPPDATA%\LocalDub Studio\extras` under your own account: no administrator rights, no
+commands, no restart. The same can be done from the *AI models* page. Needs about 9 GB of free disk
+space while installing (about 4.5 GB afterwards). It cannot run while a dubbing job is running.
+
 ## Where things are
 The program (with its own Python) is in the install folder, which is read-only for normal users.
-Your projects and results are in `%LOCALAPPDATA%\LocalDub Studio\data` and the models in
-`%LOCALAPPDATA%\LocalDub Studio\models`; both survive an upgrade. Logs: `...\data\logs`. The
+Your projects and results are in `%LOCALAPPDATA%\LocalDub Studio\data`, the models in
+`...\models` and the optional packages in `...\extras`; both survive an upgrade. Logs: `...\data\logs`. The
 program only listens on `127.0.0.1`.
 
 ## Uninstall
-*Settings → Apps → LocalDub Studio → Uninstall*. It asks whether to delete your data and the
-downloaded models. FFmpeg and Ollama are left installed.
+*Settings → Apps → LocalDub Studio → Uninstall*. It asks whether to delete your data, the
+downloaded models and the optional packages. FFmpeg and Ollama are left installed.
 
 ## Without the wizard
 `LocalDub-Studio-<version>-win64.zip` contains the same program with PowerShell scripts

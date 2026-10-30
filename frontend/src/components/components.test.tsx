@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Health, Job, ModelInfo, ModelsResponse, Options, SegmentRow, SegmentsResponse } from "../api";
 import { ModelsPanel } from "./ModelsPanel";
+import { PackagesNotice } from "./PackagesNotice";
 import { NewProject } from "./NewProject";
 import { ProgressPanel } from "./ProgressPanel";
 import { DialogueEditor } from "./DialogueEditor";
@@ -159,7 +160,7 @@ describe("original voice options", () => {
   it("disables speech removal when the optional packages are missing and explains how to enable it", () => {
     render(<NewProject options={options} health={health} onCreated={vi.fn()} />);
     expect((screen.getByLabelText(/Remove the speech/) as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getAllByText(/uv sync --extra experimental/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/uv sync/)).toBeNull(); // no manual commands any more
   });
 
   it("enables it when available", () => {
@@ -223,7 +224,7 @@ describe("ModelsPanel", () => {
   it("marks installed models and explains unavailable optional ones", () => {
     render(<ModelsPanel data={resp([model({ installed: true }), model({ id: "separation", title: "Separation", required: false, available: false })])} onChanged={vi.fn()} />);
     expect(screen.getByText("✓ installed")).toBeTruthy();
-    expect(screen.getByText(/needs the optional packages/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Download with the optional packages" })).toBeTruthy();
   });
 });
 
@@ -247,5 +248,74 @@ describe("start is blocked while required models are missing", () => {
     fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [new File([new Uint8Array(5)], "a.mp4")] } });
     expect((screen.getByRole("button", { name: /upload and start/i }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/Download the AI models first/)).toBeTruthy();
+  });
+});
+
+describe("PackagesNotice (install the optional packages without commands)", () => {
+  const row = (over: Partial<ModelInfo>): ModelInfo => ({
+    id: "packages", title: "Optional packages", description: "d", size_bytes: 2_900_000_000, required: false,
+    group: "packages", installed: false, available: true, download: null, ...over,
+  });
+  const sep = (over: Partial<ModelInfo> = {}) =>
+    row({ id: "separation", title: "Separation", size_bytes: 80_000_000, group: "separation", available: false, ...over });
+  const reply = (models: ModelInfo[]) =>
+    new Response(JSON.stringify({ models, required_missing: [], busy: false }), { status: 200 });
+
+  it("offers one button with the total size and sends the packages together with the model", async () => {
+    const posted: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        posted.push(String(init.body));
+        return new Response(JSON.stringify({ started: ["packages", "separation"] }), { status: 202 });
+      }
+      return reply([row({}), sep()]);
+    }));
+    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    const button = await screen.findByRole("button", { name: /Install now \(3\.0 GB\)/ });
+    expect(screen.getByText(/no administrator rights and no commands are needed/)).toBeTruthy();
+    fireEvent.click(button);
+    await waitFor(() => expect(posted).toEqual(['{"ids":["packages","separation"]}']));
+    vi.unstubAllGlobals();
+  });
+
+  it("shows live progress in bytes while installing", async () => {
+    const dl = { status: "running" as const, done: 1_500_000_000, total: 2_900_000_000, message: "Downloading torch", error: null };
+    vi.stubGlobal("fetch", vi.fn(async () => reply([row({ download: dl }), sep()])));
+    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    const bar = await screen.findByRole("progressbar", { name: /Installing the optional packages/ });
+    expect(Number(bar.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(49);
+    expect(screen.getByText(/1\.5 GB of 3\.0 GB · Downloading torch/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Install now/ })).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows only a percentage and the step text for the package install (its total includes unpacking)", async () => {
+    const dl = {
+      status: "running" as const, done: 2_960_000_000, total: 7_400_000_000,
+      message: "Downloading torch (1.2 GB of 2.9 GB)", error: null, show_bytes: false,
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => reply([row({ download: dl }), sep({ installed: true })])));
+    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    expect(await screen.findByText("40% · Downloading torch (1.2 GB of 2.9 GB)")).toBeTruthy();
+    expect(screen.queryByText(/7\.4 GB/)).toBeNull(); // no misleading byte totals
+    vi.unstubAllGlobals();
+  });
+
+  it("shows why it failed and lets the user try again", async () => {
+    const dl = { status: "error" as const, done: 0, total: 1, message: "Failed", error: "Not enough free disk space" };
+    vi.stubGlobal("fetch", vi.fn(async () => reply([row({ download: dl }), sep()])));
+    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={vi.fn()} />);
+    expect((await screen.findByRole("alert")).textContent).toContain("Not enough free disk space");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it("tells the page once when everything is installed", async () => {
+    const onInstalled = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async () => reply([row({ installed: true }), sep({ installed: true, available: true })])));
+    render(<PackagesNotice ids={["packages", "separation"]} onInstalled={onInstalled} />);
+    expect(await screen.findByText(/Installed\. This option is ready to use\./)).toBeTruthy();
+    await waitFor(() => expect(onInstalled).toHaveBeenCalledTimes(1));
+    vi.unstubAllGlobals();
   });
 });

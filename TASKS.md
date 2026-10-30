@@ -50,3 +50,4 @@ Legend: [x] done and verified · [~] implemented, not yet verified on real data 
 - [x] Desktop window (pywebview/WebView2, icon, close-confirm while a job runs, browser fallback): run and screenshot-verified
 - [~] Windows installer: Inno Setup wizard script written (packaging/localdub.iss) but NOT compiled/tested (Inno Setup not installed); PowerShell installer + ZIP tested
 - [x] In-app model manager: required models downloaded inside the app with progress (installer no longer downloads models); failed jobs: copy error / copy log / download log
+- [x] Optional PyTorch packages install from inside the app (Install now button + AI models page; no commands, no admin rights): tested as a normal user from the Program Files Python

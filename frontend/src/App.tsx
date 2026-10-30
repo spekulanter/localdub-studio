@@ -25,6 +25,10 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [models, setModels] = useState<ModelsResponse | null>(null);
 
+  const refreshOptions = useCallback(() => {
+    api.options().then(setOptions).catch(() => undefined);
+  }, []);
+
   const refreshModels = useCallback(() => {
     api.models().then(setModels).catch(() => undefined);
   }, []);
@@ -141,6 +145,7 @@ export default function App() {
             options={options}
             health={health}
             modelsMissing={(models?.required_missing.length ?? 0) > 0}
+            onOptionsChanged={refreshOptions}
             onCreated={(p) => {
               void refreshProjects();
               setSelected(p.id);
@@ -153,6 +158,7 @@ export default function App() {
             options={options}
             health={health}
             onChanged={refreshProjects}
+            onOptionsChanged={refreshOptions}
             onDeleted={() => {
               void refreshProjects();
               setSelected("new");

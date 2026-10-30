@@ -37,7 +37,8 @@ class OpenVoiceConverter:
         except ImportError as exc:
             raise SeparationUnavailable(
                 "Voice cloning needs the optional PyTorch packages. "
-                "Install them with: uv sync --extra experimental"
+                "In LocalDub Studio choose this option and click 'Install now' (or use the AI "
+                "models page). From a source checkout: uv sync --extra experimental"
             ) from exc
         from localdub.vendor.openvoice import utils
         from localdub.vendor.openvoice.models import SynthesizerTrn

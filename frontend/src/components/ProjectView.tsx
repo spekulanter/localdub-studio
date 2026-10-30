@@ -11,6 +11,7 @@ interface Props {
   health: Health | null;
   onChanged: () => void;
   onDeleted: () => void;
+  onOptionsChanged?: () => void;
 }
 
 const toSettings = (p: Project): Settings => ({
@@ -25,7 +26,7 @@ const toSettings = (p: Project): Settings => ({
   num_speakers: p.num_speakers,
 });
 
-export function ProjectView({ projectId, options, health, onChanged, onDeleted }: Props) {
+export function ProjectView({ projectId, options, health, onChanged, onDeleted, onOptionsChanged }: Props) {
   const [project, setProject] = useState<Project | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [segments, setSegments] = useState<SegmentsResponse | null>(null);
@@ -181,7 +182,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted }
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="mb-3 font-medium">Settings</h3>
-        <OptionFields options={options} health={health} value={draft} onChange={setDraft} lockSource disabled={active || busy} />
+        <OptionFields options={options} health={health} value={draft} onChange={setDraft} lockSource disabled={active || busy} onPackagesInstalled={onOptionsChanged} />
         {stage && !active && !(draft.clone_voice && !draft.clone_consent) && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button

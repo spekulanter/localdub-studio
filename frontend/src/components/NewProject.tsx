@@ -8,11 +8,13 @@ interface Props {
   onCreated: (p: Project) => void;
   /** Required AI models are not downloaded yet. */
   modelsMissing?: boolean;
+  /** Optional packages were installed: reload what the server can do. */
+  onOptionsChanged?: () => void;
 }
 
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 
-export function NewProject({ options, health, onCreated, modelsMissing = false }: Props) {
+export function NewProject({ options, health, onCreated, modelsMissing = false, onOptionsChanged }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>({
@@ -116,7 +118,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false }
         {tooBig.length > 0 && <p className="text-sm text-red-600">{tooBig.map((f) => f.name).join(", ")} is larger than {options.max_upload_mb} MB.</p>}
       </div>
 
-      <OptionFields options={options} health={health} value={settings} onChange={setSettings} disabled={busy} />
+      <OptionFields options={options} health={health} value={settings} onChange={setSettings} disabled={busy} onPackagesInstalled={onOptionsChanged} />
 
       {error && (
         <p className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" role="alert">

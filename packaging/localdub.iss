@@ -38,30 +38,21 @@ DiskSpanning=no
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Types]
-Name: "full"; Description: "Full installation (all optional features)"
-Name: "standard"; Description: "Standard installation"
-Name: "custom"; Description: "Custom installation"; Flags: iscustom
-
-[Components]
-Name: "core"; Description: "LocalDub Studio"; Types: full standard custom; Flags: fixed
-Name: "experimental"; Description: "Speech removal and voice cloning packages (about 3 GB download, experimental)"; Types: full
-
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"
 
 [Files]
-Source: "..\localdub\*"; DestDir: "{app}\localdub"; Excludes: "__pycache__,*.pyc"; Flags: recursesubdirs ignoreversion; Components: core
-Source: "..\frontend\dist\*"; DestDir: "{app}\frontend\dist"; Flags: recursesubdirs ignoreversion; Components: core
-Source: "..\pyproject.toml"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "..\uv.lock"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "..\.python-version"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "..\docs\LICENSES.md"; DestDir: "{app}\docs"; Flags: ignoreversion; Components: core
-Source: "..\docs\QUALITY.md"; DestDir: "{app}\docs"; Flags: ignoreversion; Components: core
-Source: "tools\uv.exe"; DestDir: "{app}\tools"; Flags: ignoreversion; Components: core
-Source: "installed.marker"; DestDir: "{app}"; DestName: ".installed"; Flags: ignoreversion; Components: core
-Source: "THIRD-PARTY-uv.txt"; DestDir: "{app}\tools"; Flags: ignoreversion; Components: core
+Source: "..\localdub\*"; DestDir: "{app}\localdub"; Excludes: "__pycache__,*.pyc"; Flags: recursesubdirs ignoreversion
+Source: "..\frontend\dist\*"; DestDir: "{app}\frontend\dist"; Flags: recursesubdirs ignoreversion
+Source: "..\pyproject.toml"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\uv.lock"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\.python-version"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\LICENSES.md"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "..\docs\QUALITY.md"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "tools\uv.exe"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "installed.marker"; DestDir: "{app}"; DestName: ".installed"; Flags: ignoreversion
+Source: "THIRD-PARTY-uv.txt"; DestDir: "{app}\tools"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\localdub\assets\localdub.ico"
@@ -240,7 +231,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Uv, Extra, EnvPrefix: String;
+  Uv, EnvPrefix: String;
 begin
   if CurStep = ssDone then
     Log('Setup is done');
@@ -255,17 +246,14 @@ begin
   if not OllamaPresent then
     InstallWithWinget('Ollama (runs the translation models)', 'Ollama.Ollama', 'the winget repository');
 
-  Extra := '';
-  if WizardIsComponentSelected('experimental') then
-    Extra := ' --extra experimental';
 
   { Always use uv's own Python (never whatever is on this PC), kept inside the install folder rather than
     in one user's profile. The AI models are downloaded later inside the app, as the user, with visible
     progress (an elevated installer would leave them unreadable for the normal user). }
   EnvPrefix := 'set "UV_PYTHON_PREFERENCE=only-managed" && set "UV_PYTHON_INSTALL_DIR=' + ExpandConstant('{app}\python') + '" && ';
 
-  RunStep('Installing Python 3.12 and the program libraries...', 'About 2.5 GB (6 GB with the experimental features). Python comes from python-build-standalone, libraries from PyPI.',
-    EnvPrefix + Uv + ' sync --frozen --no-dev' + Extra, False);
+  RunStep('Installing Python 3.12 and the program libraries...', 'About 2.5 GB. Python comes from python-build-standalone, libraries from PyPI.',
+    EnvPrefix + Uv + ' sync --frozen --no-dev', False);
   if not AppInstalled then
   begin
     { A leftover or damaged .venv from an earlier attempt: start again from a clean one. }
@@ -273,7 +261,7 @@ begin
     DelTree(ExpandConstant('{app}\.venv'), True, True, True);
     DelTree(ExpandConstant('{app}\python'), True, True, True);
     RunStep('Installing Python 3.12 and the program libraries (second attempt)...', 'Starting from a clean environment.',
-      EnvPrefix + Uv + ' sync --frozen --no-dev' + Extra, False);
+      EnvPrefix + Uv + ' sync --frozen --no-dev', False);
   end;
 
   if not AppInstalled then
@@ -285,18 +273,26 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  Data, Models: String;
+  Data, Models, Extras: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
     Data := ExpandConstant('{#UserData}\data');
     Models := ExpandConstant('{#UserData}\models');
+    Extras := ExpandConstant('{#UserData}\extras');
     if DirExists(Data) and (not UninstallSilent) then
       if MsgBox('Delete your LocalDub Studio projects, videos and results as well?' + #13#10#13#10 + Data, mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
         DelTree(Data, True, True, True);
     if DirExists(Models) and (not UninstallSilent) then
       if MsgBox('Delete the downloaded models (several GB) as well?' + #13#10#13#10 + Models, mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
         DelTree(Models, True, True, True);
+    { The optional PyTorch packages the app installed itself (several GB) go with the models. }
+    if DirExists(Extras) and (not UninstallSilent) then
+      if MsgBox('Delete the optional packages (PyTorch, several GB) as well?' + #13#10#13#10 + Extras, mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+        DelTree(Extras, True, True, True);
+    { leftovers of an interrupted package installation }
+    DelTree(ExpandConstant('{#UserData}\extras-download'), True, True, True);
+    DelTree(ExpandConstant('{#UserData}\extras-new'), True, True, True);
     RemoveDir(ExpandConstant('{#UserData}'));
     RemoveDir(ExpandConstant('{app}'));
   end;

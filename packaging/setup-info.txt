@@ -7,6 +7,9 @@ This setup will:
   * download Python 3.12 and the program's libraries (about 2.5 GB, takes a few minutes)
   * optionally install FFmpeg and Ollama with winget (you are asked first)
 
+Optional features (speech removal, voice cloning) need about 3 GB more; the program offers to
+install them with one click when you choose them. No commands are ever needed.
+
 The AI models (about 6.7 GB: speech recognition, Slovak voice, translation) are NOT downloaded by
 this setup. LocalDub Studio downloads them the first time you start it, with a progress display.
 

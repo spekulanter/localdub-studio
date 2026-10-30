@@ -8,7 +8,7 @@ interface Props {
   error?: string | null;
 }
 
-function Row({ m, onStart }: { m: ModelInfo; onStart: () => void }) {
+function Row({ m, onStart }: { m: ModelInfo; onStart: (ids?: string[]) => void }) {
   const d = m.download;
   const active = d?.status === "queued" || d?.status === "running";
   const pct = d ? percent(d.done, d.total) : 0;
@@ -33,10 +33,16 @@ function Row({ m, onStart }: { m: ModelInfo; onStart: () => void }) {
             ✓ installed
           </span>
         ) : !m.available ? (
-          <span className="text-xs text-slate-500">needs the optional packages (see install docs)</span>
+          <button
+            onClick={() => onStart(["packages", m.id])}
+            disabled={active}
+            className="rounded-md bg-indigo-600 px-3 py-1 text-sm text-white disabled:opacity-50"
+          >
+            {active ? "Downloading…" : "Download with the optional packages"}
+          </button>
         ) : (
           <button
-            onClick={onStart}
+            onClick={() => onStart([m.id])}
             disabled={active}
             className="rounded-md bg-indigo-600 px-3 py-1 text-sm text-white disabled:opacity-50"
           >
@@ -65,7 +71,11 @@ function Row({ m, onStart }: { m: ModelInfo; onStart: () => void }) {
             </p>
           ) : (
             <p className="mt-1 text-xs text-slate-500">
-              {d?.status === "queued" ? "Waiting for the previous download…" : `${pct}% · ${formatBytes(d?.done ?? 0)} of ${formatBytes(d?.total ?? 0)}`}
+              {d?.status === "queued"
+                ? "Waiting for the previous download…"
+                : d?.show_bytes === false
+                  ? `${pct}%`
+                  : `${pct}% · ${formatBytes(d?.done ?? 0)} of ${formatBytes(d?.total ?? 0)}`}
               {d?.message ? ` · ${d.message}` : ""}
             </p>
           )}
@@ -106,7 +116,7 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
       )}
       <ul className="space-y-2">
         {data.models.map((m) => (
-          <Row key={m.id} m={m} onStart={() => start([m.id])} />
+          <Row key={m.id} m={m} onStart={(ids) => start(ids)} />
         ))}
       </ul>
     </div>

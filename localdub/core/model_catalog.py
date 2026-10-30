@@ -16,6 +16,7 @@ from typing import Any
 
 import httpx
 
+from localdub import extras
 from localdub.config import Settings
 from localdub.core.models import ensure_model, is_readable
 
@@ -48,6 +49,10 @@ SPECS: list[ModelSpec] = [
     ModelSpec("diarization", "Speaker detection",
               "Tells speakers apart (experimental). GitHub, checksum-verified.",
               46_000_000, False, "diarization"),
+    ModelSpec("packages", "Optional packages (PyTorch and Demucs)",
+              "Program libraries (not an AI model) that speech removal and voice cloning need. "
+              "Installed into your user folder; no administrator rights needed.",
+              2_900_000_000, False, "packages"),
     ModelSpec("separation", "Speech and music separation (htdemucs)",
               "Removes the original speech but keeps music (experimental, needs the optional "
               "PyTorch packages). Hugging Face.", 80_000_000, False, "separation"),
@@ -71,9 +76,7 @@ def _dir_size(path: Path) -> int:
 
 
 def optional_packages_available() -> bool:
-    import importlib.util
-
-    return all(importlib.util.find_spec(m) is not None for m in ("torch", "demucs"))
+    return extras.packages_available()
 
 
 def _whisper_repo(settings: Settings) -> str:
@@ -112,6 +115,8 @@ def is_installed(spec: ModelSpec, settings: Settings) -> bool:
         except Exception:  # noqa: BLE001
             return False
         return is_readable(path / "model.bin")
+    if spec.id == "packages":
+        return extras.packages_available()
     if spec.id == "supertonic":
         base = d / settings.tts_model.replace("-", "")
         onnx = list((base / "onnx").glob("*.onnx")) if (base / "onnx").is_dir() else []
@@ -203,22 +208,39 @@ def download(spec: ModelSpec, settings: Settings, progress: Progress) -> None:
 
             ensure_model(model, d, progress=on_bytes)
             done_before += size
+    elif spec.id == "packages":
+        extras.install(progress)
     elif spec.id == "separation":
-        from localdub.core.separation.demucs_separator import DemucsSeparator
-
         hub = Path.home() / ".cache" / "huggingface" / "hub"
-        _with_polling(hub, spec, progress, lambda: DemucsSeparator(d, device="cpu").close())
+        _with_polling(hub, spec, progress, lambda: _fetch_in_subprocess(spec.id))
     elif spec.id == "cloning":
-        from localdub.core.voice.openvoice_converter import OpenVoiceConverter
-
-        _with_polling(
-            d / "openvoice", spec, progress, lambda: OpenVoiceConverter(d, device="cpu").close()
-        )
+        _with_polling(d / "openvoice", spec, progress, lambda: _fetch_in_subprocess(spec.id))
     else:
         raise ValueError(f"Unknown model {spec.id}")
     if not is_installed(spec, settings):
         raise RuntimeError(f"{spec.title} was downloaded but is not usable; see the log")
-    progress(spec.size_bytes, spec.size_bytes, "Done")
+    if spec.id != "packages":  # the package installer reports its own final state
+        progress(spec.size_bytes, spec.size_bytes, "Done")
+
+
+def _fetch_in_subprocess(model_id: str) -> None:
+    """Download a PyTorch-based model in a child process: the app window never imports torch."""
+    import subprocess
+    import sys
+
+    flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+    proc = subprocess.run(  # noqa: S603 - our own module, list arguments, no shell
+        [sys.executable, "-m", "localdub.core.model_fetch", model_id],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=flags,
+        check=False,
+    )
+    if proc.returncode != 0:
+        tail = "\n".join((proc.stderr or proc.stdout).strip().splitlines()[-6:])
+        raise RuntimeError(f"The download process failed (exit code {proc.returncode}):\n{tail}")
 
 
 def _pull_ollama(settings: Settings, progress: Progress) -> None:
@@ -282,6 +304,7 @@ class Downloads:
                     "total": BY_ID[i].size_bytes,
                     "message": "Waiting",
                     "error": None,
+                    "show_bytes": True,
                 }
                 self._queue.append(i)
             if self._thread is None or not self._thread.is_alive():
@@ -302,7 +325,14 @@ class Downloads:
                 model_id = self._queue.pop(0)
             spec = BY_ID[model_id]
             self._set(
-                model_id, status="running", message="Starting...", error=None, started=time.time()
+                model_id,
+                status="running",
+                message="Starting...",
+                error=None,
+                started=time.time(),
+                # The package install reports percent plus a text, not bytes: its total includes an
+                # estimate of the unpacking work, so "X GB of Y GB" would be misleading.
+                show_bytes=spec.id != "packages",
             )
 
             def progress(done: int, total: int, message: str, mid: str = model_id) -> None:

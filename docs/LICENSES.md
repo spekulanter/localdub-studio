@@ -173,7 +173,7 @@ measured on the samples in docs/QUALITY.md.
 | `htdemucs` weights (about 80 MB, safetensors) | Hugging Face `adefossez/HTDemucs`, `main` branch, fetched by `demucs.pretrained` (revision **not pinned**, no checksum check by us) | MIT per the Demucs repository; **the weights' licence on that model card was not checked** | UNVERIFIED |
 | PyTorch 2.9.1 + CUDA 12.8 | download.pytorch.org/whl/cu128 | BSD-3-Clause-style (PyTorch) | NVIDIA CUDA runtime libraries inside the wheels are under NVIDIA's licence; check before redistributing an installer |
 
-Installed only by `uv sync --extra experimental` (about 3 GB). Weights go to the Hugging Face cache (`~/.cache/huggingface`).
+Installed only on request from inside the app (`localdub/extras.py`: wheels and SHA-256 come from `uv.lock`, about 2.9 GB; from a source checkout `uv sync --extra experimental` does the same). Weights go to the Hugging Face cache (`~/.cache/huggingface`).
 
 ## Voice cloning (optional, experimental, M3)
 | Component | Source | Licence | Status |
@@ -182,7 +182,7 @@ Installed only by `uv sync --extra experimental` (about 3 GB). Weights go to the
 | OpenVoice V2 converter weights (`checkpoint.pth`, `config.json`) | Hugging Face `myshell-ai/OpenVoiceV2` at revision `f36e7edf…` | MIT (Hugging Face model metadata) | verified from metadata; **the licensing of OpenVoice's training data was not examined** |
 
 The checkpoint is loaded with `torch.load(weights_only=True)`. Same optional install as separation
-(`uv sync --extra experimental`). Voice cloning requires an explicit confirmation in the UI and API
+(in-app install). Voice cloning requires an explicit confirmation in the UI and API
 that the user may imitate the voices; generated MP4s keep the AI-disclosure metadata. Cloning
 people's voices can be illegal or harmful without their consent; this feature is meant for your own
 voice or voices you have permission to use.
