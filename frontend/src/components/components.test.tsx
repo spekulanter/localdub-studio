@@ -344,7 +344,8 @@ describe("DialogueEditor audio", () => {
       pause = pause;
     }
     vi.stubGlobal("Audio", FakeAudio);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Blob(["x"]), { headers: { "X-Audio-Duration": "1.0", "X-Window": "2.0" } })));
+    // a plain string body: jsdom's Blob has no .stream(), which Node 22's Response needs (it broke CI)
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("x", { headers: { "X-Audio-Duration": "1.0", "X-Window": "2.0" } })));
     const { unmount } = render(
       <DialogueEditor projectId={1} data={data([row()])} options={options} editable renderVersion={0} onChange={vi.fn()} onRerender={vi.fn()} busy={false} />,
     );
