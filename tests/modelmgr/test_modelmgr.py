@@ -284,3 +284,32 @@ def test_long_audio_is_cut_at_a_quiet_moment():
     assert all(b - a <= 40 * sr for a, b in chunks)
     assert 38.5 * sr <= chunks[0][1] <= 38.7 * sr
     assert all(chunks[i][1] == chunks[i + 1][0] for i in range(len(chunks) - 1))
+
+
+# ----- Slovak texts ------------------------------------------------------------------------
+def test_every_catalogue_entry_and_role_has_slovak_texts():
+    cat = load_catalog()
+    for role in cat.roles:
+        title, description = role.text("sk")
+        assert title and description and description != role.description
+    for e in cat.entries:
+        sk = e.text("sk")
+        assert sk["summary"] != e.summary, e.id
+        assert len(sk["choose_if"]) == len(e.choose_if), e.id
+        assert len(sk["avoid_if"]) == len(e.avoid_if), e.id
+        if e.measured:
+            assert sk["measured"] != e.measured, e.id
+        if e.pinned:
+            assert sk["pinned"] != e.pinned, e.id
+        if e.requirements.note:
+            assert sk["note"] != e.requirements.note, e.id
+    # an unknown language falls back to English
+    assert cat.entries[0].text("de")["summary"] == cat.entries[0].summary
+
+
+def test_fit_texts_follow_the_language():
+    gpu8 = hw.Hardware(hw.Gpu("x", 8192, 8000, "1"), 32.0, 8, 10**12, 2 * 10**12)
+    big = Requirements(9, 8.1, "gpu-or-cpu")
+    assert "Chce asi" in hw.fits(big, gpu8, "sk")["text"]
+    assert "Wants about" in hw.fits(big, gpu8)["text"]
+    assert "Beží na procesore" in hw.fits(Requirements(None, 1, "cpu"), gpu8, "sk")["text"]

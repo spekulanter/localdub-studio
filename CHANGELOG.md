@@ -3,6 +3,21 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.3.1] - 2026-10-31
+
+### Added
+- **Slovak interface.** A language switch (English / Slovenčina) in the sidebar. It follows the Windows
+  language on first start and remembers your choice. Model descriptions are translated too. The Slovak
+  texts are first drafts: tell us what reads badly.
+- **Voice samples.** A "Listen" button next to the Slovak voice picks a short sample of the selected voice,
+  so you can choose by ear.
+- **Cancel a download.** Every model download (and the optional packages and YouTube tools) can be cancelled
+  while it runs, or while it waits in the queue; half-downloaded files are removed. Only the unpacking step of
+  the optional packages cannot be interrupted.
+
+### Changed
+- Hugging Face downloads use plain HTTP (not the Xet transfer engine) so that they can be cancelled.
+
 ## [0.3.0] - 2026-10-31
 
 ### Added

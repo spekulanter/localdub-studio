@@ -14,6 +14,8 @@ os.environ.setdefault(
     "HF_HUB_CACHE", str((Path(_models) if _models else user_dir("models")) / "huggingface")
 )
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+# Plain HTTP downloads (not the Xet transfer engine): they can be cancelled from the models page.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 # Optional PyTorch packages installed from inside the app live outside the program folder.
 _extras.activate()

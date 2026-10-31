@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ModelInfo, ModelRole, ModelsResponse } from "../api";
 import { api } from "../api";
+import { useT } from "../i18n";
 import { formatBytes, percent } from "../lib/bytes";
 
 interface Props {
@@ -34,14 +35,16 @@ const FIT_LABEL: Record<string, string> = {
 };
 
 function Progress({ m }: { m: ModelInfo }) {
+  const t = useT();
   const d = m.download;
+  if (d?.status === "cancelled") return <p className="mt-2 text-xs text-muted">{t("Download cancelled. Nothing was kept.")}</p>;
   if (!d || (d.status !== "queued" && d.status !== "running" && d.status !== "error")) return null;
   const pct = percent(d.done, d.total);
   return (
     <div className="mt-2">
       <div
         role="progressbar"
-        aria-label={`Download of ${m.title}`}
+        aria-label={t("Download of {name}", { name: m.title })}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
@@ -60,11 +63,11 @@ function Progress({ m }: { m: ModelInfo }) {
       ) : (
         <p className="mt-1 text-xs text-muted">
           {d.status === "queued"
-            ? "Waiting for the previous download…"
+            ? t("Waiting for the previous download…")
             : d.show_bytes === false
               ? `${pct}%`
-              : `${pct}% · ${formatBytes(d.done)} of ${formatBytes(d.total)}`}
-          {d.message && d.status === "running" ? ` · ${d.message}` : ""}
+              : `${pct}% · ${t("{a} of {b}", { a: formatBytes(d.done), b: formatBytes(d.total) })}`}
+          {d.message && d.status === "running" ? ` · ${t(d.message)}` : ""}
         </p>
       )}
     </div>
@@ -72,14 +75,15 @@ function Progress({ m }: { m: ModelInfo }) {
 }
 
 function Details({ m }: { m: ModelInfo }) {
+  const t = useT();
   const r = m.requirements;
   return (
     <details className="mt-2 text-sm">
-      <summary className="cursor-pointer text-muted">Details: who it is for, what it needs</summary>
+      <summary className="cursor-pointer text-muted">{t("Details: who it is for, what it needs")}</summary>
       <div className="mt-2 space-y-2">
         {m.choose_if.length > 0 && (
           <div>
-            <p className="font-medium">Choose it if</p>
+            <p className="font-medium">{t("Choose it if")}</p>
             <ul className="list-disc pl-5 text-muted">
               {m.choose_if.map((t) => (
                 <li key={t}>{t}</li>
@@ -89,7 +93,7 @@ function Details({ m }: { m: ModelInfo }) {
         )}
         {m.avoid_if.length > 0 && (
           <div>
-            <p className="font-medium">Skip it if</p>
+            <p className="font-medium">{t("Skip it if")}</p>
             <ul className="list-disc pl-5 text-muted">
               {m.avoid_if.map((t) => (
                 <li key={t}>{t}</li>
@@ -98,26 +102,26 @@ function Details({ m }: { m: ModelInfo }) {
           </div>
         )}
         <p className="text-muted">
-          <span className="font-medium text-ink">Needs:</span> about {formatBytes(m.size_bytes)} download,{" "}
-          {r.disk_gb} GB on disk
-          {r.vram_gb !== null ? `, about ${r.vram_gb} GB of graphics memory` : ", no graphics memory"}.
+          <span className="font-medium text-ink">{t("Needs:")}</span>{" "}
+          {t("about {size} download, {disk} GB on disk", { size: formatBytes(m.size_bytes), disk: r.disk_gb })}
+          {r.vram_gb !== null ? `, ${t("about {gb} GB of graphics memory", { gb: r.vram_gb })}` : `, ${t("no graphics memory")}`}.
           {r.note ? ` ${r.note}` : ""}
-          {r.needs_packages ? " Needs the optional packages." : ""}
+          {r.needs_packages ? ` ${t("Needs the optional packages.")}` : ""}
         </p>
         <p className="text-muted">
-          <span className="font-medium text-ink">This computer:</span> {m.fits.text}
+          <span className="font-medium text-ink">{t("This computer:")}</span> {m.fits.text}
         </p>
         {m.languages && (
           <p className="text-muted">
-            <span className="font-medium text-ink">Languages:</span> {m.languages}
+            <span className="font-medium text-ink">{t("Languages:")}</span> {m.languages}
           </p>
         )}
         <p className="text-muted">
-          <span className="font-medium text-ink">Measured here:</span>{" "}
-          {m.measured ?? "Not measured yet. Treat the description as the maker's claim, not our result."}
+          <span className="font-medium text-ink">{t("Measured here:")}</span>{" "}
+          {m.measured ?? t("Not measured yet. Treat the description as the maker's claim, not our result.")}
         </p>
         <p className="text-muted">
-          <span className="font-medium text-ink">Licence:</span>{" "}
+          <span className="font-medium text-ink">{t("Licence:")}</span>{" "}
           <a href={m.license.url} target="_blank" rel="noreferrer noopener" className="underline">
             {m.license.name}
           </a>
@@ -126,7 +130,7 @@ function Details({ m }: { m: ModelInfo }) {
         {m.installed && (m.locations.length > 0 || m.store_note) && (
           <p className="break-all font-mono text-xs text-muted">
             {m.locations.length > 0 ? m.locations.join("\n") : m.store_note}
-            {m.size_on_disk !== null ? ` · ${formatBytes(m.size_on_disk)} on disk` : ""}
+            {m.size_on_disk !== null ? ` · ${t("{size} on disk", { size: formatBytes(m.size_on_disk) })}` : ""}
           </p>
         )}
       </div>
@@ -145,6 +149,7 @@ function Card({
   data: ModelsResponse;
   onAction: (fn: () => Promise<unknown>) => void;
 }) {
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
   const d = m.download;
   const active = d?.status === "queued" || d?.status === "running";
@@ -158,62 +163,72 @@ function Card({
           <p className="font-medium">{m.title}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             <span className={`chip ${m.status === "recommended" ? "chip-ok" : m.status === "not_recommended" ? "chip-warn" : ""}`}>
-              {STATUS_LABEL[m.status]}
+              {t(STATUS_LABEL[m.status])}
             </span>
-            {m.installed && <span className="chip chip-ok">✓ installed</span>}
-            {m.selected && role?.selectable && <span className="chip chip-ok">In use for new dubs</span>}
-            {m.update.available && <span className="chip chip-warn">Update available</span>}
+            {m.installed && <span className="chip chip-ok">{t("✓ installed")}</span>}
+            {m.selected && role?.selectable && <span className="chip chip-ok">{t("In use for new dubs")}</span>}
+            {m.update.available && <span className="chip chip-warn">{t("Update available")}</span>}
             <span className={FIT_CLASS[m.fits.level] ?? "chip"} title={m.fits.text}>
-              {FIT_LABEL[m.fits.level] ?? m.fits.level}
+              {t(FIT_LABEL[m.fits.level] ?? m.fits.level)}
             </span>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!m.installed && !m.available && (
+          {!m.installed && !m.available && !active && (
             <button disabled={active} className="btn-primary btn-sm" onClick={() => onAction(() => api.downloadModels(["packages", m.id]))}>
-              {active ? "Downloading…" : "Download with the optional packages"}
+              {active ? t("Downloading…") : t("Download with the optional packages")}
             </button>
           )}
-          {!m.installed && m.available && (
+          {active && (
+            <button
+              className="btn-secondary btn-sm"
+              disabled={d?.cancelling || d?.cancellable === false}
+              title={d?.cancellable === false ? t("This step can no longer be cancelled") : undefined}
+              onClick={() => onAction(() => api.cancelModel(m.id))}
+            >
+              {d?.cancelling ? t("Cancelling…") : t("Cancel")}
+            </button>
+          )}
+          {!m.installed && m.available && !active && (
             <button disabled={active} className="btn-primary btn-sm" onClick={() => onAction(() => api.downloadModels([m.id]))}>
-              {active ? "Downloading…" : d?.status === "error" ? "Try again" : `Download (${formatBytes(m.size_bytes)})`}
+              {active ? t("Downloading…") : d?.status === "error" ? t("Try again") : t("Download ({size})", { size: formatBytes(m.size_bytes) })}
             </button>
           )}
           {m.installed && role?.selectable && !m.selected && (
             <button className="btn-secondary btn-sm" onClick={() => onAction(() => api.selectModel(m.id))}>
-              Use for new dubs
+              {t("Use for new dubs")}
             </button>
           )}
           {m.installed && m.update.available && (
             <button disabled={active} className="btn-primary btn-sm" onClick={() => onAction(() => api.modelAction(m.id, "update"))}>
-              Update
+              {t("Update")}
             </button>
           )}
           {m.installed && m.can_open_folder && (
             <button className="btn-ghost btn-sm" onClick={() => onAction(() => api.openModelsFolder(m.id))}>
-              Open folder
+              {t("Open folder")}
             </button>
           )}
           {m.installed && (
             <button disabled={active} className="btn-ghost btn-sm" onClick={() => onAction(() => api.modelAction(m.id, "repair"))}>
-              Re-download
+              {t("Re-download")}
             </button>
           )}
           {m.installed && m.can_delete && !confirming && (
             <button disabled={active} className="btn-ghost btn-sm" onClick={() => setConfirming(true)}>
-              Delete
+              {t("Delete")}
             </button>
           )}
         </div>
       </div>
       <p className="mt-2 text-sm text-muted">{m.summary}</p>
       {confirming && (
-        <div className="alert mt-2 space-y-2 text-sm" role="alertdialog" aria-label={`Delete ${m.title}`}>
+        <div className="alert mt-2 space-y-2 text-sm" role="alertdialog" aria-label={t("Delete {name}", { name: m.title })}>
           <p>
-            Delete <strong>{m.title}</strong> from this computer? You can download it again later.
+            {t("Delete")} <strong>{m.title}</strong> {t("from this computer? You can download it again later.")}
           </p>
-          {shared && <p>Ollama keeps its models for every program on this PC; other programs lose this model too.</p>}
-          {lastOfRequired && <p>It is the only one installed for this step, so dubbing will not work until you download one again.</p>}
+          {shared && <p>{t("Ollama keeps its models for every program on this PC; other programs lose this model too.")}</p>}
+          {lastOfRequired && <p>{t("It is the only one installed for this step, so dubbing will not work until you download one again.")}</p>}
           <div className="flex gap-2">
             <button
               className="btn-primary btn-sm"
@@ -222,10 +237,10 @@ function Card({
                 onAction(() => api.deleteModel(m.id));
               }}
             >
-              Yes, delete
+              {t("Yes, delete")}
             </button>
             <button className="btn-ghost btn-sm" onClick={() => setConfirming(false)}>
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         </div>
@@ -237,11 +252,12 @@ function Card({
 }
 
 export function ModelsPanel({ data, onChanged, error }: Props) {
+  const t = useT();
   const [message, setMessage] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [tag, setTag] = useState("");
   const [sizes, setSizes] = useState<ModelsResponse | null>(null);
-  if (!data) return <p className="text-muted">Loading…</p>;
+  if (!data) return <p className="text-muted">{t("Loading…")}</p>;
   const view = sizes ? { ...data, models: data.models.map((m) => ({ ...m, size_on_disk: sizes.models.find((x) => x.id === m.id)?.size_on_disk ?? m.size_on_disk })) } : data;
   const missing = data.models.filter((m) => m.required && data.required_missing.includes(m.id));
   const total = missing.reduce((a, m) => a + m.size_bytes, 0);
@@ -266,9 +282,9 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
       const res = r as { checked: number; updates: string[]; errors: Record<string, string> };
       const failed = Object.keys(res.errors).length;
       setMessage(
-        `${res.checked} installed model${res.checked === 1 ? "" : "s"} checked: ` +
-          (res.updates.length > 0 ? `${res.updates.length} can be updated.` : "all up to date.") +
-          (failed > 0 ? ` ${failed} could not be checked (offline?).` : ""),
+        `${t(res.checked === 1 ? "{n} installed model checked:" : "{n} installed models checked:", { n: res.checked })} ` +
+          (res.updates.length > 0 ? t("{n} can be updated.", { n: res.updates.length }) : t("all up to date.")) +
+          (failed > 0 ? ` ${t("{n} could not be checked (offline?).", { n: failed })}` : ""),
       );
     });
 
@@ -280,43 +296,42 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
   return (
     <div className="card space-y-5">
       <div>
-        <p className="eyebrow mb-1.5">Setup</p>
-        <h2 className="font-display text-[30px] font-semibold leading-tight">AI models</h2>
+        <p className="eyebrow mb-1.5">{t("Setup")}</p>
+        <h2 className="font-display text-[30px] font-semibold leading-tight">{t("AI models")}</h2>
         <p className="text-sm text-muted">
-          Everything runs on this computer. Models are downloaded once, you decide which ones, and you can update or
-          delete them here. Dubbing needs one model for each of the three required steps.
+          {t("Everything runs on this computer. Models are downloaded once, you decide which ones, and you can update or delete them here. Dubbing needs one model for each of the three required steps.")}
         </p>
       </div>
 
       {hw && (
-        <div className="rounded-md border border-line p-3 text-sm" aria-label="This computer">
+        <div className="rounded-md border border-line p-3 text-sm" aria-label={t("This computer")}>
           <p>
-            <span className="font-medium">Graphics card:</span>{" "}
-            {hw.gpu ? `${hw.gpu.name}, ${hw.gpu.vram_gb} GB` : "no NVIDIA card found (models run on the processor, slowly)"}
+            <span className="font-medium">{t("Graphics card:")}</span>{" "}
+            {hw.gpu ? `${hw.gpu.name}, ${hw.gpu.vram_gb} GB` : t("no NVIDIA card found (models run on the processor, slowly)")}
             {" · "}
-            <span className="font-medium">Memory:</span> {hw.ram_gb ?? "?"} GB
+            <span className="font-medium">{t("Memory:")}</span> {hw.ram_gb ?? "?"} GB
             {" · "}
-            <span className="font-medium">Free disk:</span> {formatBytes(hw.disk_free_bytes)}
+            <span className="font-medium">{t("Free disk:")}</span> {formatBytes(hw.disk_free_bytes)}
           </p>
           {data.paths && (
-            <p className="mt-1 break-all font-mono text-xs text-muted">Models folder: {data.paths.models}</p>
+            <p className="mt-1 break-all font-mono text-xs text-muted">{t("Models folder:")} {data.paths.models}</p>
           )}
           <div className="mt-2 flex flex-wrap gap-2">
             <button className="btn-secondary btn-sm" onClick={() => run(() => api.openModelsFolder())}>
-              Open models folder
+              {t("Open models folder")}
             </button>
             <button className="btn-secondary btn-sm" onClick={checkUpdates}>
-              Check for updates
+              {t("Check for updates")}
             </button>
             <button
               className="btn-ghost btn-sm"
               onClick={() => run(() => api.models(true), (r) => setSizes(r as ModelsResponse))}
             >
-              Measure disk usage
+              {t("Measure disk usage")}
             </button>
           </div>
           {sizes && typeof sizes.models_bytes === "number" && (
-            <p className="mt-1 text-xs text-muted">Models folder in total: {formatBytes(sizes.models_bytes)} (Ollama's own store is separate).</p>
+            <p className="mt-1 text-xs text-muted">{t("Models folder in total: {size} (Ollama's own store is separate).", { size: formatBytes(sizes.models_bytes) })}</p>
           )}
         </div>
       )}
@@ -333,7 +348,7 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
       )}
       {missing.length > 0 && (
         <button onClick={() => run(() => api.downloadModels())} disabled={data.busy} className="btn-primary">
-          {data.busy ? "Downloading…" : `Download the required models (${formatBytes(total)})`}
+          {data.busy ? t("Downloading…") : t("Download the required models ({size})", { size: formatBytes(total) })}
         </button>
       )}
 
@@ -345,7 +360,7 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
             <div>
               <h3 className="font-display text-xl font-semibold">
                 {role.title}{" "}
-                {!role.required && <span className="chip">optional</span>}
+                {!role.required && <span className="chip">{t("optional")}</span>}
               </h3>
               <p className="text-sm text-muted">{role.description}</p>
             </div>
@@ -359,27 +374,27 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
                 className="flex flex-wrap items-center gap-2 text-sm"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  const t = tag.trim();
-                  if (!t) return;
-                  run(() => api.addOllamaModel(t), () => {
+                  const added = tag.trim();
+                  if (!added) return;
+                  run(() => api.addOllamaModel(added), () => {
                     setTag("");
-                    setMessage(`Added ${t}. Download it from the list above.`);
+                    setMessage(t("Added {tag}. Download it from the list above.", { tag: added }));
                   });
                 }}
               >
                 <label className="flex items-center gap-2">
-                  Add an Ollama model by name
+                  {t("Add an Ollama model by name")}
                   <input
                     className="field w-56"
-                    placeholder="for example gemma3:12b"
+                    placeholder={t("for example gemma3:12b")}
                     value={tag}
                     onChange={(e) => setTag(e.target.value)}
                   />
                 </label>
                 <button type="submit" className="btn-secondary btn-sm" disabled={!tag.trim()}>
-                  Add
+                  {t("Add")}
                 </button>
-                <span className="text-xs text-muted">Found on ollama.com. LocalDub has not tested it for Slovak.</span>
+                <span className="text-xs text-muted">{t("Found on ollama.com. LocalDub has not tested it for Slovak.")}</span>
               </form>
             )}
           </section>
@@ -388,8 +403,7 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
 
       {data.catalog_version && (
         <p className="text-xs text-muted">
-          Model list version {data.catalog_version}. New models arrive with program updates; nothing is checked
-          online until you press “Check for updates”.
+          {t("Model list version {v}. New models arrive with program updates; nothing is checked online until you press “Check for updates”.", { v: data.catalog_version })}
         </p>
       )}
     </div>

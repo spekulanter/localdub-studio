@@ -61,6 +61,7 @@ SEGMENT_FILES = [
     "dialogue.json",
     "asr.json",
 ]
+VOICE_SAMPLE_TEXT = "Dobrý deň, toto je ukážka môjho hlasu. Takto bude znieť vaše dabovanie."
 _BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
@@ -252,7 +253,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         }
 
     @app.get("/api/options")
-    def options() -> dict[str, Any]:
+    def options(lang: str = "en") -> dict[str, Any]:
         return {
             "voices": VOICES,
             "source_languages": SOURCE_LANGS,
@@ -260,8 +261,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             "default_voice": settings.tts_voice,
             "default_llm": default_llm(),
             "default_asr": asr_choice(""),
-            "asr_choices": mgr.choices("asr"),
-            "translation_choices": mgr.choices("translation"),
+            "asr_choices": mgr.choices("asr", lang),
+            "translation_choices": mgr.choices("translation", lang),
             "stages": STAGES,
             "max_upload_mb": settings.max_upload_mb,
             "separation_available": separation_available(),
@@ -305,8 +306,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         return HTTPException(code, str(exc))
 
     @app.get("/api/models")
-    async def list_models(sizes: bool = False) -> dict[str, Any]:
-        return await asyncio.to_thread(mgr.snapshot, sizes=sizes)
+    async def list_models(sizes: bool = False, lang: str = "en") -> dict[str, Any]:
+        return await asyncio.to_thread(lambda: mgr.snapshot(sizes=sizes, lang=lang))
 
     @app.post("/api/models/download", status_code=202)
     async def download_models(body: dict[str, list[str]] | None = None) -> dict[str, Any]:
@@ -358,6 +359,14 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         snap = await asyncio.to_thread(mgr.snapshot, sizes=True)
         return {"paths": snap["paths"], "models_bytes": snap["models_bytes"],
                 "hardware": snap["hardware"]}  # fmt: skip
+
+    @app.post("/api/models/{entry_id}/cancel")
+    async def cancel_model_download(entry_id: str) -> dict[str, bool]:
+        try:
+            mgr.get(entry_id)
+            return {"cancelled": await asyncio.to_thread(mgr.cancel, entry_id)}
+        except ModelError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     @app.post("/api/models/{entry_id}/select")
     async def select_model(entry_id: str) -> dict[str, bool]:
@@ -906,6 +915,23 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             buf = io.BytesIO()
             sf.write(buf, wav, tts.sample_rate, format="WAV", subtype="PCM_16")
             return buf.getvalue(), dur
+
+    voice_samples: dict[str, bytes] = {}
+
+    @app.get("/api/voices/{voice}/sample")
+    async def voice_sample(voice: str) -> Response:
+        """A short Slovak sentence in this voice, so you can choose by ear (made once per voice)."""
+        if voice not in VOICES:
+            raise HTTPException(404, "Unknown voice")
+        if voice not in voice_samples:
+            tts_model = mgr.catalog.default_of("tts")
+            if tts_model is not None and not await asyncio.to_thread(mgr_installed, tts_model.id):
+                raise HTTPException(
+                    409, "Download the Slovak voice on the AI models page to hear the samples."
+                )
+            data, _ = await asyncio.to_thread(synth_preview, VOICE_SAMPLE_TEXT, voice, None)
+            voice_samples[voice] = data
+        return Response(voice_samples[voice], media_type="audio/wav")
 
     @app.post("/api/projects/{pid}/segments/{sid}/preview")
     async def preview_segment(pid: int, sid: int, req: PreviewRequest) -> Response:

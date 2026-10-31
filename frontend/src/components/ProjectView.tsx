@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, watchJob, type Health, type Job, type Options, type Project, type SegmentsResponse } from "../api";
-import { formatTime, isActive, restartStage } from "../lib/format";
+import { useT } from "../i18n";
+import { formatTime, isActive, restartStage, STAGE_LABELS } from "../lib/format";
 import { OptionFields, type Settings } from "./OptionFields";
 import { ProgressPanel } from "./ProgressPanel";
 import { useVideoClock } from "../lib/useVideoClock";
@@ -30,6 +31,7 @@ const toSettings = (p: Project): Settings => ({
 });
 
 export function ProjectView({ projectId, options, health, onChanged, onDeleted, onOptionsChanged }: Props) {
+  const t = useT();
   const [project, setProject] = useState<Project | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [segments, setSegments] = useState<SegmentsResponse | null>(null);
@@ -75,7 +77,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
           onChanged();
         }
       },
-      () => setError("Lost the connection to the server. Reload the page."),
+      () => setError(t("Lost the connection to the server. Reload the page.")),
     );
   }, [activeId, projectId, load, onChanged]);
 
@@ -94,7 +96,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
   }
 
   if (!project || !draft) {
-    return error ? <p className="text-bad" role="alert">{error}</p> : <p className="text-muted">Loading…</p>;
+    return error ? <p className="text-bad" role="alert">{error}</p> : <p className="text-muted">{t("Loading…")}</p>;
   }
 
   const active = isActive(job);
@@ -106,7 +108,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="eyebrow mb-1.5">{project.source_url ? "Dub from YouTube" : "Dub from a file"}</p>
+          <p className="eyebrow mb-1.5">{project.source_url ? t("Dub from YouTube") : t("Dub from a file")}</p>
           <h2 className="font-display line-clamp-2 text-[30px] font-semibold leading-[1.1]">{project.name}</h2>
           <p className="mt-2 font-mono text-xs text-muted">
             {project.source_url ? (
@@ -124,7 +126,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
         </div>
         <button
           onClick={() => {
-            if (window.confirm("Delete this project and all of its files?")) {
+            if (window.confirm(t("Delete this project and all of its files?"))) {
               void act(async () => {
                 await api.deleteProject(projectId);
                 onDeleted();
@@ -134,7 +136,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
           disabled={busy}
           className="btn-danger btn-sm"
         >
-          Delete
+          {t("Delete")}
         </button>
       </header>
 
@@ -154,18 +156,18 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
         />
       ) : (
         <button onClick={() => void act(() => api.startJob(projectId))} disabled={busy} className="btn-primary">
-          Start dubbing
+          {t("Start dubbing")}
         </button>
       )}
 
       <section className="card">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="eyebrow">Preview</h3>
+          <h3 className="eyebrow">{t("Preview")}</h3>
           {done && (
-            <div className="seg" role="group" aria-label="Preview version">
+            <div className="seg" role="group" aria-label={t("Preview version")}>
               {(["dub", "original"] as const).map((v) => (
                 <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className="">
-                  {v === "dub" ? "Slovak dub" : "Original"}
+                  {v === "dub" ? t("Slovak dub") : t("Original")}
                 </button>
               ))}
             </div>
@@ -183,31 +185,31 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
           />
         ) : (
           <div className="flex h-40 items-center justify-center rounded-md bg-inset text-sm text-muted" role="status">
-            {active ? "The video is being downloaded from YouTube…" : "The video was not downloaded. Use Retry above to try again."}
+            {active ? t("The video is being downloaded from YouTube…") : t("The video was not downloaded. Use Retry above to try again.")}
           </div>
         )}
         {done && (
           <p className="mt-2 text-xs text-muted">
-            The dub is the first audio track. {project.keep_original_track ? "The original is the second track (switch tracks in a desktop player such as VLC)." : "The original audio track was not kept."}
+            {t("The dub is the first audio track.")} {project.keep_original_track ? t("The original is the second track (switch tracks in a desktop player such as VLC).") : t("The original audio track was not kept.")}
           </p>
         )}
         {done && (
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
             <a className="btn-primary" href={api.fileUrl(projectId, "video")}>
-              Download MP4
+              {t("Download MP4")}
             </a>
             <a className="btn-secondary" href={api.fileUrl(projectId, "srt")}>
-              Slovak subtitles (.srt)
+              {t("Slovak subtitles (.srt)")}
             </a>
             <a className="btn-secondary" href={api.fileUrl(projectId, "srt_en")}>
-              English subtitles (.srt)
+              {t("English subtitles (.srt)")}
             </a>
           </div>
         )}
       </section>
 
       <section className="card">
-        <h3 className="eyebrow mb-4">Settings</h3>
+        <h3 className="eyebrow mb-4">{t("Settings")}</h3>
         <OptionFields options={options} health={health} value={draft} onChange={setDraft} lockSource disabled={active || busy} onPackagesInstalled={onOptionsChanged} />
         {stage && !active && !(draft.clone_voice && !draft.clone_consent) && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -231,10 +233,10 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
               }
               className="btn-primary"
             >
-              Apply and re-render
+              {t("Apply and re-render")}
             </button>
             <span className="text-xs text-muted">
-              Re-runs from “{stage}” — earlier steps are reused.
+              {t("Re-runs from “{stage}” — earlier steps are reused.", { stage: t(STAGE_LABELS[stage]) })}
             </span>
           </div>
         )}
@@ -242,7 +244,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
 
       {segments !== null && segments.segments.length > 0 && (
         <section className="card">
-          <h3 className="eyebrow mb-4">Timeline</h3>
+          <h3 className="eyebrow mb-4">{t("Timeline")}</h3>
           <Timeline
             projectId={projectId}
             segments={segments.segments}
@@ -252,8 +254,8 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
             onSelect={setSelectedId}
             currentTime={clock.time}
             playing={clock.playing}
-            onSeek={(t) => {
-              if (video) video.currentTime = t;
+            onSeek={(sec) => {
+              if (video) video.currentTime = sec;
             }}
             onTimingChange={async (id, start, end) => {
               await api.patchSegment(projectId, id, { start, end });
@@ -265,7 +267,7 @@ export function ProjectView({ projectId, options, health, onChanged, onDeleted, 
       )}
 
       <section className="card">
-        <h3 className="eyebrow mb-4">Dialogue</h3>
+        <h3 className="eyebrow mb-4">{t("Dialogue")}</h3>
         <DialogueEditor
           projectId={projectId}
           data={segments}

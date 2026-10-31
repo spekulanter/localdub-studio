@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type YoutubeChoice, type YoutubeInfo, type YoutubeStatus } from "../api";
+import { useT } from "../i18n";
 import { formatTime } from "../lib/format";
 import { InstallNotice } from "./InstallNotice";
 
@@ -24,10 +25,10 @@ interface Props {
   disabled?: boolean;
 }
 
-const TOOLS_INTRO = (size: string) =>
-  `Importing from YouTube needs two small programs, yt-dlp and Deno (about ${size}). They are downloaded from their official GitHub pages and checked against the publishers' SHA-256.`;
-
 export function YoutubeSource({ onChoice, disabled }: Props) {
+  const t = useT();
+  const toolsIntro = (size: string) =>
+    t("Importing from YouTube needs two small programs, yt-dlp and Deno (about {size}). They are downloaded from their official GitHub pages and checked against the publishers' SHA-256.", { size });
   const [status, setStatus] = useState<YoutubeStatus | null>(null);
   const [url, setUrl] = useState("");
   const [quality, setQuality] = useState("auto");
@@ -66,7 +67,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
       if (mine !== latest.current) return; // the link was edited while YouTube was answering
       if (found.is_live) {
         setInfo(null);
-        setError("Live streams cannot be dubbed. Use a finished video.");
+        setError(t("Live streams cannot be dubbed. Use a finished video."));
         return;
       }
       setInfo(found);
@@ -85,7 +86,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
     setUpdateMessage(null);
     try {
       const r = await api.updateYtdlp();
-      setUpdateMessage(r.message.split("\n").filter((l) => l.trim()).pop() ?? "Updated.");
+      setUpdateMessage(r.message.split("\n").filter((l) => l.trim()).pop() ?? t("Updated."));
       loadStatus();
     } catch (e) {
       setUpdateMessage(e instanceof Error ? e.message : String(e));
@@ -94,13 +95,13 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
     }
   }
 
-  if (!status) return <p className="text-sm text-muted">Checking the YouTube tools…</p>;
+  if (!status) return <p className="text-sm text-muted">{t("Checking the YouTube tools…")}</p>;
 
   if (!status.installed) {
     return (
       <div className="rounded-lg border border-line p-4">
-        <h3 className="mb-1 font-medium">One-time setup for YouTube links</h3>
-        <InstallNotice ids={["youtube"]} intro={TOOLS_INTRO} onInstalled={loadStatus} />
+        <h3 className="mb-1 font-medium">{t("One-time setup for YouTube links")}</h3>
+        <InstallNotice ids={["youtube"]} intro={toolsIntro} onInstalled={loadStatus} />
         {error && <p className="mt-2 text-sm text-bad" role="alert">{error}</p>}
       </div>
     );
@@ -109,7 +110,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
   return (
     <fieldset disabled={disabled} className="space-y-3">
       <label className="block text-sm">
-        <span className="mb-1 block font-medium">YouTube link</span>
+        <span className="mb-1 block font-medium">{t("YouTube link")}</span>
         <div className="flex gap-2">
           <input
             type="url"
@@ -127,7 +128,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
               }
             }}
             className={field}
-            aria-label="YouTube link"
+            aria-label={t("YouTube link")}
           />
           <button
             type="button"
@@ -135,7 +136,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
             disabled={!url.trim() || checking}
             className="btn-secondary shrink-0"
           >
-            {checking ? "Checking…" : "Check link"}
+            {checking ? t("Checking…") : t("Check link")}
           </button>
         </div>
       </label>
@@ -156,14 +157,14 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
             <p className="text-muted">
               {[info.uploader, info.duration ? formatTime(info.duration) : null].filter(Boolean).join(" · ")}
             </p>
-            <p className="mt-1 text-xs text-ok">✓ The link works.</p>
+            <p className="mt-1 text-xs text-ok">{t("✓ The link works.")}</p>
           </div>
         </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
-          <span className="mb-1 block font-medium">Video quality</span>
+          <span className="mb-1 block font-medium">{t("Video quality")}</span>
           <select
             className={field}
             value={quality}
@@ -174,16 +175,16 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
           >
             {status.qualities.map((q) => (
               <option key={q} value={q}>
-                {QUALITY_LABELS[q] ?? q}
+                {t(QUALITY_LABELS[q] ?? q)}
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-muted">Dubbing does not need more than 1080p.</span>
+          <span className="mt-1 block text-xs text-muted">{t("Dubbing does not need more than 1080p.")}</span>
         </label>
         <details className="text-sm">
-          <summary className="cursor-pointer font-medium">Age-restricted or members-only video?</summary>
+          <summary className="cursor-pointer font-medium">{t("Age-restricted or members-only video?")}</summary>
           <label className="mt-2 block">
-            <span className="mb-1 block">Use cookies from</span>
+            <span className="mb-1 block">{t("Use cookies from")}</span>
             <select
               className={field}
               value={cookies}
@@ -194,27 +195,27 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
             >
               {status.browsers.map((b) => (
                 <option key={b} value={b}>
-                  {BROWSER_LABELS[b] ?? b}
+                  {t(BROWSER_LABELS[b] ?? b)}
                 </option>
               ))}
             </select>
           </label>
           <p className="mt-1 text-xs text-muted">
-            yt-dlp reads your own browser's sign-in on this computer. The cookies are not stored or sent anywhere else.
+            {t("yt-dlp reads your own browser's sign-in on this computer. The cookies are not stored or sent anywhere else.")}
           </p>
         </details>
       </div>
 
       <p className="text-xs text-muted">
-        Only use videos you have the right to download and dub. Downloading can be against YouTube's terms of service.
+        {t("Only use videos you have the right to download and dub. Downloading can be against YouTube's terms of service.")}
       </p>
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
         yt-dlp {status.yt_dlp.version ?? "?"}
         <button type="button" onClick={() => void update()} disabled={updating} className="underline disabled:opacity-50">
-          {updating ? "Updating…" : "Update yt-dlp"}
+          {updating ? t("Updating…") : t("Update yt-dlp")}
         </button>
         {updateMessage && <span role="status">{updateMessage}</span>}
-        <span>(if downloads suddenly stop working, updating usually fixes it)</span>
+        <span>{t("(if downloads suddenly stop working, updating usually fixes it)")}</span>
       </p>
     </fieldset>
   );

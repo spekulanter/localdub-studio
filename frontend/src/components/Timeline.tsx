@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SegmentRow } from "../api";
+import { useT } from "../i18n";
 import {
   boundsFor,
   clampZoom,
@@ -69,6 +70,7 @@ export function Timeline({
   onTimingChange,
   renderVersion = 0,
 }: Props) {
+  const t = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [viewWidth, setViewWidth] = useState(800);
@@ -308,21 +310,21 @@ export function Timeline({
   return (
     <div className="space-y-2" data-testid="timeline">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <button type="button" aria-label="Zoom out" onClick={() => zoomTo(zoom / 1.5)} className="tl-btn">
+        <button type="button" aria-label={t("Zoom out")} onClick={() => zoomTo(zoom / 1.5)} className="tl-btn">
           −
         </button>
-        <button type="button" aria-label="Zoom in" onClick={() => zoomTo(zoom * 1.5)} className="tl-btn">
+        <button type="button" aria-label={t("Zoom in")} onClick={() => zoomTo(zoom * 1.5)} className="tl-btn">
           +
         </button>
         <button type="button" onClick={() => zoomTo(fitZoom(duration, viewWidth))} className="tl-btn">
-          Fit
+          {t("Fit")}
         </button>
         <label className="ml-2 flex items-center gap-1.5">
           <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} />
-          Snap to neighbours and playhead
+          {t("Snap to neighbours and playhead")}
         </label>
         <span className="ml-auto text-xs text-muted">
-          {editable ? "Drag a block to move it, drag its edges to resize. Ctrl + wheel zooms." : "Editing unlocks when no job is running."}
+          {editable ? t("Drag a block to move it, drag its edges to resize. Ctrl + wheel zooms.") : t("Editing unlocks when no job is running.")}
         </span>
       </div>
 
@@ -336,13 +338,13 @@ export function Timeline({
         <div className="shrink-0 border-r border-line text-xs text-muted dark:text-muted/70" style={{ width: GUTTER }}>
           <div style={{ height: H_RULER }} />
           <div className="flex items-center px-2" style={{ height: H_WAVE }}>
-            Original audio
+            {t("Original audio")}
           </div>
           <div className="flex items-center px-2" style={{ height: H_EN }}>
-            English lines
+            {t("English lines")}
           </div>
           <div className="flex items-center px-2" style={{ height: H_SK }}>
-            Slovak dub
+            {t("Slovak dub")}
           </div>
         </div>
 
@@ -350,7 +352,7 @@ export function Timeline({
           ref={scroller}
           tabIndex={0}
           role="region"
-          aria-label="Timeline: scroll with the arrow keys, Tab moves between lines"
+          aria-label={t("Timeline: scroll with the arrow keys, Tab moves between lines")}
           className="relative min-w-0 flex-1 overflow-x-auto"
           onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}
           onWheel={onWheel}
@@ -369,12 +371,12 @@ export function Timeline({
             <div className="absolute inset-x-0 cursor-pointer" style={{ top: H_RULER, height: H_WAVE }} onClick={seekFromClick}>
               <canvas
                 ref={canvas}
-                aria-label="Waveform of the original audio"
+                aria-label={t("Waveform of the original audio")}
                 className="sticky left-0 text-ink/60"
                 style={{ width: viewWidth, height: H_WAVE }}
               />
               {waveState === "missing" && (
-                <span className="pointer-events-none absolute left-2 top-1 text-[11px] text-muted/70">The waveform appears once the audio was extracted.</span>
+                <span className="pointer-events-none absolute left-2 top-1 text-[11px] text-muted/70">{t("The waveform appears once the audio was extracted.")}</span>
               )}
             </div>
 
@@ -390,7 +392,7 @@ export function Timeline({
                     key={s.id}
                     role="button"
                     tabIndex={0}
-                    aria-label={`English line ${s.id}: ${s.source_text}. ${formatSpan(s.start, s.end)}`}
+                    aria-label={`${t("English line {n}", { n: s.id })}: ${s.source_text}. ${formatSpan(s.start, s.end)}`}
                     aria-current={selected ? "true" : undefined}
                     onKeyDown={(e) => onKeyDown(e, raw)}
                     onPointerDown={(e) => onPointerDown(e, raw, "move")}
@@ -444,7 +446,7 @@ export function Timeline({
                       onSelect(s.id);
                       onSeek(start);
                     }}
-                    title={`${s.translated_text}\n${formatSpan(start, start + s.audio_duration)}${late ? "\nRuns past its window" : ""}`}
+                    title={`${s.translated_text}\n${formatSpan(start, start + s.audio_duration)}${late ? `\n${t("Runs past its window")}` : ""}`}
                     data-late={late}
                     className={`absolute top-1 overflow-hidden truncate rounded-md border px-2 text-left text-xs ${
                       late ? "border-bad/70 bg-bad-soft text-bad" : "border-dub/50 bg-dub-soft text-dub"

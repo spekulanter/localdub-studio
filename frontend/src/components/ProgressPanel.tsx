@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Job, type Stage } from "../api";
+import { useT } from "../i18n";
 import { STAGE_LABELS, statusLabel } from "../lib/format";
 
 const ORDER: Stage[] = ["download", "probe", "extract", "asr", "diarize", "translate", "tts", "separate", "convert", "assemble", "export"];
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = false }: Props) {
+  const t = useT();
   const order = hasDownload ? ORDER : ORDER.filter((s) => s !== "download");
   const active = job.status === "queued" || job.status === "running";
   const pct = Math.round(job.progress * 100);
@@ -24,9 +26,9 @@ export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = fals
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied("Copied");
+      setCopied(t("Copied"));
     } catch {
-      setCopied("Could not copy: use Download log");
+      setCopied(t("Could not copy: use Download log"));
     }
     window.setTimeout(() => setCopied(null), 3000);
   }
@@ -41,21 +43,21 @@ export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = fals
   }, [job.id, job.status]);
 
   return (
-    <section className="card" aria-label="Job progress">
+    <section className="card" aria-label={t("Job progress")}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="font-display text-xl font-semibold">
-          {statusLabel(job)}
+          {t(statusLabel(job))}
           {job.status === "running" && job.message && <span className="ml-3 font-mono text-xs font-normal text-muted">{job.message}</span>}
-          {job.attempts > 1 && active && <span className="ml-2 text-xs text-warn">resumed (attempt {job.attempts})</span>}
+          {job.attempts > 1 && active && <span className="ml-2 text-xs text-warn">{t("resumed (attempt {n})", { n: job.attempts })}</span>}
         </h3>
         {active ? (
           <button onClick={onCancel} disabled={busy} className="btn-secondary btn-sm">
-            Cancel
+            {t("Cancel")}
           </button>
         ) : (
           (job.status === "failed" || job.status === "cancelled") && (
             <button onClick={onRetry} disabled={busy} className="btn-primary btn-sm">
-              {job.status === "failed" ? "Retry (keeps finished steps)" : "Resume"}
+              {job.status === "failed" ? t("Retry (keeps finished steps)") : t("Resume")}
             </button>
           )
         )}
@@ -85,29 +87,29 @@ export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = fals
               }`}
             >
               <span className={`size-1.5 rounded-full ${now ? "animate-pulse bg-accent" : done ? "bg-ok" : "bg-line-strong"}`} />
-              {STAGE_LABELS[s]}
+              {t(STAGE_LABELS[s])}
             </li>
           );
         })}
       </ol>
       {job.status === "failed" && (
         <div className="mt-3 space-y-2" role="alert">
-          <p className="alert alert-bad">{job.error ?? "The job failed."}</p>
+          <p className="alert alert-bad">{job.error ?? t("The job failed.")}</p>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => void copy(job.error ?? "")} className="btn-secondary btn-sm">
-              Copy error
+              {t("Copy error")}
             </button>
             <button onClick={() => void copyFullLog()} className="btn-secondary btn-sm">
-              Copy full log
+              {t("Copy full log")}
             </button>
             <a href={api.jobLogUrl(job.id)} download={`localdub-job-${job.id}.log`} className="btn-secondary btn-sm">
-              Download log
+              {t("Download log")}
             </a>
             {copied && <span className="self-center text-xs text-ok" role="status">{copied}</span>}
           </div>
           {log && log.length > 0 && (
             <details>
-              <summary className="cursor-pointer text-xs text-muted">Show the last log lines</summary>
+              <summary className="cursor-pointer text-xs text-muted">{t("Show the last log lines")}</summary>
               <pre className="mt-1 max-h-48 overflow-auto rounded bg-inset p-2 text-xs">{log.join("\n")}</pre>
             </details>
           )}

@@ -6,6 +6,7 @@ import { ModelsPanel } from "./components/ModelsPanel";
 import { NewProject } from "./components/NewProject";
 import { ProjectList } from "./components/ProjectList";
 import { ProjectView } from "./components/ProjectView";
+import { LANGS, useI18n, type Lang } from "./i18n";
 
 type Selection = number | "new" | "models";
 
@@ -16,6 +17,7 @@ function selectionFromHash(hash: string): Selection {
 }
 
 export default function App() {
+  const { t, lang, setLang } = useI18n();
   const [options, setOptions] = useState<Options | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -53,7 +55,7 @@ export default function App() {
     void refreshProjects();
     refreshHealth();
     refreshModels();
-  }, [refreshProjects, refreshHealth, refreshModels]);
+  }, [refreshProjects, refreshHealth, refreshModels, lang]);
 
   // Poll while a download runs so the progress bars move.
   const downloading = models?.busy ?? false;
@@ -82,20 +84,20 @@ export default function App() {
             <p className="eyebrow">Studio</p>
           </div>
         </header>
-        <p className="-mt-2 text-[13px] leading-snug text-muted">English → Slovak dubbing. Everything runs on this computer.</p>
+        <p className="-mt-2 text-[13px] leading-snug text-muted">{t("English → Slovak dubbing. Everything runs on this computer.")}</p>
 
         <div className="space-y-1.5">
           <button onClick={() => setSelected("new")} className={`${selected === "new" ? "btn-primary" : "btn-secondary"} w-full justify-start`}>
-            <Plus className="size-4" /> New dub
+            <Plus className="size-4" /> {t("New dub")}
           </button>
           <button
             onClick={() => setSelected("models")}
             aria-current={selected === "models"}
             className={`${selected === "models" ? "btn-primary" : "btn-ghost"} w-full justify-start`}
           >
-            <Cpu className="size-4" /> AI models
+            <Cpu className="size-4" /> {t("AI models")}
             {modelsNeeded && (
-              <span className="chip chip-warn ml-auto">{models?.busy ? "downloading…" : "download needed"}</span>
+              <span className="chip chip-warn ml-auto">{models?.busy ? t("downloading…") : t("download needed")}</span>
             )}
           </button>
         </div>
@@ -111,15 +113,30 @@ export default function App() {
           <span className={`size-2 shrink-0 rounded-full ${health === null ? "bg-line-strong" : ollamaOk ? "bg-ok" : "bg-warn"}`} />
           <span className="min-w-0 flex-1">
             {health === null
-              ? "Cannot reach the LocalDub server."
+              ? t("Cannot reach the LocalDub server.")
               : ollamaOk
-                ? `Ollama connected · ${health.ollama.models.length} models`
-                : "Ollama is not running. Translation will fail until you start it."}
+                ? t("Ollama connected · {n} models", { n: health.ollama.models.length })
+                : t("Ollama is not running. Translation will fail until you start it.")}
           </span>
           <button className="underline underline-offset-2" onClick={refreshHealth}>
-            recheck
+            {t("recheck")}
           </button>
         </div>
+        <label className="flex items-center gap-2 text-xs text-muted">
+          {t("Language")}
+          <select
+            className="field !w-auto !py-1 text-xs"
+            value={lang}
+            onChange={(e) => setLang(e.target.value as Lang)}
+            aria-label={t("Language")}
+          >
+            {LANGS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </aside>
 
       <main className="min-w-0 px-5 py-7 lg:px-10">
@@ -133,17 +150,17 @@ export default function App() {
             <div className="alert alert-warn flex flex-wrap items-center justify-between gap-3" role="status">
               <span>
                 {models?.busy
-                  ? "Downloading the AI models… dubbing starts when they are ready."
-                  : "The AI models are not downloaded yet. They are needed before the first dub."}
+                  ? t("Downloading the AI models… dubbing starts when they are ready.")
+                  : t("The AI models are not downloaded yet. They are needed before the first dub.")}
               </span>
               <button onClick={() => setSelected("models")} className="btn-primary btn-sm">
-                {models?.busy ? "Show progress" : "Download models"}
+                {models?.busy ? t("Show progress") : t("Download models")}
               </button>
             </div>
           )}
           <div key={String(selected)} className="rise">
             {options === null ? (
-              <p className="text-muted">Loading…</p>
+              <p className="text-muted">{t("Loading…")}</p>
             ) : selected === "models" ? (
               <ModelsPanel data={models} onChanged={refreshModels} />
             ) : selected === "new" ? (

@@ -104,7 +104,10 @@ export interface Preview {
 }
 
 export interface ModelDownload {
-  status: "queued" | "running" | "done" | "error";
+  status: "queued" | "running" | "done" | "error" | "cancelled";
+  /** false while a step cannot be interrupted (unpacking the optional packages) */
+  cancellable?: boolean;
+  cancelling?: boolean;
   done: number;
   total: number;
   message: string;
@@ -250,6 +253,12 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
+let apiLang = "en";
+/** The language of the texts the server provides (model descriptions); set by the I18nProvider. */
+export const setApiLang = (lang: string) => {
+  apiLang = lang;
+};
+
 const json = (method: string, body?: unknown): RequestInit => ({
   method,
   headers: { "Content-Type": "application/json" },
@@ -258,10 +267,12 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   health: () => request<Health>("/api/health"),
-  models: (sizes = false) => request<ModelsResponse>(sizes ? "/api/models?sizes=true" : "/api/models"),
+  models: (sizes = false) => request<ModelsResponse>(`/api/models?lang=${apiLang}${sizes ? "&sizes=true" : ""}`),
   selectModel: (id: string) => request<{ ok: boolean }>(`/api/models/${encodeURIComponent(id)}/select`, json("POST", {})),
   deleteModel: (id: string) =>
     request<{ deleted: boolean; warnings: string[] }>(`/api/models/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  voiceSampleUrl: (voice: string) => `/api/voices/${encodeURIComponent(voice)}/sample`,
+  cancelModel: (id: string) => request<{ cancelled: boolean }>(`/api/models/${encodeURIComponent(id)}/cancel`, json("POST", {})),
   modelAction: (id: string, action: "update" | "repair") =>
     request<{ started: string[] }>(`/api/models/${encodeURIComponent(id)}/${action}`, json("POST", {})),
   checkModelUpdates: () =>
@@ -278,7 +289,7 @@ export const api = {
     request<{ started: string[] }>("/api/models/download", json("POST", ids ? { ids } : {})),
   jobLogFull: (jobId: number) => fetch(`/api/jobs/${jobId}/log/download`).then((r) => r.text()),
   jobLogUrl: (jobId: number) => `/api/jobs/${jobId}/log/download`,
-  options: () => request<Options>("/api/options"),
+  options: () => request<Options>(`/api/options?lang=${apiLang}`),
   projects: () => request<Project[]>("/api/projects"),
   project: (id: number) => request<Project>(`/api/projects/${id}`),
   createProject: (form: FormData) =>

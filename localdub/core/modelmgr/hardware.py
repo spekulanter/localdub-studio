@@ -123,30 +123,44 @@ def detect(models_dir: Path) -> Hardware:
     )
 
 
-def fits(req: Requirements, hw: Hardware) -> dict[str, Any]:
+CPU_TEXT = "Runs on the processor; the graphics card stays free."
+NO_GPU_TEXT = "No NVIDIA graphics card was found, so this runs on the processor, much slower."
+_SK = {
+    CPU_TEXT: "Beží na procesore; grafická karta zostane voľná.",
+    NO_GPU_TEXT: "Nenašla sa grafická karta NVIDIA, takže to beží na procesore, oveľa pomalšie.",
+}
+
+
+def fits(req: Requirements, hw: Hardware, lang: str = "en") -> dict[str, Any]:
     """How comfortably the model runs here: level + a sentence for the user."""
+    sk = lang == "sk"
     if req.runs_on == "cpu" or req.vram_gb is None:
-        return {"level": "cpu", "text": "Runs on the processor; the graphics card stays free."}
+        text = CPU_TEXT
+        return {"level": "cpu", "text": _SK[text] if sk else text}
     if hw.gpu is None:
-        return {
-            "level": "no_gpu",
-            "text": "No NVIDIA graphics card was found, so this runs on the processor, "
-            "which is much slower.",
-        }
-    have = hw.gpu.vram_gb
-    if have >= req.vram_gb:
-        return {
-            "level": "ok",
-            "text": f"Fits your graphics card ({have:.0f} GB; about {req.vram_gb:g} GB wanted).",
-        }
-    if have >= req.vram_gb * 0.5:
-        return {
-            "level": "partial",
-            "text": f"Wants about {req.vram_gb:g} GB of graphics memory, you have {have:.0f} GB: "
-            "part of it will run on the processor, noticeably slower.",
-        }
-    return {
-        "level": "too_big",
-        "text": f"Wants about {req.vram_gb:g} GB of graphics memory, you have {have:.0f} GB: "
-        "it would be very slow.",
-    }
+        text = NO_GPU_TEXT
+        return {"level": "no_gpu", "text": _SK[text] if sk else text}
+    have, want = hw.gpu.vram_gb, req.vram_gb
+    if have >= want:
+        text = (
+            f"Sedí vašej grafickej karte ({have:.0f} GB; potrebuje asi {want:g} GB)."
+            if sk
+            else f"Fits your graphics card ({have:.0f} GB; about {want:g} GB wanted)."
+        )
+        return {"level": "ok", "text": text}
+    if have >= want * 0.5:
+        text = (
+            f"Chce asi {want:g} GB pamäte grafickej karty, vy máte {have:.0f} GB: časť pobeží na "
+            "procesore, citeľne pomalšie."
+            if sk
+            else f"Wants about {want:g} GB of graphics memory, you have {have:.0f} GB: "
+            "part of it will run on the processor, noticeably slower."
+        )
+        return {"level": "partial", "text": text}
+    text = (
+        f"Chce asi {want:g} GB pamäte grafickej karty, vy máte {have:.0f} GB: bude to veľmi pomalé."
+        if sk
+        else f"Wants about {want:g} GB of graphics memory, you have {have:.0f} GB: "
+        "it would be very slow."
+    )
+    return {"level": "too_big", "text": text}

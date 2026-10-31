@@ -82,7 +82,11 @@ if __name__ == "__main__":
     # PyTorch-based models in a child process.
     import sys
 
-    jobs = {"separation": fetch_separation, "cloning": fetch_voice_cloning}
+    jobs = {
+        "separation": fetch_separation,
+        "cloning": fetch_voice_cloning,
+        "supertonic": fetch_supertonic,
+    }
     if len(sys.argv) != 2 or sys.argv[1] not in jobs:
         raise SystemExit(f"usage: model_fetch {'|'.join(jobs)}")
     jobs[sys.argv[1]](Settings(), print)

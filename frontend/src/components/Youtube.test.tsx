@@ -23,7 +23,7 @@ function route(handlers: Record<string, Handler>) {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, body });
-    const handler = handlers[url];
+    const handler = handlers[url.split("?")[0] ?? url];
     return handler ? handler(body) : json({ detail: `unexpected ${url}` }, 404);
   }));
   return calls;

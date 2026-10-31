@@ -23,6 +23,7 @@ from localdub.core.modelmgr.catalog import (
 )
 from localdub.core.modelmgr.handlers import (
     HANDLERS,
+    Cancelled,
     Ctx,
     Handler,
     ModelError,
@@ -47,6 +48,7 @@ class ModelManager:
         self._lock = threading.RLock()
         self._downloads: dict[str, dict[str, Any]] = {}
         self._queue: list[tuple[str, str]] = []  # (entry id, action)
+        self._stop: dict[str, threading.Event] = {}
         self._thread: threading.Thread | None = None
 
     # ----- lookup ----------------------------------------------------------------------------
@@ -99,7 +101,7 @@ class ModelManager:
             raise ModelError("Download this model first, then it can be used.")
         self.state.set_selected(e.role, e.id)
 
-    def choices(self, role: str) -> list[dict[str, Any]]:
+    def choices(self, role: str, lang: str = "en") -> list[dict[str, Any]]:
         """Short rows for the pickers in the dub forms (installed or not)."""
         ctx = self.ctx()
         out = []
@@ -109,9 +111,9 @@ class ModelManager:
             out.append(
                 {
                     "id": e.id,
-                    "title": e.title,
+                    "title": e.text(lang)["title"],
                     "status": e.status,
-                    "summary": e.summary,
+                    "summary": e.text(lang)["summary"],
                     "tag": e.source.get("tag"),
                     "installed": self.handler(e).installed(e, ctx),
                 }
@@ -152,7 +154,7 @@ class ModelManager:
         return missing
 
     # ----- the view the page needs -----------------------------------------------------------
-    def snapshot(self, *, sizes: bool = False) -> dict[str, Any]:
+    def snapshot(self, *, sizes: bool = False, lang: str = "en") -> dict[str, Any]:
         ctx = self.ctx()
         hw = hardware.detect(self.settings.models_dir)
         packages_ok = extras.packages_available()
@@ -160,7 +162,7 @@ class ModelManager:
         selected = {
             r.id: self.selected_entry(r.id, ctx) for r in self.catalog.roles if r.selectable
         }
-        titles = {e.id: e.title for e in self.entries()}
+        titles = {e.id: e.text(lang)["title"] for e in self.entries()}
         rows = []
         for e in self.entries():
             h = self.handler(e)
@@ -168,27 +170,28 @@ class ModelManager:
             locs = h.locations(e, ctx) if installed else []
             rec = self.state.record(e.id)
             sel = selected.get(e.role)
+            txt = e.text(lang)
             rows.append(
                 {
                     "id": e.id,
                     "role": e.role,
-                    "title": e.title,
-                    "summary": e.summary,
-                    "choose_if": list(e.choose_if),
-                    "avoid_if": list(e.avoid_if),
+                    "title": txt["title"],
+                    "summary": txt["summary"],
+                    "choose_if": txt["choose_if"],
+                    "avoid_if": txt["avoid_if"],
                     "requirements": {
                         "vram_gb": e.requirements.vram_gb,
                         "disk_gb": e.requirements.disk_gb,
                         "runs_on": e.requirements.runs_on,
-                        "note": e.requirements.note,
+                        "note": txt["note"],
                         "needs_packages": e.requirements.needs_packages,
                     },
                     "size_bytes": e.size_bytes,
                     "license": {"name": e.license_name, "url": e.license_url},
                     "status": e.status,
-                    "measured": e.measured,
+                    "measured": txt["measured"],
                     "languages": e.languages,
-                    "pinned": e.pinned,
+                    "pinned": txt["pinned"],
                     "custom": e.custom,
                     "default": e.default,
                     "replaced_by": e.replaced_by,
@@ -198,7 +201,7 @@ class ModelManager:
                     "installed": installed,
                     "available": packages_ok or not e.requirements.needs_packages,
                     "selected": sel is not None and sel.id == e.id,
-                    "fits": hardware.fits(e.requirements, hw),
+                    "fits": hardware.fits(e.requirements, hw, lang),
                     "download": downloads.get(e.id),
                     "locations": [str(p) for p in locs],
                     "store_note": h.note(e, ctx) if installed else None,
@@ -219,8 +222,8 @@ class ModelManager:
             "roles": [
                 {
                     "id": r.id,
-                    "title": r.title,
-                    "description": r.description,
+                    "title": r.text(lang)[0],
+                    "description": r.text(lang)[1],
                     "required": r.required,
                     "selectable": r.selectable,
                     "selected_id": chosen.id if (chosen := selected.get(r.id)) else None,
@@ -281,6 +284,7 @@ class ModelManager:
                     "error": None, "show_bytes": True, "action": action,
                 }  # fmt: skip
                 self._queue.append((i, action))
+                self._stop[i] = threading.Event()
                 queued.append(i)
             if queued and (self._thread is None or not self._thread.is_alive()):
                 self._thread = threading.Thread(
@@ -288,6 +292,22 @@ class ModelManager:
                 )
                 self._thread.start()
         return queued
+
+    def cancel(self, entry_id: str) -> bool:
+        """Cancel a queued or running download. Returns False if there was nothing to cancel."""
+        with self._lock:
+            state = self._downloads.get(entry_id)
+            if not state or state["status"] not in ACTIVE:
+                return False
+            if state["status"] == "queued":
+                self._queue = [q for q in self._queue if q[0] != entry_id]
+                state.update(status="cancelled", message="Cancelled", error=None)
+                return True
+            if not state.get("cancellable", True):
+                raise ModelError("This step can no longer be cancelled; it will finish shortly.")
+            self._stop[entry_id].set()
+            state.update(message="Cancelling...", cancelling=True)
+            return True
 
     def _set(self, entry_id: str, **fields: Any) -> None:
         with self._lock:
@@ -300,31 +320,70 @@ class ModelManager:
                     return
                 entry_id, action = self._queue.pop(0)
             e = self.get(entry_id)
+            stop = self._stop[entry_id]
             self._set(
-                entry_id, status="running", message="Starting...", error=None, started=time.time(),
+                entry_id,
+                status="running",
+                cancellable=True,
+                cancelling=False,
+                message="Starting...",
+                error=None,
+                started=time.time(),
                 show_bytes=e.source["type"] != "packages",
-            )  # fmt: skip
+            )
 
             def progress(
-                done: int, total: int, message: str, eid: str = entry_id, size: int = e.size_bytes
+                done: int,
+                total: int,
+                message: str,
+                eid: str = entry_id,
+                size: int = e.size_bytes,
+                stop: threading.Event = stop,
             ) -> None:
                 fields: dict[str, Any] = {"done": done, "total": total or size}
                 if message:
                     fields["message"] = message
+                    # unpacking cannot be interrupted safely: stop offering "Cancel" there
+                    if message.startswith(("Unpacking", "Installing")):
+                        fields["cancellable"] = False
+                if stop.is_set() and self.download_state()[eid].get("cancellable", True):
+                    raise Cancelled
                 self._set(eid, **fields)
 
             try:
-                self._perform(e, action, progress)
-                self._set(entry_id, status="done", message="Installed")
+                self._perform(e, action, progress, stop)
+                self._set(entry_id, status="done", message="Installed", cancellable=False)
+            except Cancelled:
+                self._after_cancel(e, action)
+                self._set(entry_id, status="cancelled", message="Cancelled", error=None)
             except Exception as exc:  # noqa: BLE001 - shown to the user
                 log.exception("%s of %s failed", action, entry_id)
                 self._set(
                     entry_id, status="error", error=f"{type(exc).__name__}: {exc}", message="Failed"
                 )
 
-    def _perform(self, e: Entry, action: str, progress: Callable[[int, int, str], None]) -> None:
+    def _after_cancel(self, e: Entry, action: str) -> None:
+        """Drop the half-downloaded files of a first download (an update keeps the old version)."""
+        if action == "update":
+            return
+        ctx = self.ctx()
+        h = self.handler(e)
+        try:
+            if not h.installed(e, ctx):
+                h.cleanup_partial(e, ctx)
+        except Exception:  # noqa: BLE001 - cleanup is best effort
+            log.warning("Could not clean up after cancelling %s", e.id, exc_info=True)
+
+    def _perform(
+        self,
+        e: Entry,
+        action: str,
+        progress: Callable[[int, int, str], None],
+        stop: threading.Event,
+    ) -> None:
         h = self.handler(e)
         ctx = self.ctx()
+        ctx.should_stop = stop.is_set
         self.settings.models_dir.mkdir(parents=True, exist_ok=True)
         if action == "redownload":
             progress(0, e.size_bytes, "Removing the old files...")

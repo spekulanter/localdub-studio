@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,6 +38,10 @@ _MANIFEST = "application/vnd.docker.distribution.manifest.v2+json"
 
 class ModelError(RuntimeError):
     """A model operation failed; the message is shown to the user."""
+
+
+class Cancelled(Exception):  # noqa: N818 - a control signal, not an error
+    """The user cancelled a download; partial files are cleaned up by the manager."""
 
 
 class NotDeletable(ModelError):
@@ -133,7 +138,10 @@ def with_polling(
 
     def poll() -> None:
         while not stop.wait(0.7):
-            progress(min(max(dir_size(watch) - start, 0), int(total * 0.99)), total, message)
+            try:
+                progress(min(max(dir_size(watch) - start, 0), int(total * 0.99)), total, message)
+            except Cancelled:
+                return  # the work itself stops through ctx.should_stop
 
     t = threading.Thread(target=poll, daemon=True)
     t.start()
@@ -142,6 +150,29 @@ def with_polling(
     finally:
         stop.set()
         t.join(timeout=2)
+
+
+def byte_progress(progress: Progress, total: int) -> Any:
+    """A tqdm class for huggingface_hub: reports bytes; raising in `progress` aborts it."""
+    from tqdm.auto import tqdm
+
+    lock = threading.Lock()
+    seen = [0]
+
+    class Reporter(tqdm):  # type: ignore[misc]
+        def update(self, n: float | None = 1) -> bool | None:
+            result: bool | None = super().update(n)
+            if getattr(self, "unit", "") == "B" and n:
+                with lock:
+                    seen[0] += int(n)
+                    done = seen[0]
+                progress(min(done, int(total * 0.99)), total, "")
+            return result
+
+        def display(self, *args: Any, **kwargs: Any) -> None:  # no console output in the app
+            return None
+
+    return Reporter
 
 
 def split_ollama_tag(tag: str) -> tuple[str, str, str]:
@@ -183,6 +214,7 @@ class Ctx:
     _ollama: list[dict[str, Any]] | None = None
     _ollama_loaded: bool = False
     extras_cache: dict[str, Any] = field(default_factory=dict)
+    should_stop: Callable[[], bool] = lambda: False  # noqa: E731 - set per download
 
     @property
     def models_dir(self) -> Path:
@@ -232,6 +264,9 @@ class Handler:
 
     def delete(self, e: Entry, ctx: Ctx) -> None:
         raise NotDeletable("This cannot be deleted here.")
+
+    def cleanup_partial(self, e: Entry, ctx: Ctx) -> None:
+        """Remove what a cancelled first download left behind (nothing by default)."""
 
     def locations(self, e: Entry, ctx: Ctx) -> list[Path]:
         return []
@@ -286,11 +321,15 @@ class WhisperHandler(Handler):
 
         cache = self._cache(ctx)
         repo = e.source["repo"]
+        snapshot_download(
+            repo,
+            allow_patterns=self.PATTERNS,
+            cache_dir=str(cache),
+            tqdm_class=byte_progress(progress, e.size_bytes),
+        )
 
-        def fetch() -> None:
-            snapshot_download(repo, allow_patterns=self.PATTERNS, cache_dir=str(cache))
-
-        with_polling(cache, e.size_bytes, progress, fetch)
+    def cleanup_partial(self, e: Entry, ctx: Ctx) -> None:
+        self.delete(e, ctx)
 
     def update(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
         self.download(e, ctx, progress)
@@ -389,6 +428,9 @@ class FolderHandler(Handler):
     def delete(self, e: Entry, ctx: Ctx) -> None:
         safe_rmtree(self.folder(e, ctx), ctx.models_dir)
 
+    def cleanup_partial(self, e: Entry, ctx: Ctx) -> None:
+        self.delete(e, ctx)
+
 
 class SupertonicHandler(FolderHandler):
     def installed(self, e: Entry, ctx: Ctx) -> bool:
@@ -397,13 +439,10 @@ class SupertonicHandler(FolderHandler):
         return len(onnx) >= 4 and (base / "voice_styles" / "F1.json").is_file()
 
     def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
-        from localdub.core.tts.supertonic_provider import SupertonicProvider
-
         base = self.folder(e, ctx)
         with_polling(
-            base, e.size_bytes, progress,
-            lambda: SupertonicProvider(model_dir=base, threads=ctx.settings.tts_threads).close(),
-        )  # fmt: skip
+            base, e.size_bytes, progress, lambda: fetch_in_subprocess("supertonic", ctx.should_stop)
+        )
 
 
 class ParakeetHandler(FolderHandler):
@@ -429,7 +468,10 @@ class OpenVoiceHandler(FolderHandler):
 
     def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
         with_polling(
-            self.folder(e, ctx), e.size_bytes, progress, lambda: fetch_in_subprocess("cloning")
+            self.folder(e, ctx),
+            e.size_bytes,
+            progress,
+            lambda: fetch_in_subprocess("cloning", ctx.should_stop),
         )
 
 
@@ -480,7 +522,10 @@ class DemucsHandler(Handler):
 
     def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
         with_polling(
-            ctx.hf_cache, e.size_bytes, progress, lambda: fetch_in_subprocess("separation")
+            ctx.hf_cache,
+            e.size_bytes,
+            progress,
+            lambda: fetch_in_subprocess("separation", ctx.should_stop),
         )
 
     def delete(self, e: Entry, ctx: Ctx) -> None:
@@ -492,6 +537,9 @@ class DemucsHandler(Handler):
     def locations(self, e: Entry, ctx: Ctx) -> list[Path]:
         d = hf_repo_dir(ctx.hf_cache, e.source["repo"])
         return [d] if d.exists() else []
+
+    def cleanup_partial(self, e: Entry, ctx: Ctx) -> None:
+        self.delete(e, ctx)
 
 
 class YoutubeHandler(Handler):
@@ -539,16 +587,37 @@ class PackagesHandler(Handler):
             safe_rmtree(folder.parent / (folder.name + leftover), folder.parent)
 
 
-def fetch_in_subprocess(model_id: str) -> None:
-    """Download a PyTorch-based model in a child process: the app window never imports torch."""
+def fetch_in_subprocess(model_id: str, should_stop: Callable[[], bool] = lambda: False) -> None:
+    """Download a model in a child process (no torch in the app window); can be cancelled."""
     flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
-    proc = subprocess.run(  # noqa: S603 - our own module, list arguments, no shell
+    proc = subprocess.Popen(  # noqa: S603 - our own module, list arguments, no shell
         [sys.executable, "-m", "localdub.core.model_fetch", model_id],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        creationflags=flags, check=False,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+        text=True, encoding="utf-8", errors="replace", creationflags=flags,
     )  # fmt: skip
+    lines: list[str] = []
+
+    def read() -> None:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            lines.append(line)
+
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    try:
+        while proc.poll() is None:
+            if should_stop():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                raise Cancelled
+            time.sleep(0.3)
+    finally:
+        reader.join(timeout=3)
     if proc.returncode != 0:
-        tail = "\n".join((proc.stderr or proc.stdout).strip().splitlines()[-6:])
+        tail = "\n".join("".join(lines).strip().splitlines()[-6:])
         raise ModelError(f"The download process failed (exit code {proc.returncode}):\n{tail}")
 
 

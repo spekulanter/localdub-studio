@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type ModelsResponse } from "../api";
 import { formatBytes, percent } from "../lib/bytes";
+import { useT } from "../i18n";
 
 interface Props {
   /** What to install, e.g. ["packages", "separation"] or ["youtube"]. */
@@ -15,6 +16,7 @@ const BUSY = ["queued", "running"];
 
 /** One-click installation of optional components (packages, tools, models) with progress. */
 export function InstallNotice({ ids, onInstalled, intro }: Props) {
+  const t = useT();
   const [data, setData] = useState<ModelsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const notified = useRef(false);
@@ -52,11 +54,11 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
       });
   };
 
-  if (!data) return <p className="text-xs text-muted">Checking…</p>;
+  if (!data) return <p className="text-xs text-muted">{t("Checking…")}</p>;
   if (allInstalled) {
     return (
       <p className="text-xs text-ok" role="status">
-        ✓ Installed. This option is ready to use.
+        {t("✓ Installed. This option is ready to use.")}
       </p>
     );
   }
@@ -72,15 +74,15 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
     <div className="mt-1 space-y-1 text-xs text-muted">
       {!running && (
         <p>
-          {intro(formatBytes(total))} It is installed into your own user folder; no administrator rights and no
-          commands are needed.
+          {intro(formatBytes(total))}{" "}
+          {t("It is installed into your own user folder; no administrator rights and no commands are needed.")}
         </p>
       )}
       {running && (
         <>
           <div
             role="progressbar"
-            aria-label="Installing the optional packages"
+            aria-label={t("Installing the optional packages")}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={pct}
@@ -90,7 +92,7 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
           </div>
           <p>
             {pct}%
-            {current?.download?.show_bytes === false ? "" : ` · ${formatBytes(done)} of ${formatBytes(total)}`}
+            {current?.download?.show_bytes === false ? "" : ` · ${t("{a} of {b}", { a: formatBytes(done), b: formatBytes(total) })}`}
             {current?.download?.message ? ` · ${current.download.message}` : ""}
           </p>
         </>
@@ -100,13 +102,26 @@ export function InstallNotice({ ids, onInstalled, intro }: Props) {
           {problem}
         </p>
       )}
+      {running && (
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          disabled={rows.some((m) => m.download?.cancellable === false)}
+          onClick={() => {
+            const busyIds = rows.filter((m) => m.download && BUSY.includes(m.download.status)).map((m) => m.id);
+            void Promise.all(busyIds.map((id) => api.cancelModel(id).catch(() => undefined))).then(refresh);
+          }}
+        >
+          {t("Cancel")}
+        </button>
+      )}
       {!running && (
         <button
           type="button"
           onClick={start}
           className="btn-primary btn-sm"
         >
-          {problem ? "Try again" : `Install now (${formatBytes(total)})`}
+          {problem ? t("Try again") : t("Install now ({size})", { size: formatBytes(total) })}
         </button>
       )}
     </div>

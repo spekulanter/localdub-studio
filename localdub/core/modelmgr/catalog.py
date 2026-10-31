@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from typing import Any
 
+LANGS = ("sk",)  # languages that may carry translated texts next to the English ones
 STATUSES = ("recommended", "available", "experimental", "not_recommended", "custom")
 RUNS_ON = ("gpu", "cpu", "gpu-or-cpu")
 SOURCE_TYPES = (
@@ -33,6 +34,11 @@ class Role:
     description: str
     required: bool
     selectable: bool
+    translations: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def text(self, lang: str) -> tuple[str, str]:
+        tr = self.translations.get(lang, {})
+        return tr.get("title", self.title), tr.get("description", self.description)
 
 
 @dataclass(frozen=True)
@@ -65,6 +71,20 @@ class Entry:
     check_updates: bool = False
     replaced_by: str | None = None
     custom: bool = False
+    translations: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def text(self, lang: str) -> dict[str, Any]:
+        """The user-facing texts in `lang` (English where no translation exists)."""
+        tr = self.translations.get(lang, {})
+        return {
+            "title": tr.get("title", self.title),
+            "summary": tr.get("summary", self.summary),
+            "choose_if": list(tr.get("choose_if", self.choose_if)),
+            "avoid_if": list(tr.get("avoid_if", self.avoid_if)),
+            "measured": tr.get("measured", self.measured),
+            "pinned": tr.get("pinned", self.pinned),
+            "note": tr.get("note", self.requirements.note),
+        }
 
 
 @dataclass(frozen=True)
@@ -141,6 +161,10 @@ def parse_entry(raw: dict[str, Any], *, custom: bool = False) -> Entry:
         check_updates=bool(raw.get("check_updates", False)),
         replaced_by=raw.get("replaced_by"),
         custom=custom,
+        translations={
+            k: dict(v)
+            for k, v in (raw.get("translations") or {k: raw[k] for k in LANGS if k in raw}).items()
+        },
     )
 
 
@@ -153,6 +177,7 @@ def parse_catalog(raw: dict[str, Any]) -> Catalog:
             description=_need(r, "description", str, "role"),
             required=bool(r.get("required", False)),
             selectable=bool(r.get("selectable", False)),
+            translations={k: dict(r[k]) for k in LANGS if k in r},
         )
         for r in _need(raw, "roles", list, "catalog")
     )
