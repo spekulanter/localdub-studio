@@ -3,6 +3,11 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Changed
+- Dark mode uses a cool blue-slate palette with a blue accent instead of orange.
+
 ## [0.4.2] - 2026-10-31
 
 ### Changed

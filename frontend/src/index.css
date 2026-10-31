@@ -21,6 +21,7 @@
   --accent-hover: #c43d13;
   --accent-fg: #ffffff;
   --accent-soft: #fbe3d9;
+  --accent-mix: #f2b233;
   --dub: #0d6a61;
   --dub-soft: #d5ebe6;
   --ok: #2e7d4e;
@@ -36,19 +37,20 @@
 /* Dark theme: chosen in the app (Auto follows Windows); the attribute is set before first paint. */
 :root[data-theme="dark"] {
     color-scheme: dark;
-    --paper: #12100d;
-    --surface: #1b1814;
-    --inset: #24201a;
-    --line: #342f27;
-    --line-strong: #4b443a;
-    --ink: #efe8d9;
-    --muted: #a39a87;
-    --accent: #ff6b3d;
-    --accent-hover: #ff8660;
-    --accent-fg: #1a0d07;
-    --accent-soft: #3b2016;
-    --dub: #52cbbc;
-    --dub-soft: #123631;
+    --paper: #0d1117;
+    --surface: #151b24;
+    --inset: #1c2430;
+    --line: #2a3441;
+    --line-strong: #3d4a5c;
+    --ink: #e6edf5;
+    --muted: #93a1b3;
+    --accent: #5b9dff;
+    --accent-hover: #82b4ff;
+    --accent-fg: #06101f;
+    --accent-soft: #14284a;
+    --accent-mix: #8be9fd;
+    --dub: #4fd1b5;
+    --dub-soft: #10342f;
     --ok: #6fcf93;
     --ok-soft: #15301f;
     --warn: #e8b04a;
@@ -126,7 +128,7 @@ select.field {
 }
 
 [data-theme="dark"] select.field {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23a39a87' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4.5 6 8l3.5-3.5'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2393a1b3' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M2.5 4.5 6 8l3.5-3.5'/></svg>");
 }
 
 ::selection {
@@ -255,7 +257,7 @@ select.field {
   }
   .meter > span {
     @apply block h-full rounded-full transition-[width] duration-500 ease-out;
-    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #f2b233));
+    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--accent-mix)));
   }
   .meter > span[data-state="done"] {
     background: linear-gradient(90deg, var(--ok), color-mix(in srgb, var(--ok) 70%, #9bd8b0));
@@ -266,7 +268,7 @@ select.field {
   .meter > span[data-live="true"] {
     background-size: 200% 100%;
     animation: meter-glow 1.6s linear infinite;
-    background-image: linear-gradient(90deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, #f2b233) 45%, var(--accent) 90%);
+    background-image: linear-gradient(90deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, var(--accent-mix)) 45%, var(--accent) 90%);
   }
 
 }
