@@ -3,6 +3,11 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.4.5] - 2026-10-31
+
+### Fixed
+- Slovak typo in the description of Whisper large-v3 turbo ("polovičná").
+
 ## [0.4.4] - 2026-10-31
 
 ### Added
