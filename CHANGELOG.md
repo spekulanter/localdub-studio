@@ -3,7 +3,7 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [Unreleased]
+## [0.4.4] - 2026-10-31
 
 ### Added
 - The largest accepted video file can be changed on the New dub page ("Largest file: 4 GB, Change"). The
