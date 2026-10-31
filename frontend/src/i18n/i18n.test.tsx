@@ -44,7 +44,7 @@ const options: Options = {
   asr_choices: [],
   translation_choices: [],
   stages: [],
-  max_upload_mb: 1,
+  max_upload_mb: 1, default_max_upload_mb: 4096, free_disk_mb: 100000,
   separation_available: true,
 };
 const settings = {

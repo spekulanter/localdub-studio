@@ -14,6 +14,53 @@ interface Props {
   onOptionsChanged?: () => void;
 }
 
+function UploadLimit({ options, onChanged }: { options: Options; onChanged?: () => void }) {
+  const t = useT();
+  const [editing, setEditing] = useState(false);
+  const [gb, setGb] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const show = (mb: number) => `${Math.round((mb / 1024) * 10) / 10} GB`;
+  const save = (mb: number | null) => {
+    setProblem(null);
+    api
+      .setUploadLimit(mb)
+      .then(() => {
+        setEditing(false);
+        onChanged?.();
+      })
+      .catch((e: unknown) => setProblem(e instanceof Error ? e.message : String(e)));
+  };
+  return (
+    <div className="text-xs text-muted">
+      {t("Largest file: {size} (default {def}).", { size: show(options.max_upload_mb), def: show(options.default_max_upload_mb) })}{" "}
+      {!editing && (
+        <button type="button" className="underline" onClick={() => { setGb(String(Math.round((options.max_upload_mb / 1024) * 10) / 10)); setEditing(true); }}>
+          {t("Change")}
+        </button>
+      )}
+      {editing && (
+        <span className="mt-1 flex flex-wrap items-center justify-center gap-2">
+          <label className="flex items-center gap-1">
+            {t("Limit in GB")}
+            <input className="field w-24" type="number" min={0.1} step={0.5} value={gb} onChange={(e) => setGb(e.target.value)} />
+          </label>
+          <button type="button" className="btn-primary btn-sm" disabled={!(Number(gb) > 0)} onClick={() => save(Math.round(Number(gb) * 1024))}>
+            {t("Save")}
+          </button>
+          <button type="button" className="btn-ghost btn-sm" onClick={() => save(null)}>
+            {t("Back to default")}
+          </button>
+          <button type="button" className="btn-ghost btn-sm" onClick={() => setEditing(false)}>
+            {t("Cancel")}
+          </button>
+          <span className="basis-full">{t("The video is copied into the app's data folder first; free space there: {size}.", { size: show(options.free_disk_mb) })}</span>
+        </span>
+      )}
+      {problem && <span className="block text-bad">{problem}</span>}
+    </div>
+  );
+}
+
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 
 export function NewProject({ options, health, onCreated, modelsMissing = false, onOptionsChanged }: Props) {
@@ -183,6 +230,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
           {files.length > 0 ? t("Choose other files") : t("Choose videos")}
         </button>
         <input ref={input} type="file" multiple accept={ACCEPT} className="hidden" onChange={(e) => setFiles(Array.from(e.target.files ?? []))} aria-label={t("Video file")} />
+        <UploadLimit options={options} onChanged={onOptionsChanged} />
         {tooBig.length > 0 && <p className="text-sm text-bad">{t("{names} is larger than {mb} MB.", { names: tooBig.map((f) => f.name).join(", "), mb: options.max_upload_mb })}</p>}
       </div>
 

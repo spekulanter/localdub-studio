@@ -28,7 +28,7 @@ const options: Options = {
     { id: "translategemma-12b", title: "TranslateGemma 12B", status: "available", summary: "", tag: "translategemma:12b", source_langs: null, installed: false },
   ],
   stages: ["probe", "extract", "asr", "translate", "tts", "assemble", "export"],
-  max_upload_mb: 1,
+  max_upload_mb: 1, default_max_upload_mb: 4096, free_disk_mb: 100000,
   separation_available: false,
 };
 const health: Health = { ok: true, ollama: { reachable: true, error: null, models: ["translategemma:4b", "qwen3:8b"] } };

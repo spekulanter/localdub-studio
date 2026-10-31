@@ -28,6 +28,7 @@ from localdub import extras
 from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
+from localdub.core import usersettings
 from localdub.core.audio.waveform import peaks_payload
 from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.media.ffmpeg import FFmpeg, MediaError
@@ -89,6 +90,10 @@ class ProjectOut(BaseModel):
     created_at: float
     latest_job: dict[str, Any] | None = None
     has_output: bool = False
+
+
+class SettingsPatch(BaseModel):
+    max_upload_mb: int | None
 
 
 class ProjectPatch(BaseModel):
@@ -182,6 +187,10 @@ def safe_filename(name: str, fallback: str = "video.mp4") -> str:
 
 def create_app(settings: Settings | None = None, *, start_queue: bool = True) -> FastAPI:
     settings = settings or Settings()
+    default_upload_mb = settings.max_upload_mb
+    user_settings_path = settings.data_dir / "user-settings.json"
+    stored = usersettings.load(user_settings_path)
+    settings.max_upload_mb = stored.get("max_upload_mb", default_upload_mb)
     db = Database(settings.data_dir / "localdub.sqlite")
     jobs = JobManager(db, settings)
     mgr = ModelManager(settings, db.any_active)
@@ -269,8 +278,24 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             "translation_choices": mgr.choices("translation", lang),
             "stages": STAGES,
             "max_upload_mb": settings.max_upload_mb,
+            "default_max_upload_mb": default_upload_mb,
+            "free_disk_mb": shutil.disk_usage(settings.data_dir).free // (1024 * 1024),
             "separation_available": separation_available(),
         }
+
+    @app.put("/api/settings")
+    def put_settings(body: SettingsPatch) -> dict[str, Any]:
+        """Change the upload limit; null puts the default back."""
+        value = body.max_upload_mb
+        if value is not None and not usersettings.valid_upload_mb(value):
+            raise HTTPException(
+                422,
+                f"Limit must be between {usersettings.MIN_UPLOAD_MB} and "
+                f"{usersettings.MAX_UPLOAD_MB} MB",
+            )
+        settings.max_upload_mb = default_upload_mb if value is None else value
+        usersettings.save(user_settings_path, {} if value is None else {"max_upload_mb": value})
+        return {"max_upload_mb": settings.max_upload_mb, "default_max_upload_mb": default_upload_mb}
 
     # ----- models ------------------------------------------------------------------------
     def default_llm() -> str:

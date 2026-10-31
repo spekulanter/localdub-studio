@@ -190,3 +190,15 @@ def test_voice_cloning_requires_explicit_consent(client: TestClient, sample_mp4:
     assert client.patch(f"/api/projects/{pid}", json={"clone_voice": True}).status_code == 422
     done = client.patch(f"/api/projects/{pid}", json={"clone_voice": True, "clone_consent": True})
     assert done.status_code == 200 and done.json()["clone_voice"] is True
+
+
+def test_upload_limit_can_be_changed_and_survives_restart(client, settings):
+    default = client.get("/api/options").json()["default_max_upload_mb"]
+    assert client.put("/api/settings", json={"max_upload_mb": 5}).status_code == 422
+    r = client.put("/api/settings", json={"max_upload_mb": 20000})
+    assert r.status_code == 200
+    opts = client.get("/api/options").json()
+    assert opts["max_upload_mb"] == 20000 and opts["default_max_upload_mb"] == default
+    assert (settings.data_dir / "user-settings.json").exists()
+    assert client.put("/api/settings", json={"max_upload_mb": None}).json()["max_upload_mb"] == default
+    assert client.get("/api/options").json()["max_upload_mb"] == default

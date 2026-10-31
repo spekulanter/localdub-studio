@@ -51,6 +51,8 @@ export interface Options {
   translation_choices: ModelChoice[];
   stages: Stage[];
   max_upload_mb: number;
+  default_max_upload_mb: number;
+  free_disk_mb: number;
   separation_available: boolean;
 }
 
@@ -268,6 +270,8 @@ const json = (method: string, body?: unknown): RequestInit => ({
 });
 
 export const api = {
+  setUploadLimit: (mb: number | null) =>
+    request<{ max_upload_mb: number; default_max_upload_mb: number }>("/api/settings", json("PUT", { max_upload_mb: mb })),
   health: () => request<Health>("/api/health"),
   models: (sizes = false) => request<ModelsResponse>(`/api/models?lang=${apiLang}${sizes ? "&sizes=true" : ""}`),
   selectModel: (id: string) => request<{ ok: boolean }>(`/api/models/${encodeURIComponent(id)}/select`, json("POST", {})),
