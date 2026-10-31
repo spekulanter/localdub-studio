@@ -115,6 +115,7 @@ class ModelManager:
                     "status": e.status,
                     "summary": e.text(lang)["summary"],
                     "tag": e.source.get("tag"),
+                    "source_langs": list(e.source_langs) if e.source_langs else None,
                     "installed": self.handler(e).installed(e, ctx),
                 }
             )

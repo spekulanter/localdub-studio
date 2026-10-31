@@ -19,7 +19,7 @@ const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 export function NewProject({ options, health, onCreated, modelsMissing = false, onOptionsChanged }: Props) {
   const t = useT();
   const [source, setSource] = useState<"file" | "youtube">("file");
-  const [youtube, setYoutube] = useState<YoutubeChoice | null>(null);
+  const [youtube, setYoutube] = useState<YoutubeChoice[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>({
@@ -43,15 +43,18 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
   const tooBig = files.filter((f) => f.size > limit);
 
   async function submitYoutube() {
-    if (!youtube) return;
+    if (youtube.length === 0) return;
     setBusy(true);
     setError(null);
-    try {
-      onCreated(
-        await api.createFromYoutube({
-          url: youtube.url,
-          quality: youtube.quality,
-          cookies_browser: youtube.cookies_browser,
+    const failures: string[] = [];
+    let first: Project | null = null;
+    for (const [i, choice] of youtube.entries()) {
+      setProgress(youtube.length > 1 ? t("Adding {i} of {n}: {name}", { i: i + 1, n: youtube.length, name: choice.info.title }) : null);
+      try {
+        const created = await api.createFromYoutube({
+          url: choice.url,
+          quality: choice.quality,
+          cookies_browser: choice.cookies_browser,
           source_lang: settings.source_lang,
           voice: settings.voice,
           llm_model: settings.llm_model,
@@ -62,10 +65,18 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
           num_speakers: settings.diarize ? settings.num_speakers : null,
           clone_voice: settings.clone_voice,
           clone_consent: settings.clone_consent,
-        }),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+        });
+        first ??= created;
+      } catch (err) {
+        failures.push(`${choice.info.title}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    setProgress(null);
+    if (first) {
+      if (failures.length > 0) window.alert(`${t("Some links were not added:")}\n${failures.join("\n")}`);
+      onCreated(first);
+    } else {
+      setError(failures.join("\n"));
       setBusy(false);
     }
   }
@@ -183,11 +194,13 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
         </p>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={modelsMissing || (source === "file" ? files.length === 0 || tooBig.length > 0 : youtube === null) || busy || (settings.clone_voice && !settings.clone_consent)} className="btn-primary">
+        <button type="submit" disabled={modelsMissing || (source === "file" ? files.length === 0 || tooBig.length > 0 : youtube.length === 0) || busy || (settings.clone_voice && !settings.clone_consent)} className="btn-primary">
           {source === "youtube"
             ? busy
-              ? t("Starting…")
-              : t("Download and start dubbing")
+              ? (progress ?? t("Starting…"))
+              : youtube.length > 1
+                ? t("Download and dub {n} videos", { n: youtube.length })
+                : t("Download and start dubbing")
             : busy
               ? (progress ?? t("Uploading…"))
               : files.length > 1

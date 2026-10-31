@@ -205,7 +205,10 @@
         "avoid_if": [
           "Chcete najlepší výsledok: veľké modely sú oveľa presnejšie."
         ]
-      }
+      },
+      "source_langs": [
+        "en"
+      ]
     },
     {
       "id": "parakeet-tdt-0.6b-v3",
@@ -259,7 +262,17 @@
         "note": "Používa procesor cez ONNX (sherpa-onnx); PyTorch netreba.",
         "measured": "Na 4 anglických klipoch (44 s až 5,7 min) sa jeho text od Whispera large-v3 líši v 0 až 6 % slov, väčšinou v interpunkcii a koncoch viet. Zle počul zriedkavé mená („Palak Paneer“ sa stalo „Palek Paner“). Na tomto notebooku nebol rýchlejší než Whisper (obaja asi 0,4-násobok reálneho času pri vyváženom napájaní). Iné jazyky sa netestovali.",
         "pinned": "Pripnuté na jeden súbor overený kontrolným súčtom."
-      }
+      },
+      "source_langs": [
+        "en",
+        "de",
+        "it",
+        "es",
+        "ru",
+        "uk",
+        "pl",
+        "hu"
+      ]
     },
     {
       "id": "translategemma-4b",

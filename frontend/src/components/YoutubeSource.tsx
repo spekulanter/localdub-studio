@@ -20,9 +20,17 @@ const BROWSER_LABELS: Record<string, string> = {
 const field = "field";
 
 interface Props {
-  /** The checked link and its options, or null while there is nothing valid to download. */
-  onChoice: (choice: YoutubeChoice | null) => void;
+  /** The checked links and their options (only the ones that work); empty while there is nothing to download. */
+  onChoice: (choices: YoutubeChoice[]) => void;
   disabled?: boolean;
+}
+
+const MAX_LINKS = 50;
+
+interface Item {
+  url: string;
+  info?: YoutubeInfo;
+  error?: string;
 }
 
 export function YoutubeSource({ onChoice, disabled }: Props) {
@@ -30,10 +38,10 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
   const toolsIntro = (size: string) =>
     t("Importing from YouTube needs two small programs, yt-dlp and Deno (about {size}). They are downloaded from their official GitHub pages and checked against the publishers' SHA-256.", { size });
   const [status, setStatus] = useState<YoutubeStatus | null>(null);
-  const [url, setUrl] = useState("");
+  const [text, setText] = useState("");
   const [quality, setQuality] = useState("auto");
   const [cookies, setCookies] = useState("none");
-  const [info, setInfo] = useState<YoutubeInfo | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
@@ -44,38 +52,44 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
   };
   useEffect(loadStatus, []);
 
-  // Every check gets a number; an answer that arrives after the link changed is ignored.
+  // Every check gets a number; an answer that arrives after the links changed is ignored.
   const latest = useRef(0);
+
+  const links = Array.from(new Set(text.split(/\s+/).filter(Boolean))).slice(0, MAX_LINKS);
+
+  const choices = (list: Item[], q = quality, c = cookies): YoutubeChoice[] =>
+    list.flatMap((i) => (i.info ? [{ url: i.url, quality: q, cookies_browser: c, info: i.info }] : []));
 
   const reset = () => {
     latest.current++;
     setChecking(false);
-    setInfo(null);
+    setItems([]);
     setError(null);
-    onChoice(null);
+    onChoice([]);
   };
 
   async function check() {
-    const link = url.trim();
-    if (!link) return;
+    if (links.length === 0) return;
     const mine = ++latest.current;
     setChecking(true);
     setError(null);
-    onChoice(null);
+    setItems([]);
+    onChoice([]);
+    const found: Item[] = [];
     try {
-      const found = await api.youtubeInfo(link, cookies);
-      if (mine !== latest.current) return; // the link was edited while YouTube was answering
-      if (found.is_live) {
-        setInfo(null);
-        setError(t("Live streams cannot be dubbed. Use a finished video."));
-        return;
+      for (const link of links) {
+        let item: Item;
+        try {
+          const info = await api.youtubeInfo(link, cookies);
+          item = info.is_live ? { url: link, error: t("Live streams cannot be dubbed. Use a finished video.") } : { url: link, info };
+        } catch (e) {
+          item = { url: link, error: e instanceof Error ? e.message : String(e) };
+        }
+        if (mine !== latest.current) return; // the links were edited while YouTube was answering
+        found.push(item);
+        setItems([...found]);
       }
-      setInfo(found);
-      onChoice({ url: link, quality, cookies_browser: cookies, info: found });
-    } catch (e) {
-      if (mine !== latest.current) return;
-      setInfo(null);
-      setError(e instanceof Error ? e.message : String(e));
+      onChoice(choices(found));
     } finally {
       if (mine === latest.current) setChecking(false);
     }
@@ -110,34 +124,31 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
   return (
     <fieldset disabled={disabled} className="space-y-3">
       <label className="block text-sm">
-        <span className="mb-1 block font-medium">{t("YouTube link")}</span>
-        <div className="flex gap-2">
-          <input
-            type="url"
-            inputMode="url"
-            placeholder="https://www.youtube.com/watch?v=…"
-            value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              if (info || error || checking) reset();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void check();
-              }
-            }}
-            className={field}
-            aria-label={t("YouTube link")}
-          />
-          <button
-            type="button"
-            onClick={() => void check()}
-            disabled={!url.trim() || checking}
-            className="btn-secondary shrink-0"
-          >
-            {checking ? t("Checking…") : t("Check link")}
+        <span className="mb-1 block font-medium">{t("YouTube links (one per line)")}</span>
+        <textarea
+          rows={3}
+          placeholder="https://www.youtube.com/watch?v=…"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (items.length > 0 || error || checking) reset();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              void check();
+            }
+          }}
+          className={field}
+          aria-label={t("YouTube links (one per line)")}
+        />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void check()} disabled={links.length === 0 || checking} className="btn-secondary shrink-0">
+            {checking ? t("Checking…") : links.length > 1 ? t("Check links") : t("Check link")}
           </button>
+          <span className="text-xs text-muted">
+            {links.length > 1 ? t("{n} links; they are dubbed one after another.", { n: links.length }) : t("Paste several links to dub them all in turn (Ctrl + Enter checks).")}
+          </span>
         </div>
       </label>
 
@@ -147,19 +158,31 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
         </p>
       )}
 
-      {info && (
-        <div className="flex gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3" data-testid="youtube-card">
-          {info.thumbnail && (
-            <img src={info.thumbnail} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-20 w-36 shrink-0 rounded-md bg-inset object-cover" />
+      {items.length > 0 && (
+        <ul className="space-y-2">
+          {items.map((it) =>
+            it.info ? (
+              <li key={it.url} className="flex gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3" data-testid="youtube-card">
+                {it.info.thumbnail && (
+                  <img src={it.info.thumbnail} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-16 w-28 shrink-0 rounded-md bg-inset object-cover" />
+                )}
+                <div className="min-w-0 text-sm">
+                  <p className="line-clamp-2 font-medium">{it.info.title}</p>
+                  <p className="text-muted">
+                    {[it.info.uploader, it.info.duration ? formatTime(it.info.duration) : null].filter(Boolean).join(" · ")}
+                  </p>
+                  <p className="mt-1 text-xs text-ok">{t("✓ The link works.")}</p>
+                </div>
+              </li>
+            ) : (
+              <li key={it.url} className="alert alert-bad" role="alert">
+                <span className="break-all font-mono text-xs">{it.url}</span>
+                <br />
+                {it.error}
+              </li>
+            ),
           )}
-          <div className="min-w-0 text-sm">
-            <p className="line-clamp-2 font-medium">{info.title}</p>
-            <p className="text-muted">
-              {[info.uploader, info.duration ? formatTime(info.duration) : null].filter(Boolean).join(" · ")}
-            </p>
-            <p className="mt-1 text-xs text-ok">{t("✓ The link works.")}</p>
-          </div>
-        </div>
+        </ul>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -170,7 +193,7 @@ export function YoutubeSource({ onChoice, disabled }: Props) {
             value={quality}
             onChange={(e) => {
               setQuality(e.target.value);
-              if (info) onChoice({ url: url.trim(), quality: e.target.value, cookies_browser: cookies, info });
+              if (items.some((i) => i.info)) onChoice(choices(items, e.target.value));
             }}
           >
             {status.qualities.map((q) => (

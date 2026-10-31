@@ -71,6 +71,7 @@ class Entry:
     check_updates: bool = False
     replaced_by: str | None = None
     custom: bool = False
+    source_langs: tuple[str, ...] | None = None  # None = every language
     translations: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def text(self, lang: str) -> dict[str, Any]:
@@ -161,6 +162,7 @@ def parse_entry(raw: dict[str, Any], *, custom: bool = False) -> Entry:
         check_updates=bool(raw.get("check_updates", False)),
         replaced_by=raw.get("replaced_by"),
         custom=custom,
+        source_langs=tuple(raw["source_langs"]) if raw.get("source_langs") else None,
         translations={
             k: dict(v)
             for k, v in (raw.get("translations") or {k: raw[k] for k in LANGS if k in raw}).items()

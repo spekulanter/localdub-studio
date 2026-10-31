@@ -20,13 +20,14 @@ def draw(size: int) -> np.ndarray:
     y, x = np.mgrid[0:s, 0:s].astype(np.float32)
     u, v = x / s, y / s
     img = np.zeros((s, s, 4), np.float32)
-    # rounded square with a diagonal indigo -> violet gradient
+    # rounded square with a diagonal orange -> amber gradient
     r = 0.22
     cx = np.clip(u, r, 1 - r)
     cy = np.clip(v, r, 1 - r)
     inside = (u - cx) ** 2 + (v - cy) ** 2 <= r**2
     t = (u + v) / 2
-    top, bottom = np.array([79, 70, 229], np.float32), np.array([168, 85, 247], np.float32)
+    # the same orange as the interface (--accent #de4a1c, shading to amber like the in-app logo)
+    top, bottom = np.array([222, 74, 28], np.float32), np.array([236, 130, 40], np.float32)
     rgb = top[None, None, :] * (1 - t[..., None]) + bottom[None, None, :] * t[..., None]
     img[..., :3] = rgb
     img[..., 3] = inside * 255

@@ -194,6 +194,8 @@ export interface ModelChoice {
   status: ModelInfo["status"];
   summary: string;
   tag: string | null;
+  /** languages this model can recognise; null = all */
+  source_langs: string[] | null;
   installed: boolean;
 }
 

@@ -49,14 +49,14 @@ describe("YoutubeSource", () => {
     expect(await screen.findByText(/One-time setup for YouTube links/)).toBeTruthy();
     expect(await screen.findByText(/yt-dlp and Deno \(about 70 MB\)/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Install now/ })).toBeTruthy();
-    expect(screen.queryByLabelText("YouTube link")).toBeNull();
+    expect(screen.queryByLabelText("YouTube links (one per line)")).toBeNull();
   });
 
   it("checks a link, shows the video card and reports the choice", async () => {
     const calls = route({ "/api/youtube/status": () => json(STATUS), "/api/youtube/info": () => json(INFO) });
     const onChoice = vi.fn();
     render(<YoutubeSource onChoice={onChoice} />);
-    const input = await screen.findByLabelText("YouTube link");
+    const input = await screen.findByLabelText("YouTube links (one per line)");
     const check = screen.getByRole("button", { name: "Check link" }) as HTMLButtonElement;
     expect(check.disabled).toBe(true);
     fireEvent.change(input, { target: { value: " https://youtu.be/abc " } });
@@ -66,21 +66,21 @@ describe("YoutubeSource", () => {
     expect(card.textContent).toContain("2:05");
     expect(card.querySelector("img")?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(calls.find((c) => c.url === "/api/youtube/info")?.body).toEqual({ url: "https://youtu.be/abc", cookies_browser: "none" });
-    expect(onChoice).toHaveBeenLastCalledWith({ url: "https://youtu.be/abc", quality: "auto", cookies_browser: "none", info: INFO });
+    expect(onChoice).toHaveBeenLastCalledWith([{ url: "https://youtu.be/abc", quality: "auto", cookies_browser: "none", info: INFO }]);
   });
 
-  it("starts the check with Enter and shows the reason when YouTube refuses", async () => {
+  it("starts the check with Ctrl+Enter and shows the reason when YouTube refuses", async () => {
     route({
       "/api/youtube/status": () => json(STATUS),
       "/api/youtube/info": () => json({ detail: "This video is age-restricted. Choose a browser under 'Use cookies from'" }, 422),
     });
     const onChoice = vi.fn();
     render(<YoutubeSource onChoice={onChoice} />);
-    const input = await screen.findByLabelText("YouTube link");
+    const input = await screen.findByLabelText("YouTube links (one per line)");
     fireEvent.change(input, { target: { value: "https://youtu.be/abc" } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
     expect((await screen.findByRole("alert")).textContent).toContain("age-restricted");
-    expect(onChoice).toHaveBeenLastCalledWith(null);
+    expect(onChoice).toHaveBeenLastCalledWith([]);
     expect(screen.queryByTestId("youtube-card")).toBeNull();
   });
 
@@ -88,24 +88,24 @@ describe("YoutubeSource", () => {
     route({ "/api/youtube/status": () => json(STATUS), "/api/youtube/info": () => json({ ...INFO, is_live: true }) });
     const onChoice = vi.fn();
     render(<YoutubeSource onChoice={onChoice} />);
-    fireEvent.change(await screen.findByLabelText("YouTube link"), { target: { value: "https://youtu.be/abc" } });
+    fireEvent.change(await screen.findByLabelText("YouTube links (one per line)"), { target: { value: "https://youtu.be/abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Check link" }));
     expect((await screen.findByRole("alert")).textContent).toContain("Live streams");
-    expect(onChoice).toHaveBeenLastCalledWith(null);
+    expect(onChoice).toHaveBeenLastCalledWith([]);
   });
 
   it("forgets the choice when the link changes, and re-reports it when only the quality changes", async () => {
     route({ "/api/youtube/status": () => json(STATUS), "/api/youtube/info": () => json(INFO) });
     const onChoice = vi.fn();
     render(<YoutubeSource onChoice={onChoice} />);
-    const input = await screen.findByLabelText("YouTube link");
+    const input = await screen.findByLabelText("YouTube links (one per line)");
     fireEvent.change(input, { target: { value: "https://youtu.be/abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Check link" }));
     await screen.findByTestId("youtube-card");
     fireEvent.change(screen.getByLabelText(/Video quality/), { target: { value: "720" } });
-    expect(onChoice).toHaveBeenLastCalledWith(expect.objectContaining({ quality: "720", url: "https://youtu.be/abc" }));
+    expect(onChoice).toHaveBeenLastCalledWith([expect.objectContaining({ quality: "720", url: "https://youtu.be/abc" })]);
     fireEvent.change(input, { target: { value: "https://youtu.be/other" } });
-    expect(onChoice).toHaveBeenLastCalledWith(null);
+    expect(onChoice).toHaveBeenLastCalledWith([]);
     expect(screen.queryByTestId("youtube-card")).toBeNull();
   });
 
@@ -119,6 +119,27 @@ describe("YoutubeSource", () => {
     fireEvent.click(screen.getByRole("button", { name: "Update yt-dlp" }));
     expect(await screen.findByText("Updated yt-dlp to 2026.11.02")).toBeTruthy();
     expect(calls.some((c) => c.url === "/api/youtube/update")).toBe(true);
+  });
+
+  it("checks several links one after another and keeps the working ones", async () => {
+    const calls = route({
+      "/api/youtube/status": () => json(STATUS),
+      "/api/youtube/info": (body) =>
+        (body as { url: string }).url.endsWith("bad") ? json({ detail: "Video unavailable" }, 422) : json({ ...INFO, title: `Video ${(body as { url: string }).url.slice(-1)}` }),
+    });
+    const onChoice = vi.fn();
+    render(<YoutubeSource onChoice={onChoice} />);
+    fireEvent.change(await screen.findByLabelText("YouTube links (one per line)"), {
+      target: { value: "https://youtu.be/a\nhttps://youtu.be/bad\n  https://youtu.be/c  \nhttps://youtu.be/a" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check links" }));
+    await waitFor(() => expect(onChoice).toHaveBeenLastCalledWith(expect.arrayContaining([expect.anything()])));
+    expect(calls.filter((c) => c.url === "/api/youtube/info").map((c) => (c.body as { url: string }).url)).toEqual([
+      "https://youtu.be/a", "https://youtu.be/bad", "https://youtu.be/c",
+    ]); // a repeated link is checked once
+    expect(screen.getAllByTestId("youtube-card")).toHaveLength(2);
+    expect(screen.getByRole("alert").textContent).toContain("Video unavailable");
+    expect((onChoice.mock.lastCall?.[0] as { url: string }[]).map((c) => c.url)).toEqual(["https://youtu.be/a", "https://youtu.be/c"]);
   });
 
   it("warns about rights and terms of service", async () => {
@@ -149,7 +170,7 @@ describe("NewProject with a YouTube link", () => {
     const { calls, onCreated } = await openLinkTab({ "/api/projects/from-youtube": () => json(project, 201) });
     const start = screen.getByRole("button", { name: /Download and start dubbing/ }) as HTMLButtonElement;
     expect(start.disabled).toBe(true);
-    fireEvent.change(await screen.findByLabelText("YouTube link"), { target: { value: "https://youtu.be/abc" } });
+    fireEvent.change(await screen.findByLabelText("YouTube links (one per line)"), { target: { value: "https://youtu.be/abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Check link" }));
     await screen.findByTestId("youtube-card");
     expect(start.disabled).toBe(false);
@@ -168,7 +189,7 @@ describe("NewProject with a YouTube link", () => {
     const { onCreated } = await openLinkTab({
       "/api/projects/from-youtube": () => json({ detail: "Required models are missing: Speech recognition" }, 409),
     });
-    fireEvent.change(await screen.findByLabelText("YouTube link"), { target: { value: "https://youtu.be/abc" } });
+    fireEvent.change(await screen.findByLabelText("YouTube links (one per line)"), { target: { value: "https://youtu.be/abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Check link" }));
     await screen.findByTestId("youtube-card");
     fireEvent.click(screen.getByRole("button", { name: /Download and start dubbing/ }));
@@ -180,7 +201,7 @@ describe("NewProject with a YouTube link", () => {
     await openLinkTab();
     fireEvent.click(screen.getByRole("tab", { name: "Video file" }));
     expect(screen.getByRole("button", { name: /Upload and start dubbing/ })).toBeTruthy();
-    expect(screen.queryByLabelText("YouTube link")).toBeNull();
+    expect(screen.queryByLabelText("YouTube links (one per line)")).toBeNull();
   });
 });
 
@@ -211,15 +232,15 @@ describe("YoutubeSource: a slow answer for an old link", () => {
     });
     const onChoice = vi.fn();
     render(<YoutubeSource onChoice={onChoice} />);
-    const input = await screen.findByLabelText("YouTube link");
+    const input = await screen.findByLabelText("YouTube links (one per line)");
     fireEvent.change(input, { target: { value: "https://youtu.be/AAA" } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
     await waitFor(() => expect(calls.some((c) => c.url === "/api/youtube/info")).toBe(true));
     fireEvent.change(input, { target: { value: "https://youtu.be/BBB" } }); // the user pastes another link
     answer(json({ ...INFO, title: "Video A" })); // the answer for the first one arrives late
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.queryByTestId("youtube-card")).toBeNull();
-    expect(onChoice).not.toHaveBeenCalledWith(expect.objectContaining({ url: "https://youtu.be/AAA" }));
+    expect(onChoice).not.toHaveBeenCalledWith([expect.objectContaining({ url: "https://youtu.be/AAA" })]);
     expect((screen.getByRole("button", { name: "Check link" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

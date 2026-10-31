@@ -19,9 +19,17 @@ const DOT: Record<string, string> = {
 
 export function ProjectList({ projects, selected, onSelect }: Props) {
   const t = useT();
+  // The queue is first come, first served: waiting jobs are numbered by their job id.
+  const waiting = projects
+    .filter((p) => p.latest_job?.status === "queued")
+    .sort((a, b) => (a.latest_job?.id ?? 0) - (b.latest_job?.id ?? 0))
+    .map((p) => p.id);
   return (
     <nav aria-label={t("Projects")} className="min-h-0">
-      <p className="eyebrow mb-2 px-3">{t("Projects")}</p>
+      <p className="eyebrow mb-2 px-3">
+        {t("Projects")}
+        {waiting.length > 0 && <span className="ml-2 normal-case tracking-normal">· {t("{n} waiting in the queue", { n: waiting.length })}</span>}
+      </p>
       <ul className="space-y-0.5">
         {projects.map((p) => {
           const active = selected === p.id;
@@ -40,7 +48,7 @@ export function ProjectList({ projects, selected, onSelect }: Props) {
                   <span className={`inline-block size-1.5 shrink-0 rounded-full ${DOT[p.latest_job?.status ?? ""] ?? "bg-line-strong"}`} />
                   {p.source_url && <Link2 className="size-3 shrink-0" aria-label={t("from YouTube")} />}
                   <span className="truncate">
-                    {t(statusLabel(p.latest_job))}
+                    {p.latest_job?.status === "queued" ? t("Waiting in queue (#{n})", { n: waiting.indexOf(p.id) + 1 }) : t(statusLabel(p.latest_job))}
                     {p.duration > 0 ? ` · ${formatTime(p.duration)}` : ""}
                   </span>
                 </span>

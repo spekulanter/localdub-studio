@@ -361,3 +361,24 @@ def test_the_models_page_and_pickers_can_be_asked_for_in_slovak(
     assert any(
         c["id"] == "parakeet-tdt-0.6b-v3" and "NVIDIA" in c["title"] for c in opts["asr_choices"]
     )
+
+
+def test_a_model_that_does_not_know_the_language_is_refused(client: TestClient, sample_mp4: Path):
+    def create(asr_id: str, lang: str):
+        with sample_mp4.open("rb") as fh:
+            return client.post(
+                "/api/projects",
+                files={"file": (sample_mp4.name, fh, "video/mp4")},
+                data={"start": "false", "asr_id": asr_id, "source_lang": lang},
+            )
+
+    assert create("whisper-small-en", "de").status_code == 422
+    assert create("parakeet-tdt-0.6b-v3", "ja").status_code == 422
+    assert create("parakeet-tdt-0.6b-v3", "pl").status_code == 201
+    assert create("whisper-large-v3", "ja").status_code == 201
+    opts = client.get("/api/options").json()
+    assert {"de", "it", "es", "ja", "zh", "ru", "uk", "pl", "hu", "en", "auto"} == set(
+        opts["source_languages"]
+    )
+    langs = {c["id"]: c["source_langs"] for c in opts["asr_choices"]}
+    assert langs["whisper-large-v3"] is None and langs["whisper-small-en"] == ["en"]

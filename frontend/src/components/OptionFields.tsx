@@ -88,6 +88,14 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
   const pytorchIntro = (size: string) => t("This needs an extra download of about {size} (PyTorch).", { size });
   const set = <K extends keyof Settings>(key: K, v: Settings[K]) => onChange({ ...value, [key]: v });
   const asrChoices = options.asr_choices ?? [];
+  const knows = (c: { source_langs: string[] | null }, lang: string) =>
+    c.source_langs === null || (lang !== "auto" && c.source_langs.includes(lang));
+  const chooseLanguage = (lang: string) => {
+    const current = asrChoices.find((c) => c.id === value.asr_id);
+    // a recognition model that does not know the new language is swapped for the default one
+    const asr = current && !knows(current, lang) ? options.default_asr : value.asr_id;
+    onChange({ ...value, source_lang: lang, asr_id: asr });
+  };
   const known = new Map((options.translation_choices ?? []).map((c) => [c.tag ?? c.id, c]));
   const installedInOllama = new Set(health?.ollama.models ?? []);
   const llmChoices = Array.from(new Set([value.llm_model, ...known.keys(), ...installedInOllama]));
@@ -101,7 +109,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
     <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
       <label className="text-sm">
         <span className="mb-1 block font-medium">{t("Spoken language in the video")}</span>
-        <select className={field} value={value.source_lang} disabled={lockSource} onChange={(e) => set("source_lang", e.target.value)}>
+        <select className={field} value={value.source_lang} disabled={lockSource} onChange={(e) => chooseLanguage(e.target.value)}>
           {Object.entries(options.source_languages).map(([code, name]) => (
             <option key={code} value={code}>
               {t(name)}
@@ -128,11 +136,11 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
       <label className="text-sm">
         <span className="mb-1 block font-medium">{t("Speech recognition")}</span>
         <select className={field} value={value.asr_id} onChange={(e) => set("asr_id", e.target.value)}>
-          {(asrChoices.some((c) => c.id === value.asr_id) ? asrChoices : [...asrChoices, { id: value.asr_id, title: value.asr_id, status: "available" as const, summary: "", tag: null, installed: false }]).map((c) => (
-            <option key={c.id} value={c.id}>
+          {(asrChoices.some((c) => c.id === value.asr_id) ? asrChoices : [...asrChoices, { id: value.asr_id, title: value.asr_id, status: "available" as const, summary: "", tag: null, source_langs: null, installed: false }]).map((c) => (
+            <option key={c.id} value={c.id} disabled={!knows(c, value.source_lang)}>
               {c.title}
               {c.status === "experimental" ? ` [${t("experimental")}]` : ""}
-              {c.installed ? "" : ` (${t("not downloaded")})`}
+              {knows(c, value.source_lang) ? (c.installed ? "" : ` (${t("not downloaded")})`) : ` (${t("does not know this language")})`}
             </option>
           ))}
         </select>

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from localdub.core.timeline.models import DialogueSegment, Word
 
-_SENTENCE_END = (".", "?", "!", "…", '."', '?"', '!"')
-_CLAUSE_END = (",", ";", ":", "—", "-")
+_SENTENCE_END = (".", "?", "!", "…", '."', '?"', '!"', "。", "！", "？")
+_CLAUSE_END = (",", ";", ":", "—", "-", "，", "、", "；", "：")
 
 
 def _ends(word: Word, suffixes: tuple[str, ...]) -> bool:

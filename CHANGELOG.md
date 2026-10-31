@@ -3,9 +3,16 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [0.3.1] - 2026-10-31
+## [0.4.0] - 2026-10-31
 
 ### Added
+- **More spoken languages.** Besides English: German, Italian, Spanish, Japanese, Chinese, Russian,
+  Ukrainian, Polish and Hungarian (or detect automatically). No extra download: Whisper already knows them.
+  Models that do not know a language (Whisper small.en, Parakeet for Japanese/Chinese) are greyed out and
+  refused by the server. Only English has been tested end to end; the other languages are unverified.
+- **Dark mode switch.** Theme: Automatic (follows Windows) / Light / Dark, remembered.
+- **Several YouTube links at once** (one per line); each becomes its own dub. Several video files could
+  already be added together. Dubs are processed one after another; the project list numbers the waiting ones.
 - **Slovak interface.** A language switch (English / Slovenčina) in the sidebar. It follows the Windows
   language on first start and remembers your choice. Model descriptions are translated too. The Slovak
   texts are first drafts: tell us what reads badly.
@@ -16,6 +23,7 @@ has not been tested before relying on a feature.
   the optional packages cannot be interrupted.
 
 ### Changed
+- The program and installer icon is orange, like the interface (it was violet).
 - Hugging Face downloads use plain HTTP (not the Xet transfer engine) so that they can be cancelled.
 
 ## [0.3.0] - 2026-10-31

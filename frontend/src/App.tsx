@@ -7,6 +7,7 @@ import { NewProject } from "./components/NewProject";
 import { ProjectList } from "./components/ProjectList";
 import { ProjectView } from "./components/ProjectView";
 import { LANGS, useI18n, type Lang } from "./i18n";
+import { useTheme, type ThemePref } from "./i18n/theme";
 
 type Selection = number | "new" | "models";
 
@@ -18,6 +19,7 @@ function selectionFromHash(hash: string): Selection {
 
 export default function App() {
   const { t, lang, setLang } = useI18n();
+  const { pref: theme, setPref: setTheme } = useTheme();
   const [options, setOptions] = useState<Options | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -135,6 +137,19 @@ export default function App() {
                 {l.label}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-muted">
+          {t("Theme")}
+          <select
+            className="field !w-auto !py-1 text-xs"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value as ThemePref)}
+            aria-label={t("Theme")}
+          >
+            <option value="system">{t("Automatic")}</option>
+            <option value="light">{t("Light")}</option>
+            <option value="dark">{t("Dark")}</option>
           </select>
         </label>
       </aside>

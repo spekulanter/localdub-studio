@@ -20,12 +20,12 @@ const options: Options = {
   default_llm: "translategemma:4b",
   default_asr: "whisper-large-v3",
   asr_choices: [
-    { id: "whisper-large-v3", title: "Whisper large-v3", status: "recommended", summary: "", tag: null, installed: true },
-    { id: "parakeet-tdt-0.6b-v3", title: "NVIDIA Parakeet", status: "experimental", summary: "", tag: null, installed: false },
+    { id: "whisper-large-v3", title: "Whisper large-v3", status: "recommended", summary: "", tag: null, source_langs: null, installed: true },
+    { id: "parakeet-tdt-0.6b-v3", title: "NVIDIA Parakeet", status: "experimental", summary: "", tag: null, source_langs: ["en"], installed: false },
   ],
   translation_choices: [
-    { id: "translategemma-4b", title: "TranslateGemma 4B", status: "recommended", summary: "", tag: "translategemma:4b", installed: true },
-    { id: "translategemma-12b", title: "TranslateGemma 12B", status: "available", summary: "", tag: "translategemma:12b", installed: false },
+    { id: "translategemma-4b", title: "TranslateGemma 4B", status: "recommended", summary: "", tag: "translategemma:4b", source_langs: null, installed: true },
+    { id: "translategemma-12b", title: "TranslateGemma 12B", status: "available", summary: "", tag: "translategemma:12b", source_langs: null, installed: false },
   ],
   stages: ["probe", "extract", "asr", "translate", "tts", "assemble", "export"],
   max_upload_mb: 1,

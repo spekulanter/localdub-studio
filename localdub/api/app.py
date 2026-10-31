@@ -52,7 +52,11 @@ from localdub.pipeline import STAGES, default_providers
 log = logging.getLogger(__name__)
 
 ALLOWED_SUFFIXES = {".mp4", ".m4v", ".mov", ".mkv"}
-SOURCE_LANGS = {"en": "English", "auto": "Auto-detect"}
+SOURCE_LANGS = {
+    "en": "English", "de": "German", "it": "Italian", "es": "Spanish", "ja": "Japanese",
+    "zh": "Chinese", "ru": "Russian", "uk": "Ukrainian", "pl": "Polish", "hu": "Hungarian",
+    "auto": "Auto-detect",
+}  # fmt: skip
 SEGMENT_FILES = [
     "segments.json",
     "voiced.json",
@@ -275,6 +279,16 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         entry = next((e for e in mgr.entries() if e.id == picked), None) if picked else None
         return str(entry.source["tag"]) if entry else settings.translation_model
 
+    def check_language(asr_id: str, source_lang: str) -> None:
+        """Some recognition models only know some languages: say so before a job is created."""
+        entry = next((e for e in mgr.entries() if e.id == asr_id), None)
+        if entry is not None and entry.source_langs and source_lang not in entry.source_langs:
+            raise HTTPException(
+                422,
+                f"{entry.title} does not support '{source_lang}'. "
+                "Pick another speech recognition model (for example Whisper large-v3).",
+            )
+
     def asr_choice(requested: str) -> str:
         """The catalogue id for a new dub: the request, else the user's default model."""
         if requested:
@@ -422,6 +436,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             )
         if source_lang not in SOURCE_LANGS:
             raise HTTPException(422, f"Unsupported source language '{source_lang}'")
+        check_language(asr_choice(asr_id), source_lang)
         if start:
             await asyncio.to_thread(require_models, asr_choice(asr_id), llm_model.strip() or None)
         voice = voice or settings.tts_voice
@@ -542,6 +557,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             raise HTTPException(
                 422, "Voice cloning needs your confirmation that you may imitate these voices"
             )
+        check_language(asr_choice(body.asr_id), body.source_lang)
         if body.start:
             await asyncio.to_thread(
                 require_models, asr_choice(body.asr_id), body.llm_model.strip() or None
@@ -583,7 +599,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
 
     @app.patch("/api/projects/{pid}")
     def patch_project(pid: int, patch: ProjectPatch) -> ProjectOut:
-        require_project(pid)
+        project_row = require_project(pid)
         if db.active_job(pid):
             raise HTTPException(409, "Cannot change settings while a job is queued or running")
         fields = patch.model_dump(exclude_none=True)
@@ -591,6 +607,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             fields["num_speakers"] = patch.num_speakers  # null = detect automatically
         if "asr_id" in fields:
             fields["asr_id"] = asr_choice(fields["asr_id"])
+            check_language(fields["asr_id"], str(project_row["source_lang"]))
         if "voice" in fields and fields["voice"] not in VOICES:
             raise HTTPException(422, f"Unknown voice '{fields['voice']}'")
         fields.pop("clone_consent", None)

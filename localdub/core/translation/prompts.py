@@ -8,7 +8,11 @@ import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 
-LANG_NAMES = {"en": "English", "sk": "Slovak", "cs": "Czech", "de": "German"}
+LANG_NAMES = {
+    "en": "English", "sk": "Slovak", "cs": "Czech", "de": "German", "it": "Italian",
+    "es": "Spanish", "ja": "Japanese", "zh": "Chinese", "ru": "Russian", "uk": "Ukrainian",
+    "pl": "Polish", "hu": "Hungarian",
+}  # fmt: skip
 
 TRANSLATION_SCHEMA = {
     "type": "object",
