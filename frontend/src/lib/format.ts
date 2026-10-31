@@ -49,9 +49,10 @@ export function isActive(job: Job | null): boolean {
  * Earliest pipeline stage that must run again after changing project settings, or null if
  * nothing that affects the output changed.
  */
-type Tunable = Pick<Project, "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers" | "clone_voice">;
+type Tunable = Pick<Project, "voice" | "llm_model" | "asr_id" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers" | "clone_voice">;
 
 export function restartStage(before: Tunable, after: Tunable): Stage | null {
+  if (before.asr_id !== after.asr_id) return "asr";
   if (before.diarize !== after.diarize || (after.diarize && before.num_speakers !== after.num_speakers)) return "diarize";
   if (before.llm_model !== after.llm_model) return "translate";
   if (before.voice !== after.voice) return "tts";

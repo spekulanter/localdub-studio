@@ -99,6 +99,25 @@ class ModelManager:
             raise ModelError("Download this model first, then it can be used.")
         self.state.set_selected(e.role, e.id)
 
+    def choices(self, role: str) -> list[dict[str, Any]]:
+        """Short rows for the pickers in the dub forms (installed or not)."""
+        ctx = self.ctx()
+        out = []
+        for e in self.entries():
+            if e.role != role:
+                continue
+            out.append(
+                {
+                    "id": e.id,
+                    "title": e.title,
+                    "status": e.status,
+                    "summary": e.summary,
+                    "tag": e.source.get("tag"),
+                    "installed": self.handler(e).installed(e, ctx),
+                }
+            )
+        return out
+
     # ----- readiness for a dub ---------------------------------------------------------------
     def missing_for(self, asr_id: str | None, llm_tag: str | None) -> list[str]:
         """Human-readable list of what a dub with these choices still needs (empty = ready)."""

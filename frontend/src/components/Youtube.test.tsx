@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Health, Job, ModelsResponse, Options, Project, YoutubeInfo, YoutubeStatus } from "../api";
+import { mkModel } from "../testing/models";
 import { NewProject } from "./NewProject";
 import { ProgressPanel } from "./ProgressPanel";
 import { YoutubeSource } from "./YoutubeSource";
@@ -38,7 +39,7 @@ describe("YoutubeSource", () => {
   it("asks for a one-time setup instead of a link while the tools are missing", async () => {
     const models: ModelsResponse = {
       busy: false, required_missing: [],
-      models: [{ id: "youtube", title: "YouTube import tools", description: "d", size_bytes: 70_000_000, required: false, group: "youtube", installed: false, available: true, download: null }],
+      models: [mkModel({ id: "youtube", title: "YouTube import tools", size_bytes: 70_000_000, required: false, group: "tools", role: "tools" })],
     };
     route({
       "/api/youtube/status": () => json({ ...STATUS, installed: false, yt_dlp: { available: false, version: null, error: null } }),
@@ -130,7 +131,8 @@ describe("YoutubeSource", () => {
 describe("NewProject with a YouTube link", () => {
   const options: Options = {
     voices: ["F1", "M1"], source_languages: { en: "English" }, target_language: "sk", default_voice: "F1",
-    default_llm: "translategemma:4b", stages: [], max_upload_mb: 100, separation_available: true,
+    default_llm: "translategemma:4b", default_asr: "whisper-large-v3", asr_choices: [], translation_choices: [],
+    stages: [], max_upload_mb: 100, separation_available: true,
   };
   const health: Health = { ok: true, ollama: { reachable: true, error: null, models: ["translategemma:4b"] } };
 

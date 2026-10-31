@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Health, Job, ModelInfo, ModelsResponse, Options, SegmentRow, SegmentsResponse } from "../api";
+import type { Health, Job, ModelInfo, Options, SegmentRow, SegmentsResponse } from "../api";
+import { mkModel, mkResponse } from "../testing/models";
 import { ModelsPanel } from "./ModelsPanel";
 import { InstallNotice } from "./InstallNotice";
 
@@ -17,6 +18,15 @@ const options: Options = {
   target_language: "sk",
   default_voice: "F1",
   default_llm: "translategemma:4b",
+  default_asr: "whisper-large-v3",
+  asr_choices: [
+    { id: "whisper-large-v3", title: "Whisper large-v3", status: "recommended", summary: "", tag: null, installed: true },
+    { id: "parakeet-tdt-0.6b-v3", title: "NVIDIA Parakeet", status: "experimental", summary: "", tag: null, installed: false },
+  ],
+  translation_choices: [
+    { id: "translategemma-4b", title: "TranslateGemma 4B", status: "recommended", summary: "", tag: "translategemma:4b", installed: true },
+    { id: "translategemma-12b", title: "TranslateGemma 12B", status: "available", summary: "", tag: "translategemma:12b", installed: false },
+  ],
   stages: ["probe", "extract", "asr", "translate", "tts", "assemble", "export"],
   max_upload_mb: 1,
   separation_available: false,
@@ -195,13 +205,35 @@ describe("voice cloning consent", () => {
 });
 
 describe("ModelsPanel", () => {
-  const model = (over: Partial<ModelInfo>): ModelInfo => ({
-    id: "whisper", title: "Speech recognition", description: "d", size_bytes: 3_000_000_000, required: true,
-    group: "core", installed: false, available: true, download: null, ...over,
-  });
-  const resp = (models: ModelInfo[], busy = false): ModelsResponse => ({
-    models, busy, required_missing: models.filter((m) => m.required && !m.installed).map((m) => m.id),
-  });
+  const model = mkModel;
+  const resp = mkResponse;
+  const roles = [
+    { id: "asr", title: "Speech recognition", description: "Listens.", required: true, selectable: true, selected_id: "whisper-large-v3" },
+    { id: "translation", title: "Translation", description: "Translates.", required: true, selectable: true, selected_id: null },
+  ];
+  const library = () =>
+    resp(
+      [
+        model({ installed: true, selected: true, can_delete: true, can_open_folder: true, locations: ["C:\\models\\w"], choose_if: ["You have 6 GB."] }),
+        model({ id: "parakeet-tdt-0.6b-v3", title: "NVIDIA Parakeet", status: "experimental", required: true, fits: { level: "cpu", text: "Runs on the processor." } }),
+        model({ id: "translategemma-12b", role: "translation", group: "translation", title: "TranslateGemma 12B", status: "available", size_bytes: 8_110_000_000, fits: { level: "partial", text: "Only part fits." }, required: true }),
+      ],
+      {
+        roles,
+        hardware: { gpu: { name: "RTX 5060 Laptop", vram_gb: 8, vram_free_gb: 7.5, driver: "1" }, ram_gb: 32, cpu_threads: 24, disk_free_bytes: 300e9, disk_total_bytes: 1e12 },
+        paths: { models: "C:\\models" },
+        catalog_version: "2026.10.31",
+      },
+    );
+  const stubApi = (calls: string[]) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        if (url.endsWith("/check-updates")) return new Response(JSON.stringify({ checked: 2, updates: ["whisper-large-v3"], errors: {} }));
+        return new Response(JSON.stringify({ ok: true, deleted: true, warnings: [], started: [], id: "x", opened: "x" }));
+      }),
+    );
 
   it("offers one button for all missing required models and shows the total size", () => {
     render(<ModelsPanel data={resp([model({}), model({ id: "tts", title: "Voice", size_bytes: 400_000_000 })])} onChanged={vi.fn()} />);
@@ -210,7 +242,7 @@ describe("ModelsPanel", () => {
 
   it("shows a progress bar with percent and bytes while downloading", () => {
     const dl = { status: "running" as const, done: 1_500_000_000, total: 3_000_000_000, message: "", error: null };
-    render(<ModelsPanel data={resp([model({ download: dl })], true)} onChanged={vi.fn()} />);
+    render(<ModelsPanel data={resp([model({ download: dl })], { busy: true })} onChanged={vi.fn()} />);
     const bar = screen.getByRole("progressbar", { name: /Download of Speech recognition/ });
     expect(bar.getAttribute("aria-valuenow")).toBe("50");
     expect(screen.getByText(/50% · 1\.5 GB of 3\.0 GB/)).toBeTruthy();
@@ -227,6 +259,80 @@ describe("ModelsPanel", () => {
     render(<ModelsPanel data={resp([model({ installed: true }), model({ id: "separation", title: "Separation", required: false, available: false })])} onChanged={vi.fn()} />);
     expect(screen.getByText("✓ installed")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Download with the optional packages" })).toBeTruthy();
+  });
+
+  it("is a library: roles with descriptions, status, fit for this computer and the choose-if advice", () => {
+    render(<ModelsPanel data={library()} onChanged={vi.fn()} />);
+    expect(screen.getByRole("region", { name: "Speech recognition" })).toBeTruthy();
+    expect(screen.getByText("Translates.")).toBeTruthy();
+    expect(screen.getByText(/RTX 5060 Laptop, 8 GB/)).toBeTruthy();
+    expect(screen.getByText("Experimental")).toBeTruthy();
+    expect(screen.getByText("Only partly fits your card")).toBeTruthy();
+    expect(screen.getByText("Runs on the processor")).toBeTruthy();
+    expect(screen.getByText("In use for new dubs")).toBeTruthy();
+    expect(screen.getByText("You have 6 GB.")).toBeTruthy();
+    expect(screen.getByText(/Model list version 2026\.10\.31/)).toBeTruthy();
+  });
+
+  it("makes an installed model the default, and asks before deleting it", async () => {
+    const calls: string[] = [];
+    stubApi(calls);
+    const data = library();
+    data.models.push(model({ id: "whisper-small-en", title: "Whisper small", installed: true, required: true }));
+    render(<ModelsPanel data={data} onChanged={vi.fn()} />);
+    const small = within(screen.getByTestId("model-whisper-small-en"));
+    fireEvent.click(small.getByRole("button", { name: "Use for new dubs" }));
+    await waitFor(() => expect(calls).toContain("POST /api/models/whisper-small-en/select"));
+
+    const big = within(screen.getByTestId("model-whisper-large-v3"));
+    fireEvent.click(big.getByRole("button", { name: "Delete" }));
+    expect(calls.some((c) => c.startsWith("DELETE"))).toBe(false); // nothing happens without a confirmation
+    fireEvent.click(big.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(big.getByRole("button", { name: "Delete" }));
+    fireEvent.click(big.getByRole("button", { name: "Yes, delete" }));
+    await waitFor(() => expect(calls).toContain("DELETE /api/models/whisper-large-v3"));
+    vi.unstubAllGlobals();
+  });
+
+  it("warns that deleting an Ollama model affects other programs too", () => {
+    const data = resp([model({ id: "translategemma-4b", role: "translation", title: "TG 4B", installed: true, can_delete: true, store_note: "Stored by Ollama" })], { roles });
+    render(<ModelsPanel data={data} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.getByText(/other programs lose this model too/)).toBeTruthy();
+    expect(screen.getByText(/only one installed for this step/)).toBeTruthy();
+  });
+
+  it("checks for updates only on request and reports the result", async () => {
+    const calls: string[] = [];
+    stubApi(calls);
+    render(<ModelsPanel data={library()} onChanged={vi.fn()} />);
+    expect(calls).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+    expect(await screen.findByText(/2 installed models checked: 1 can be updated/)).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it("offers an update and a re-download for installed models", async () => {
+    const calls: string[] = [];
+    stubApi(calls);
+    const data = resp([model({ installed: true, can_delete: true, update: { supported: true, available: true, checked_at: 1, error: null } })], { roles });
+    render(<ModelsPanel data={data} onChanged={vi.fn()} />);
+    expect(screen.getByText("Update available")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
+    await waitFor(() => expect(calls).toContain("POST /api/models/whisper-large-v3/update"));
+    fireEvent.click(screen.getByRole("button", { name: "Re-download" }));
+    await waitFor(() => expect(calls).toContain("POST /api/models/whisper-large-v3/repair"));
+    vi.unstubAllGlobals();
+  });
+
+  it("adds an Ollama model by name", async () => {
+    const calls: string[] = [];
+    stubApi(calls);
+    render(<ModelsPanel data={library()} onChanged={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Add an Ollama model by name/), { target: { value: "gemma3:12b" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(calls).toContain("POST /api/models/custom-ollama"));
+    vi.unstubAllGlobals();
   });
 });
 
@@ -254,12 +360,10 @@ describe("start is blocked while required models are missing", () => {
 });
 
 describe("InstallNotice (install the optional packages without commands)", () => {
-  const row = (over: Partial<ModelInfo>): ModelInfo => ({
-    id: "packages", title: "Optional packages", description: "d", size_bytes: 2_900_000_000, required: false,
-    group: "packages", installed: false, available: true, download: null, ...over,
-  });
+  const row = (over: Partial<ModelInfo>): ModelInfo =>
+    mkModel({ id: "packages", title: "Optional packages", size_bytes: 2_900_000_000, required: false, group: "tools", role: "tools", ...over });
   const sep = (over: Partial<ModelInfo> = {}) =>
-    row({ id: "separation", title: "Separation", size_bytes: 80_000_000, group: "separation", available: false, ...over });
+    row({ id: "separation", title: "Separation", size_bytes: 80_000_000, group: "separation", role: "separation", available: false, ...over });
   const reply = (models: ModelInfo[]) =>
     new Response(JSON.stringify({ models, required_missing: [], busy: false }), { status: 200 });
 

@@ -24,6 +24,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
     source_lang: "en",
     voice: options.default_voice,
     llm_model: options.default_llm,
+    asr_id: options.default_asr,
     original_audio: "duck",
     keep_original_track: true,
     diarize: false,
@@ -52,6 +53,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
           source_lang: settings.source_lang,
           voice: settings.voice,
           llm_model: settings.llm_model,
+          asr_id: settings.asr_id,
           original_audio: settings.original_audio,
           keep_original_track: settings.keep_original_track,
           diarize: settings.diarize,
@@ -81,6 +83,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
       form.set("source_lang", settings.source_lang);
       form.set("voice", settings.voice);
       form.set("llm_model", settings.llm_model);
+      form.set("asr_id", settings.asr_id);
       form.set("original_audio", settings.original_audio);
       form.set("keep_original_track", String(settings.keep_original_track));
       form.set("diarize", String(settings.diarize));

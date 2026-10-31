@@ -258,13 +258,22 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             "source_languages": SOURCE_LANGS,
             "target_language": "sk",
             "default_voice": settings.tts_voice,
-            "default_llm": settings.translation_model,
+            "default_llm": default_llm(),
+            "default_asr": asr_choice(""),
+            "asr_choices": mgr.choices("asr"),
+            "translation_choices": mgr.choices("translation"),
             "stages": STAGES,
             "max_upload_mb": settings.max_upload_mb,
             "separation_available": separation_available(),
         }
 
     # ----- models ------------------------------------------------------------------------
+    def default_llm() -> str:
+        """The translation model new dubs start with: the user's pick, else the setting."""
+        picked = mgr.state.selected("translation")
+        entry = next((e for e in mgr.entries() if e.id == picked), None) if picked else None
+        return str(entry.source["tag"]) if entry else settings.translation_model
+
     def asr_choice(requested: str) -> str:
         """The catalogue id for a new dub: the request, else the user's default model."""
         if requested:
@@ -421,7 +430,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             duration=0.0,
             source_lang=source_lang,
             voice=voice,
-            llm_model=llm_model.strip() or settings.translation_model,
+            llm_model=llm_model.strip() or default_llm(),
             asr_id=asr_choice(asr_id),
             original_audio=original_audio,
             keep_original_track=int(keep_original_track),
@@ -543,7 +552,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             duration=float(info.duration or 0.0),
             source_lang=body.source_lang,
             voice=voice,
-            llm_model=body.llm_model.strip() or settings.translation_model,
+            llm_model=body.llm_model.strip() or default_llm(),
             asr_id=asr_choice(body.asr_id),
             original_audio=body.original_audio,
             keep_original_track=int(body.keep_original_track),

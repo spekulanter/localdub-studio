@@ -3,6 +3,26 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.3.0] - 2026-10-31
+
+### Added
+- **AI model library.** The AI models page is now a library: every model has a description, who should
+  choose it and who should skip it, what it needs, whether it fits *your* graphics card, its licence and
+  what we actually measured. Download only what you want; make an installed model the default for new dubs.
+- **More models.** TranslateGemma 12B and 27B (for bigger graphics cards), Whisper large-v3 turbo and
+  small.en, and NVIDIA Parakeet TDT 0.6B v3 (experimental; runs on the processor). Any Ollama model can be
+  added by name.
+- **Speech recognition per dub.** Each dub remembers its recognition model; changing it re-runs from that step.
+- **Managing models.** Check for updates on request (nothing is checked in the background), update,
+  re-download a damaged model, open its folder, delete with a confirmation, see where everything is stored
+  and how much space it takes.
+
+### Changed
+- Models are looked up from a shipped catalogue (`catalog.json`), so new models can arrive with updates.
+- Hugging Face downloads now go to the program's own models folder.
+- Parakeet vs Whisper on 4 English clips: 0 to 6% of words differ, mostly punctuation, and it misheard rare
+  names; speed on our laptop was similar. Whisper large-v3 stays the default.
+
 ## [0.2.0] - 2026-10-30
 
 ### Added

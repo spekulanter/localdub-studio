@@ -8,6 +8,7 @@ export interface Settings {
   source_lang: string;
   voice: string;
   llm_model: string;
+  asr_id: string;
   original_audio: OriginalAudio;
   keep_original_track: boolean;
   diarize: boolean;
@@ -33,7 +34,16 @@ const field = "field";
 export function OptionFields({ options, health, value, onChange, lockSource, disabled, onPackagesInstalled }: Props) {
   const packagesInstalled = onPackagesInstalled ?? (() => undefined);
   const set = <K extends keyof Settings>(key: K, v: Settings[K]) => onChange({ ...value, [key]: v });
-  const llmChoices = Array.from(new Set([value.llm_model, ...(health?.ollama.models ?? [])]));
+  const asrChoices = options.asr_choices ?? [];
+  const known = new Map((options.translation_choices ?? []).map((c) => [c.tag ?? c.id, c]));
+  const installedInOllama = new Set(health?.ollama.models ?? []);
+  const llmChoices = Array.from(new Set([value.llm_model, ...known.keys(), ...installedInOllama]));
+  const llmLabel = (m: string) => {
+    const c = known.get(m);
+    const ready = installedInOllama.has(m) || installedInOllama.has(`${m}:latest`);
+    const status = c && c.status !== "available" && c.status !== "custom" ? ` [${c.status.replace("_", " ")}]` : "";
+    return `${c ? c.title : m}${status}${health && !ready ? " (not downloaded)" : ""}`;
+  };
   return (
     <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
       <label className="text-sm">
@@ -57,12 +67,24 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
         </select>
       </label>
       <label className="text-sm">
+        <span className="mb-1 block font-medium">Speech recognition</span>
+        <select className={field} value={value.asr_id} onChange={(e) => set("asr_id", e.target.value)}>
+          {(asrChoices.some((c) => c.id === value.asr_id) ? asrChoices : [...asrChoices, { id: value.asr_id, title: value.asr_id, status: "available" as const, summary: "", tag: null, installed: false }]).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.title}
+              {c.status === "experimental" ? " [experimental]" : ""}
+              {c.installed ? "" : " (not downloaded)"}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-xs text-muted">Choose and download models on the AI models page.</span>
+      </label>
+      <label className="text-sm">
         <span className="mb-1 block font-medium">Translation model (Ollama)</span>
         <select className={field} value={value.llm_model} onChange={(e) => set("llm_model", e.target.value)}>
           {llmChoices.map((m) => (
             <option key={m} value={m}>
-              {m}
-              {health && !health.ollama.models.includes(m) ? " (not installed)" : ""}
+              {llmLabel(m)}
             </option>
           ))}
         </select>

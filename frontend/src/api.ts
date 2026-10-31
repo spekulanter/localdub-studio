@@ -25,6 +25,7 @@ export interface Project {
   source_lang: string;
   voice: string;
   llm_model: string;
+  asr_id: string;
   original_audio: OriginalAudio;
   keep_original_track: boolean;
   diarize: boolean;
@@ -45,6 +46,9 @@ export interface Options {
   target_language: string;
   default_voice: string;
   default_llm: string;
+  default_asr: string;
+  asr_choices: ModelChoice[];
+  translation_choices: ModelChoice[];
   stages: Stage[];
   max_upload_mb: number;
   separation_available: boolean;
@@ -109,23 +113,85 @@ export interface ModelDownload {
   show_bytes?: boolean;
 }
 
+export interface Fit {
+  level: "ok" | "partial" | "too_big" | "cpu" | "no_gpu";
+  text: string;
+}
+
 export interface ModelInfo {
   id: string;
+  role: string;
   title: string;
-  description: string;
+  summary: string;
+  choose_if: string[];
+  avoid_if: string[];
+  requirements: {
+    vram_gb: number | null;
+    disk_gb: number;
+    runs_on: string;
+    note: string;
+    needs_packages: boolean;
+  };
   size_bytes: number;
+  license: { name: string; url: string };
+  status: "recommended" | "available" | "experimental" | "not_recommended" | "custom";
+  measured: string | null;
+  languages: string | null;
+  pinned: string | null;
+  custom: boolean;
+  default: boolean;
   required: boolean;
   group: string;
   installed: boolean;
   /** false when the optional PyTorch packages are missing */
   available: boolean;
+  /** the model new dubs use for its role */
+  selected: boolean;
+  fits: Fit;
   download: ModelDownload | null;
+  locations: string[];
+  store_note: string | null;
+  size_on_disk: number | null;
+  update: { supported: boolean; available: boolean; checked_at: number | null; error: string | null };
+  can_delete: boolean;
+  can_open_folder: boolean;
+}
+
+export interface ModelRole {
+  id: string;
+  title: string;
+  description: string;
+  required: boolean;
+  selectable: boolean;
+  selected_id: string | null;
+}
+
+export interface HardwareInfo {
+  gpu: { name: string; vram_gb: number; vram_free_gb: number; driver: string } | null;
+  ram_gb: number | null;
+  cpu_threads: number;
+  disk_free_bytes: number;
+  disk_total_bytes: number;
 }
 
 export interface ModelsResponse {
+  catalog_version?: string;
+  roles?: ModelRole[];
   models: ModelInfo[];
   required_missing: string[];
   busy: boolean;
+  hardware?: HardwareInfo;
+  paths?: Record<string, string>;
+  models_bytes?: number | null;
+}
+
+export interface ModelChoice {
+  id: string;
+  title: string;
+  status: ModelInfo["status"];
+  summary: string;
+  tag: string | null;
+  installed: boolean;
 }
 
 export interface ToolState {
@@ -192,7 +258,16 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   health: () => request<Health>("/api/health"),
-  models: () => request<ModelsResponse>("/api/models"),
+  models: (sizes = false) => request<ModelsResponse>(sizes ? "/api/models?sizes=true" : "/api/models"),
+  selectModel: (id: string) => request<{ ok: boolean }>(`/api/models/${encodeURIComponent(id)}/select`, json("POST", {})),
+  deleteModel: (id: string) =>
+    request<{ deleted: boolean; warnings: string[] }>(`/api/models/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  modelAction: (id: string, action: "update" | "repair") =>
+    request<{ started: string[] }>(`/api/models/${encodeURIComponent(id)}/${action}`, json("POST", {})),
+  checkModelUpdates: () =>
+    request<{ checked: number; updates: string[]; errors: Record<string, string> }>("/api/models/check-updates", json("POST", {})),
+  addOllamaModel: (tag: string) => request<{ id: string }>("/api/models/custom-ollama", json("POST", { tag })),
+  openModelsFolder: (id?: string) => request<{ opened: string }>("/api/models/open-folder", json("POST", id ? { id } : {})),
   youtubeStatus: () => request<YoutubeStatus>("/api/youtube/status"),
   youtubeInfo: (url: string, cookies_browser: string) =>
     request<YoutubeInfo>("/api/youtube/info", json("POST", { url, cookies_browser })),
@@ -208,7 +283,7 @@ export const api = {
   project: (id: number) => request<Project>(`/api/projects/${id}`),
   createProject: (form: FormData) =>
     request<Project>("/api/projects", { method: "POST", body: form }),
-  patchProject: (id: number, patch: Partial<Pick<Project, "name" | "voice" | "llm_model" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers" | "clone_voice">> & { clone_consent?: boolean }) =>
+  patchProject: (id: number, patch: Partial<Pick<Project, "name" | "voice" | "llm_model" | "asr_id" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers" | "clone_voice">> & { clone_consent?: boolean }) =>
     request<Project>(`/api/projects/${id}`, json("PATCH", patch)),
   deleteProject: (id: number) => request<void>(`/api/projects/${id}`, { method: "DELETE" }),
   startJob: (projectId: number, fromStage?: Stage) =>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Job } from "../api";
 import { formatTime, isActive, restartStage, statusLabel } from "./format";
 
-const base = { voice: "F1", llm_model: "m", original_audio: "duck", keep_original_track: true, diarize: false, clone_voice: false, num_speakers: null } as const;
+const base = { voice: "F1", llm_model: "m", asr_id: "whisper-large-v3", original_audio: "duck", keep_original_track: true, diarize: false, clone_voice: false, num_speakers: null } as const;
 
 describe("formatTime", () => {
   it("formats m:ss", () => {
@@ -21,6 +21,7 @@ describe("restartStage", () => {
     expect(restartStage(base, { ...base, keep_original_track: false })).toBe("export");
     expect(restartStage(base, { ...base, voice: "M1", original_audio: "mute" })).toBe("tts");
     expect(restartStage(base, { ...base, llm_model: "x", voice: "M1" })).toBe("translate");
+    expect(restartStage(base, { ...base, asr_id: "parakeet-tdt-0.6b-v3", llm_model: "x", diarize: true })).toBe("asr");
     expect(restartStage(base, { ...base, diarize: true, llm_model: "x" })).toBe("diarize");
     expect(restartStage({ ...base, diarize: true }, { ...base, diarize: true, num_speakers: 3 })).toBe("diarize");
     expect(restartStage(base, { ...base, num_speakers: 3 })).toBeNull(); // ignored while diarization is off
@@ -45,7 +46,7 @@ describe("job helpers", () => {
 });
 
 describe("voice cloning restart", () => {
-  const b = { voice: "F1", llm_model: "m", original_audio: "duck", keep_original_track: true, diarize: false, clone_voice: false, num_speakers: null } as const;
+  const b = { voice: "F1", llm_model: "m", asr_id: "whisper-large-v3", original_audio: "duck", keep_original_track: true, diarize: false, clone_voice: false, num_speakers: null } as const;
   it("only needs the convert step", () => {
     expect(restartStage(b, { ...b, clone_voice: true })).toBe("convert");
     expect(restartStage({ ...b, clone_voice: true }, b)).toBe("convert");

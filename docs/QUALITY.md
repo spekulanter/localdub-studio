@@ -291,3 +291,20 @@ updater is used for updates (it does its own verification).
 **Not tested:** age-restricted or members-only videos and the cookies option (needs an account), videos behind
 a PO-token requirement, region-locked videos, very long videos, Firefox/Chrome cookie access (Chrome may block
 it), and YouTube changes after today (yt-dlp has to be updated then).
+
+## Speech recognition models (0.3.0)
+
+Measured on this laptop (RTX 5060 8 GB) with four English clips (44 s, 50 s, 53 s, 5.7 min); Whisper
+large-v3 is the reference, so "difference" means disagreement with it, not an error rate against a
+transcript:
+
+| Model | Result |
+|---|---|
+| Parakeet TDT 0.6B v3 (sherpa-onnx int8, CPU) | 0.0%, 1.1%, 3.1% and 5.8% of words differ. Mostly punctuation and sentence ends; mishears rare names ("Palak Paneer" → "Palek Paner"). A full dub with it ran end to end. |
+| Speed | Both ran at about 0.4× real time during the test (the laptop was in a power-saving state; the earlier 0.06–0.09× for Whisper was not reproduced). So no speed advantage for Parakeet was shown. |
+| Whisper large-v3 turbo, small.en | Not measured. |
+| TranslateGemma 12B / 27B | Not measured; 12B needs about 9 GB of graphics memory, so it only partly fits this laptop. To be rated on the desktop RTX 5070 Ti. |
+
+Only English was tested. Parakeet's other languages are the maker's claim.
+Model management flows (download, update check, delete) were exercised against the real Ollama registry and
+Hugging Face with small models (all-minilm, faster-whisper tiny.en).

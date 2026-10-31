@@ -29,6 +29,9 @@ LocalDub Studio incorporates the following third-party components. This document
 | CTranslate2 | Efficient inference engine | 4.8.4 | MIT | [PyPI](https://pypi.org/project/ctranslate2/4.8.4/) | Yes |
 | OpenAI Whisper large-v3 weights | Original Whisper model weights | large-v3 | Apache-2.0 | [HuggingFace](https://huggingface.co/openai/whisper-large-v3) | Yes (downloaded) |
 | Systran/faster-whisper-large-v3 | CTranslate2-converted Whisper weights | large-v3 | MIT | [HuggingFace](https://huggingface.co/Systran/faster-whisper-large-v3) | Yes (downloaded) |
+| Systran/faster-whisper-small.en | Small English-only Whisper (optional) | main | MIT | [HuggingFace](https://huggingface.co/Systran/faster-whisper-small.en) | Yes (downloaded on request) |
+| dropbox-dash/faster-whisper-large-v3-turbo | Whisper large-v3 turbo (optional; formerly mobiuslabsgmbh/…) | main | MIT | [HuggingFace](https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo) | Yes (downloaded on request) |
+| **NVIDIA Parakeet TDT 0.6B v3** (sherpa-onnx int8 build) | Experimental speech recognition (optional) | SHA-256 5793d0fd…b16bf | **CC BY 4.0** — attribution: "parakeet-tdt-0.6b-v3 by NVIDIA, converted to ONNX by the k2-fsa/sherpa-onnx project" | [GitHub release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) | Yes (downloaded on request, checksum-verified) |
 | Silero VAD | Voice activity detection (bundled in faster-whisper) | bundled | MIT | [GitHub](https://github.com/snakers4/silero-vad) | Yes |
 
 ### Speech Synthesis (TTS)
