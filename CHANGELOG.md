@@ -3,7 +3,7 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [Unreleased]
+## [0.4.2] - 2026-10-31
 
 ### Changed
 - AI models page: the model that the "Download the required models" button fetches for each required
