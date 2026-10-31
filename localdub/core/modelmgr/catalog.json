@@ -156,7 +156,7 @@
         "name": "large-v3-turbo"
       },
       "sk": {
-        "summary": "Asi poloviečná veľkosť a rýchlejšie než large-v3; pri ťažkom zvuku trochu menej presné.",
+        "summary": "Asi polovičná veľkosť a rýchlejšie než large-v3; pri ťažkom zvuku trochu menej presné.",
         "choose_if": [
           "Chcete rýchlejšie rozpoznávanie alebo máte len 4 až 6 GB pamäte grafickej karty.",
           "Vaše videá majú čistú reč."
