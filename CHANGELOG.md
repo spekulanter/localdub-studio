@@ -6,6 +6,8 @@ has not been tested before relying on a feature.
 ## [0.4.1] - 2026-10-31
 
 ### Fixed
+- After downloading a model, the pickers on the New dub page kept saying "(not downloaded)" until the page was
+  reloaded. They now refresh when a download ends and when another page is opened.
 - The desktop and Start-menu icon stayed violet after updating because Windows caches icons by file name.
   The icon file has a new name and Setup asks Windows to refresh its icon cache.
 

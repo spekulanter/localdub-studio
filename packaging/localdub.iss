@@ -283,14 +283,15 @@ begin
       Result := MsgBox('The Microsoft Edge WebView2 runtime was not found. LocalDub Studio will then open in your web browser instead of its own window.' + #13#10#13#10 + 'Windows 11 includes it; for Windows 10 download "WebView2 Runtime" from Microsoft.' + #13#10#13#10 + 'Continue anyway?', mbConfirmation, MB_YESNO) = IDYES;
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
+{ Runs before Setup writes anything (also for silent setups). The old version has to be removed here:
+  Setup creates its uninstall files as soon as it starts installing. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  Uv, EnvPrefix: String;
   ResultCode, I: Integer;
 begin
-  if CurStep = ssDone then
-    Log('Setup is done');
-  if (CurStep = ssInstall) and (OldVersion <> '') then
+  Result := '';
+  if OldVersion = '' then
+    Exit;
   begin
     Log('Existing installation ' + OldVersion + ', mode: ' + InstallMode);
     { files that a newer version no longer ships must not linger (old modules, old web assets) }
@@ -322,6 +323,14 @@ begin
       DelTree(ExpandConstant('{app}\python'), True, True, True);
     end;
   end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Uv, EnvPrefix: String;
+begin
+  if CurStep = ssDone then
+    Log('Setup is done');
   if CurStep <> ssPostInstall then
     Exit;
   Log('Post-install started');

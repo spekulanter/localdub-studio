@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Health, type ModelsResponse, type Options, type Project } from "./api";
 import { Cpu, Plus } from "lucide-react";
 import { Logo } from "./components/Logo";
@@ -61,6 +61,16 @@ export default function App() {
 
   // Poll while a download runs so the progress bars move.
   const downloading = models?.busy ?? false;
+  // The pickers in the dub forms list which models are downloaded: reload them when a download ends and
+  // whenever another page is opened, so "(not downloaded)" never outlives the download.
+  const wasDownloading = useRef(false);
+  useEffect(() => {
+    if (wasDownloading.current && !downloading) refreshOptions();
+    wasDownloading.current = downloading;
+  }, [downloading, refreshOptions]);
+  useEffect(() => {
+    refreshOptions();
+  }, [selected, refreshOptions]);
   useEffect(() => {
     if (!downloading) return;
     const t = window.setInterval(refreshModels, 1000);
