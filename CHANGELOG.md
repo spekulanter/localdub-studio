@@ -8,6 +8,8 @@ has not been tested before relying on a feature.
 ### Changed
 - AI models page: the model that the "Download the required models" button fetches for each required
   step now carries a "Required" label instead of "Recommended".
+- AI models page: the disk space of every downloaded model is shown on its card, plus the total of all
+  downloaded models, measured automatically (no need to press a button).
 - Qwen3 8B removed from the model list (not recommended for Slovak; it can still be added by name).
 
 ## [0.4.1] - 2026-10-31

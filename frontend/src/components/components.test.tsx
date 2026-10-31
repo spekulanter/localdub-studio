@@ -306,7 +306,7 @@ describe("ModelsPanel", () => {
     const calls: string[] = [];
     stubApi(calls);
     render(<ModelsPanel data={library()} onChanged={vi.fn()} />);
-    expect(calls).toEqual([]);
+    expect(calls.filter((c) => !c.includes("sizes=true"))).toEqual([]); // the local disk measurement is fine
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     expect(await screen.findByText(/2 installed models checked: 1 can be updated/)).toBeTruthy();
     vi.unstubAllGlobals();

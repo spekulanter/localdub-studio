@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ModelInfo, ModelRole, ModelsResponse } from "../api";
 import { api } from "../api";
 import { useT } from "../i18n";
@@ -172,6 +172,7 @@ function Card({
               </span>
             )}
             {m.installed && <span className="chip chip-ok">{t("✓ installed")}</span>}
+            {m.installed && m.size_on_disk !== null && <span className="chip">{formatBytes(m.size_on_disk)}</span>}
             {m.selected && role?.selectable && <span className="chip chip-ok">{t("In use for new dubs")}</span>}
             {m.update.available && <span className="chip chip-warn">{t("Update available")}</span>}
             <span className={FIT_CLASS[m.fits.level] ?? "chip"} title={m.fits.text}>
@@ -263,6 +264,17 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
   const [problem, setProblem] = useState<string | null>(null);
   const [tag, setTag] = useState("");
   const [sizes, setSizes] = useState<ModelsResponse | null>(null);
+  // measured automatically, again whenever the set of installed models or a download changes
+  const installedKey = data ? data.models.filter((m) => m.installed).map((m) => m.id).join(",") + (data.busy ? "!" : "") : "";
+  useEffect(() => {
+    if (!data || data.busy) return;
+    let alive = true;
+    api.models(true).then((r) => alive && Array.isArray(r?.models) && setSizes(r)).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [installedKey]);
   if (!data) return <p className="text-muted">{t("Loading…")}</p>;
   const view = sizes ? { ...data, models: data.models.map((m) => ({ ...m, size_on_disk: sizes.models.find((x) => x.id === m.id)?.size_on_disk ?? m.size_on_disk })) } : data;
   const missing = data.models.filter((m) => m.required && data.required_missing.includes(m.id));
@@ -333,11 +345,17 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
               className="btn-ghost btn-sm"
               onClick={() => run(() => api.models(true), (r) => setSizes(r as ModelsResponse))}
             >
-              {t("Measure disk usage")}
+              {t("Measure disk usage again")}
             </button>
           </div>
-          {sizes && typeof sizes.models_bytes === "number" && (
-            <p className="mt-1 text-xs text-muted">{t("Models folder in total: {size} (Ollama's own store is separate).", { size: formatBytes(sizes.models_bytes) })}</p>
+          {sizes && (
+            <p className="mt-1 text-xs text-muted">
+              {t("All installed models together: {size}.", {
+                size: formatBytes(view.models.reduce((a, m) => a + (m.installed ? (m.size_on_disk ?? 0) : 0), 0)),
+              })}
+              {typeof sizes.models_bytes === "number" &&
+                ` ${t("Models folder in total: {size} (Ollama's own store is separate).", { size: formatBytes(sizes.models_bytes) })}`}
+            </p>
           )}
         </div>
       )}
