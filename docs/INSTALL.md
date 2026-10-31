@@ -63,6 +63,12 @@ Your projects and results are in `%LOCALAPPDATA%\LocalDub Studio\data`, the mode
 `...\models` and the optional packages in `...\extras`; both survive an upgrade. Logs: `...\data\logs`. The
 program only listens on `127.0.0.1`.
 
+## Installing a newer version over an old one
+Run the new Setup. If LocalDub Studio is already installed it asks: **Update** (default), **Repair**
+(reinstall the program and its libraries from scratch, for a broken installation) or **Remove the old version
+first, then install**. Your projects, models and settings are kept in all three. For unattended installs add
+`/MODE=update`, `/MODE=repair` or `/MODE=fresh`.
+
 ## Uninstall
 *Settings → Apps → LocalDub Studio → Uninstall*. It asks whether to delete your data, the
 downloaded models and the optional packages. The small YouTube tools are removed without asking. FFmpeg and

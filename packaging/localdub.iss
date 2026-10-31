@@ -1,4 +1,6 @@
 ; LocalDub Studio installer (Inno Setup 6). Build with: uv run python packaging/build_release.py
+; The icon file has a new name on purpose: Windows caches icons by path, so a changed picture under
+; the old name would keep showing the old one on shortcuts.
 ; The build script copies tools\uv.exe next to this file and passes /DAppVersion=x.y.z.
 
 #ifndef AppVersion
@@ -25,8 +27,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\release
 OutputBaseFilename=LocalDub-Studio-{#AppVersion}-Setup
-SetupIconFile=..\localdub\assets\localdub.ico
-UninstallDisplayIcon={app}\localdub\assets\localdub.ico
+SetupIconFile=..\localdub\assets\localdub-orange.ico
+UninstallDisplayIcon={app}\localdub\assets\localdub-orange.ico
 UninstallDisplayName={#AppName}
 InfoBeforeFile=setup-info.txt
 WizardStyle=modern
@@ -34,6 +36,8 @@ Compression=lzma2
 SolidCompression=yes
 CloseApplications=no
 DiskSpanning=no
+; Makes Windows refresh its icon cache when the shortcuts change.
+ChangesAssociations=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -55,8 +59,8 @@ Source: "installed.marker"; DestDir: "{app}"; DestName: ".installed"; Flags: ign
 Source: "THIRD-PARTY-uv.txt"; DestDir: "{app}\tools"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\localdub\assets\localdub.ico"
-Name: "{autodesktop}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\localdub\assets\localdub.ico"; Tasks: desktopicon
+Name: "{autoprograms}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\localdub\assets\localdub-orange.ico"
+Name: "{autodesktop}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\localdub\assets\localdub-orange.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{#AppExe}"; WorkingDir: "{app}"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent runasoriginaluser; Check: AppInstalled
@@ -73,7 +77,43 @@ Type: files; Name: "{app}\.installed"
 [Code]
 var
   ProgressPage: TOutputMarqueeProgressWizardPage;
+  ModePage: TInputOptionWizardPage;
   Problems: String;
+  OldVersion, OldUninstaller: String;
+
+const
+  UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6E0B8F6E-3B1D-4C52-9E0A-7C6F0B7D4A11}_is1';
+
+procedure FindOldInstall;
+var
+  Raw: String;
+begin
+  OldVersion := '';
+  OldUninstaller := '';
+  if RegQueryStringValue(HKLM, UninstallKey, 'UninstallString', Raw) then
+  begin
+    OldUninstaller := RemoveQuotes(Raw);
+    if not RegQueryStringValue(HKLM, UninstallKey, 'DisplayVersion', OldVersion) then
+      OldVersion := '?';
+  end;
+end;
+
+{ update (default) | repair | fresh. Silent setups choose with /MODE=repair or /MODE=fresh. }
+function InstallMode: String;
+begin
+  Result := LowerCase(ExpandConstant('{param:MODE|}'));
+  if (Result <> 'repair') and (Result <> 'fresh') then
+  begin
+    Result := 'update';
+    if (OldVersion <> '') and (not WizardSilent) then
+    begin
+      if ModePage.SelectedValueIndex = 1 then
+        Result := 'repair'
+      else if ModePage.SelectedValueIndex = 2 then
+        Result := 'fresh';
+    end;
+  end;
+end;
 
 function WebView2Present: Boolean;
 var
@@ -219,11 +259,25 @@ end;
 procedure InitializeWizard;
 begin
   ProgressPage := CreateOutputMarqueeProgressPage('Setting up LocalDub Studio', 'Please wait; this downloads several gigabytes and can take a while.');
+  ModePage := CreateInputOptionPage(wpWelcome, 'LocalDub Studio is already installed',
+    'Installed version: ' + OldVersion + '. This setup installs {#AppVersion}. What should it do?', '', True, False);
+  ModePage.Add('Update to {#AppVersion}. Keeps your projects, downloaded models and settings. (recommended)');
+  ModePage.Add('Repair: reinstall the program files and its libraries from scratch, for when something is broken. Keeps your projects and models.');
+  ModePage.Add('Remove the old version first, then install {#AppVersion}. Keeps your projects and models (delete them from Windows Settings > Apps if you want that).');
+  ModePage.SelectedValueIndex := 0;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
+  if (ModePage <> nil) and (PageID = ModePage.ID) then
+    Result := WizardSilent or (OldVersion = '');
 end;
 
 function InitializeSetup: Boolean;
 begin
   Result := True;
+  FindOldInstall;
   if not WebView2Present then
     if not WizardSilent then
       Result := MsgBox('The Microsoft Edge WebView2 runtime was not found. LocalDub Studio will then open in your web browser instead of its own window.' + #13#10#13#10 + 'Windows 11 includes it; for Windows 10 download "WebView2 Runtime" from Microsoft.' + #13#10#13#10 + 'Continue anyway?', mbConfirmation, MB_YESNO) = IDYES;
@@ -232,9 +286,33 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Uv, EnvPrefix: String;
+  ResultCode: Integer;
 begin
   if CurStep = ssDone then
     Log('Setup is done');
+  if (CurStep = ssInstall) and (OldVersion <> '') then
+  begin
+    Log('Existing installation ' + OldVersion + ', mode: ' + InstallMode);
+    { files that a newer version no longer ships must not linger (old modules, old web assets) }
+    DelTree(ExpandConstant('{app}\localdub'), True, True, True);
+    DelTree(ExpandConstant('{app}\frontend'), True, True, True);
+    if (InstallMode = 'fresh') and FileExists(OldUninstaller) then
+    begin
+      { Silent: the old uninstaller keeps projects, models and settings and asks nothing. }
+      ShowProgress('Removing the old version...', 'Your projects and models are kept.');
+      try
+        Exec(OldUninstaller, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Log('Old uninstaller finished with code ' + IntToStr(ResultCode));
+      finally
+        HideProgress;
+      end;
+    end
+    else if InstallMode = 'repair' then
+    begin
+      DelTree(ExpandConstant('{app}\.venv'), True, True, True);
+      DelTree(ExpandConstant('{app}\python'), True, True, True);
+    end;
+  end;
   if CurStep <> ssPostInstall then
     Exit;
   Log('Post-install started');

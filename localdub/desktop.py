@@ -24,7 +24,7 @@ log = logging.getLogger("localdub.desktop")
 TITLE = "LocalDub Studio"
 APP_ID = "LocalDub.Studio"
 MUTEX_NAME = "LocalDubStudioRunning"
-ICON = Path(__file__).resolve().parent / "assets" / "localdub.ico"
+ICON = Path(__file__).resolve().parent / "assets" / "localdub-orange.ico"
 
 SPLASH = """<!doctype html><meta charset="utf-8"><title>LocalDub Studio</title>
 <style>

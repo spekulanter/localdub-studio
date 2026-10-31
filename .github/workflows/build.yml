@@ -99,6 +99,26 @@ jobs:
           $userData = Join-Path $env:LOCALAPPDATA 'LocalDub Studio\data'
           if (-not (Test-Path (Join-Path $userData 'localdub.sqlite'))) { throw "User data is not in $userData" }
           if (Test-Path (Join-Path $dir 'data')) { throw 'The program wrote user data into its install folder' }
+          # Upgrade paths: run the same installer over the existing installation.
+          function Run-Setup($mode) {
+            $a = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/COMPONENTS=core', '/TASKS=!desktopicon', "/MODE=$mode", "/LOG=C:\ld-setup-$mode.log")
+            $s = Start-Process -FilePath $setup.FullName -PassThru -Wait -ArgumentList $a
+            Get-Content "C:\ld-setup-$mode.log" -Tail 12
+            if ($s.ExitCode -ne 0) { throw "Installer ($mode) exit code $($s.ExitCode)" }
+            foreach ($f in '.venv\Scripts\localdub-app.exe', '.venv\Scripts\python.exe', '.installed', 'frontend\dist\index.html', 'unins000.exe') {
+              if (-not (Test-Path (Join-Path $dir $f))) { throw "Missing after $mode : $f" }
+            }
+            & "$dir\.venv\Scripts\python.exe" -c "import localdub, fastapi; print('imports ok after $mode')"
+          }
+          $keep = Join-Path $userData 'upgrade-marker.txt'
+          'projects and settings live here' | Set-Content $keep
+          Set-Content (Join-Path $dir 'localdub\stale-from-old-version.py') 'x'
+          Run-Setup 'update'
+          if (Test-Path (Join-Path $dir 'localdub\stale-from-old-version.py')) { throw 'A file of the old version survived the update' }
+          if (-not (Test-Path $keep)) { throw 'The update removed user data' }
+          Run-Setup 'fresh'
+          if (-not (Test-Path $keep)) { throw 'Remove-and-install removed user data' }
+          if (-not (Test-Path (Join-Path $userData 'localdub.sqlite'))) { throw 'The database is gone after remove-and-install' }
           $u = Start-Process -FilePath "$dir\unins000.exe" -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
           if ($u.ExitCode -ne 0) { throw "Uninstaller exit code $($u.ExitCode)" }
           Start-Sleep -Seconds 3

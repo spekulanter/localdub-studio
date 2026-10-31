@@ -1,4 +1,4 @@
-"""Draw the LocalDub icon (rounded tile, audio waveform) into localdub/assets/localdub.ico.
+"""Draw the LocalDub icon (rounded tile, audio waveform) into localdub/assets/localdub-orange.ico.
 
 Pure numpy + zlib: no imaging library needed. Re-run to regenerate.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-OUT = Path(__file__).resolve().parents[1] / "localdub" / "assets" / "localdub.ico"
+OUT = Path(__file__).resolve().parents[1] / "localdub" / "assets" / "localdub-orange.ico"
 SIZES = (16, 24, 32, 48, 64, 128, 256)
 
 

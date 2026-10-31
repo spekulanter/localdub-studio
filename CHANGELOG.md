@@ -3,6 +3,19 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.4.1] - 2026-10-31
+
+### Fixed
+- The desktop and Start-menu icon stayed violet after updating because Windows caches icons by file name.
+  The icon file has a new name and Setup asks Windows to refresh its icon cache.
+
+### Added
+- **Updating an installed copy.** When Setup finds an existing installation it asks what to do: update
+  (default), repair (reinstall the program and its libraries from scratch) or remove the old version first and
+  then install the new one. Projects, downloaded models and settings are kept in every case. Silent setups
+  can choose with `/MODE=update|repair|fresh`. Files of the old version that the new one no longer ships are
+  removed during an update. The installer test now also runs an update and a remove-and-install.
+
 ## [0.4.0] - 2026-10-31
 
 ### Added
