@@ -28,10 +28,11 @@ from localdub import extras
 from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
-from localdub.core import model_catalog
 from localdub.core.audio.waveform import peaks_payload
 from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.media.ffmpeg import FFmpeg, MediaError
+from localdub.core.modelmgr.handlers import ModelError, NotDeletable
+from localdub.core.modelmgr.manager import ModelManager
 from localdub.core.timeline.edits import (
     SegmentEdit,
     apply_edits,
@@ -71,6 +72,7 @@ class ProjectOut(BaseModel):
     source_lang: str
     voice: str
     llm_model: str
+    asr_id: str = "whisper-large-v3"
     original_audio: Literal["duck", "mute", "background"]
     keep_original_track: bool
     diarize: bool = False
@@ -88,6 +90,7 @@ class ProjectPatch(BaseModel):
     name: str | None = None
     voice: str | None = None
     llm_model: str | None = None
+    asr_id: str | None = None
     original_audio: Literal["duck", "mute", "background"] | None = None
     keep_original_track: bool | None = None
     diarize: bool | None = None
@@ -138,6 +141,7 @@ class FromYoutube(BaseModel):
     source_lang: str = "en"
     voice: str = ""
     llm_model: str = ""
+    asr_id: str = ""
     original_audio: Literal["duck", "mute", "background"] = "duck"
     keep_original_track: bool = True
     diarize: bool = False
@@ -175,7 +179,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
     settings = settings or Settings()
     db = Database(settings.data_dir / "localdub.sqlite")
     jobs = JobManager(db, settings)
-    downloads = model_catalog.Downloads(settings)
+    mgr = ModelManager(settings, db.any_active)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -189,7 +193,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
 
     app = FastAPI(title="LocalDub Studio", version="0.1.0", lifespan=lifespan)
     app.state.db, app.state.jobs, app.state.settings = db, jobs, settings
-    app.state.downloads = downloads
+    app.state.models = mgr
 
     def project_dir(pid: int) -> Path:
         return settings.data_dir / "projects" / str(pid)
@@ -261,87 +265,116 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         }
 
     # ----- models ------------------------------------------------------------------------
-    def models_view() -> dict[str, Any]:
-        packages = model_catalog.optional_packages_available()
-        package_size = extras.estimated_total_bytes()
-        states = downloads.state()
-        rows = []
-        for spec in model_catalog.SPECS:
-            needs_packages = spec.group in ("separation", "cloning")
-            rows.append(
-                {
-                    "id": spec.id,
-                    "title": spec.title,
-                    "description": spec.description,
-                    "size_bytes": package_size
-                    if spec.id == "packages" and package_size
-                    else spec.size_bytes,
-                    "required": spec.required,
-                    "group": spec.group,
-                    "installed": model_catalog.is_installed(spec, settings),
-                    "available": packages or not needs_packages,
-                    "download": states.get(spec.id),
-                }
-            )
-        missing = [r["id"] for r in rows if r["required"] and not r["installed"]]
-        return {"models": rows, "required_missing": missing, "busy": downloads.busy()}
+    def asr_choice(requested: str) -> str:
+        """The catalogue id for a new dub: the request, else the user's default model."""
+        if requested:
+            entry = next((e for e in mgr.entries() if e.id == requested and e.role == "asr"), None)
+            if entry is None:
+                raise HTTPException(422, f"Unknown speech recognition model '{requested}'")
+            return requested
+        default = mgr.default_entry("asr")
+        return default.id if default else settings.asr_id
 
-    def require_models() -> None:
-        if downloads.installing("packages"):
+    def require_models(asr_id: str | None = None, llm_model: str | None = None) -> None:
+        if mgr.installing("packages"):
             raise HTTPException(
                 409, "The optional packages are being installed. Wait until that has finished."
             )
         if not settings.require_models_before_jobs:
             return
-        missing = [
-            s.title
-            for s in model_catalog.SPECS
-            if s.required and not model_catalog.is_installed(s, settings)
-        ]
+        missing = mgr.missing_for(asr_id, llm_model)
         if missing:
             raise HTTPException(
                 409,
-                "Required models are missing: "
+                "Models are missing: "
                 + "; ".join(missing)
                 + ". Download them first (Models page).",
             )
 
+    def model_failure(exc: Exception) -> HTTPException:
+        code = 409 if isinstance(exc, NotDeletable | ModelError) else 500
+        return HTTPException(code, str(exc))
+
     @app.get("/api/models")
-    async def list_models() -> dict[str, Any]:
-        return await asyncio.to_thread(models_view)
+    async def list_models(sizes: bool = False) -> dict[str, Any]:
+        return await asyncio.to_thread(mgr.snapshot, sizes=sizes)
 
     @app.post("/api/models/download", status_code=202)
     async def download_models(body: dict[str, list[str]] | None = None) -> dict[str, Any]:
-        ids = (body or {}).get("ids") or [s.id for s in model_catalog.SPECS if s.required]
-        unknown = [i for i in ids if i not in model_catalog.BY_ID]
-        if unknown:
-            raise HTTPException(422, f"Unknown model(s): {unknown}")
-        ids = sorted(dict.fromkeys(ids), key=lambda i: i != "packages")  # packages first
-        packages = model_catalog.optional_packages_available()
-        blocked = [
-            i
-            for i in ids
-            if model_catalog.BY_ID[i].group in ("separation", "cloning")
-            and not packages
-            and "packages" not in ids
-        ]
-        if blocked:
+        ids = (body or {}).get("ids") or mgr.required_missing()
+        try:
+            entries = [mgr.get(i) for i in dict.fromkeys(ids)]
+        except ModelError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        ids = sorted((e.id for e in entries), key=lambda i: i != "packages")  # packages first
+        packages = extras.packages_available()
+        if any(e.requirements.needs_packages for e in entries) and not (
+            packages or "packages" in ids
+        ):
             raise HTTPException(
                 409, "These models need the optional packages: install them first (or together)."
             )
-        todo = [
-            i
-            for i in ids
-            if not await asyncio.to_thread(
-                model_catalog.is_installed, model_catalog.BY_ID[i], settings
-            )
-        ]
+        todo = [i for i in ids if not await asyncio.to_thread(mgr_installed, i)]
         if "packages" in todo and db.any_active():
             raise HTTPException(
                 409, "Wait for the running dubbing job to finish before installing packages."
             )
-        downloads.start(todo)
-        return {"started": todo}
+        return {"started": mgr.start(todo)}
+
+    def mgr_installed(entry_id: str) -> bool:
+        e = mgr.get(entry_id)
+        return mgr.handler(e).installed(e, mgr.ctx())
+
+    @app.post("/api/models/check-updates")
+    async def check_model_updates() -> dict[str, Any]:
+        return await asyncio.to_thread(mgr.check_updates)
+
+    @app.post("/api/models/custom-ollama", status_code=201)
+    async def add_custom_model(body: dict[str, str]) -> dict[str, Any]:
+        try:
+            entry = await asyncio.to_thread(mgr.add_custom_ollama, body.get("tag", ""))
+        except ModelError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return {"id": entry.id}
+
+    @app.post("/api/models/open-folder")
+    async def open_models_folder(body: dict[str, str] | None = None) -> dict[str, str]:
+        try:
+            return {"opened": await asyncio.to_thread(mgr.open_folder, (body or {}).get("id"))}
+        except ModelError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.get("/api/models/storage")
+    async def models_storage() -> dict[str, Any]:
+        snap = await asyncio.to_thread(mgr.snapshot, sizes=True)
+        return {"paths": snap["paths"], "models_bytes": snap["models_bytes"],
+                "hardware": snap["hardware"]}  # fmt: skip
+
+    @app.post("/api/models/{entry_id}/select")
+    async def select_model(entry_id: str) -> dict[str, bool]:
+        try:
+            await asyncio.to_thread(mgr.select, entry_id)
+        except ModelError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return {"ok": True}
+
+    @app.post("/api/models/{entry_id}/{action}", status_code=202)
+    async def model_action(entry_id: str, action: Literal["update", "repair"]) -> dict[str, Any]:
+        try:
+            mgr.get(entry_id)
+        except ModelError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        if db.any_active():
+            raise HTTPException(409, "Wait for the running dubbing job to finish first.")
+        kind = "update" if action == "update" else "redownload"
+        return {"started": mgr.start([entry_id], kind)}
+
+    @app.delete("/api/models/{entry_id}")
+    async def delete_model(entry_id: str) -> dict[str, Any]:
+        try:
+            return await asyncio.to_thread(mgr.delete, entry_id)
+        except (ModelError, NotDeletable) as exc:
+            raise model_failure(exc) from exc
 
     # ----- projects ----------------------------------------------------------------------
     @app.get("/api/projects")
@@ -355,6 +388,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         source_lang: Annotated[str, Form()] = "en",
         voice: Annotated[str, Form()] = "",
         llm_model: Annotated[str, Form()] = "",
+        asr_id: Annotated[str, Form()] = "",
         original_audio: Annotated[Literal["duck", "mute", "background"], Form()] = "duck",
         keep_original_track: Annotated[bool, Form()] = True,
         diarize: Annotated[bool, Form()] = False,
@@ -371,7 +405,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         if source_lang not in SOURCE_LANGS:
             raise HTTPException(422, f"Unsupported source language '{source_lang}'")
         if start:
-            await asyncio.to_thread(require_models)
+            await asyncio.to_thread(require_models, asr_choice(asr_id), llm_model.strip() or None)
         voice = voice or settings.tts_voice
         if voice not in VOICES:
             raise HTTPException(422, f"Unknown voice '{voice}'")
@@ -388,6 +422,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             source_lang=source_lang,
             voice=voice,
             llm_model=llm_model.strip() or settings.translation_model,
+            asr_id=asr_choice(asr_id),
             original_audio=original_audio,
             keep_original_track=int(keep_original_track),
             diarize=int(diarize),
@@ -490,7 +525,9 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
                 422, "Voice cloning needs your confirmation that you may imitate these voices"
             )
         if body.start:
-            await asyncio.to_thread(require_models)
+            await asyncio.to_thread(
+                require_models, asr_choice(body.asr_id), body.llm_model.strip() or None
+            )
         try:  # also proves the link works before anything is created
             info = await asyncio.to_thread(ytdlp.fetch_info, url, body.cookies_browser)
         except ytdlp.YoutubeError as exc:
@@ -507,6 +544,7 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             source_lang=body.source_lang,
             voice=voice,
             llm_model=body.llm_model.strip() or settings.translation_model,
+            asr_id=asr_choice(body.asr_id),
             original_audio=body.original_audio,
             keep_original_track=int(body.keep_original_track),
             diarize=int(body.diarize),
@@ -533,6 +571,8 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         fields = patch.model_dump(exclude_none=True)
         if "num_speakers" in patch.model_fields_set:
             fields["num_speakers"] = patch.num_speakers  # null = detect automatically
+        if "asr_id" in fields:
+            fields["asr_id"] = asr_choice(fields["asr_id"])
         if "voice" in fields and fields["voice"] not in VOICES:
             raise HTTPException(422, f"Unknown voice '{fields['voice']}'")
         fields.pop("clone_consent", None)
@@ -561,10 +601,10 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
     # ----- jobs --------------------------------------------------------------------------
     @app.post("/api/projects/{pid}/jobs", status_code=201)
     def start_job(pid: int, req: JobRequest | None = None) -> dict[str, Any]:
-        require_project(pid)
+        row = require_project(pid)
         if db.active_job(pid):
             raise HTTPException(409, "A job is already queued or running for this project")
-        require_models()
+        require_models(str(row["asr_id"]), str(row["llm_model"]))
         job_id = jobs.submit(pid, req.from_stage if req else None)
         return job_out(db.get_job(job_id)) or {}
 

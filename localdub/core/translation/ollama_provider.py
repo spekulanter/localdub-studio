@@ -51,6 +51,29 @@ class OllamaClient:
             ) from exc
         return sorted(m["name"] for m in r.json().get("models", []))
 
+    def tags(self) -> list[dict[str, Any]]:
+        """Installed models with their digest and size: [{name, digest, size}, ...]."""
+        try:
+            r = self._http.get("/api/tags")
+            r.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise OllamaError(
+                f"Cannot reach Ollama at {self.base_url} ({exc}). Is Ollama installed and running?"
+            ) from exc
+        return [
+            {"name": m["name"], "digest": m.get("digest", ""), "size": int(m.get("size", 0))}
+            for m in r.json().get("models", [])
+        ]
+
+    def delete(self, model: str) -> None:
+        """Remove a model from Ollama's store (shared with every program that uses Ollama)."""
+        try:
+            r = self._http.request("DELETE", "/api/delete", json={"model": model})
+        except httpx.HTTPError as exc:
+            raise OllamaError(f"Ollama request failed: {exc}") from exc
+        if r.status_code not in (200, 404):
+            raise OllamaError(f"Ollama returned {r.status_code}: {r.text[:300]}")
+
     def chat(
         self,
         model: str,

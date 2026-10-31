@@ -25,8 +25,10 @@ class FasterWhisperProvider:
         download_root: Path | None = None,
         beam_size: int = 5,
         allow_fallback: bool = True,
+        repo: str | None = None,
     ) -> None:
         self.model_name = model
+        self.repo = repo
         self.device = device
         self.compute_type = compute_type
         self.download_root = download_root
@@ -35,6 +37,23 @@ class FasterWhisperProvider:
         self._model: Any = None
         self.engine = ""
         self.attempt_errors: list[str] = []
+
+    def _local_snapshot(self, cache_dir: str | None) -> str:
+        from huggingface_hub import snapshot_download
+
+        try:
+            return str(
+                snapshot_download(
+                    str(self.repo), cache_dir=cache_dir, local_files_only=True,
+                    allow_patterns=["config.json", "preprocessor_config.json", "model.bin",
+                                    "tokenizer.json", "vocabulary.*"],
+                )
+            )  # fmt: skip
+        except Exception as exc:  # noqa: BLE001
+            raise FileNotFoundError(
+                f"The speech recognition model {self.repo} is not downloaded. "
+                "Download it on the AI models page."
+            ) from exc
 
     def _candidates(self) -> list[tuple[str, str]]:
         first = (self.device, self.compute_type)
@@ -52,11 +71,14 @@ class FasterWhisperProvider:
         from faster_whisper import WhisperModel
 
         root = str(self.download_root) if self.download_root else None
+        model_ref = self.model_name
+        if self.repo:  # a model chosen in the catalogue: use exactly its downloaded files
+            model_ref = self._local_snapshot(root)
         for device, ctype in self._candidates():
             try:
                 t0 = time.perf_counter()
                 model = WhisperModel(
-                    self.model_name, device=device, compute_type=ctype, download_root=root
+                    model_ref, device=device, compute_type=ctype, download_root=root
                 )
                 self.engine = f"faster-whisper:{self.model_name}:{device}:{ctype}"
                 log.info("Loaded %s in %.1fs", self.engine, time.perf_counter() - t0)

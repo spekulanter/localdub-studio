@@ -57,6 +57,7 @@ MIGRATIONS = {
     "source_url": "TEXT",
     "download_quality": "TEXT NOT NULL DEFAULT 'auto'",
     "cookies_browser": "TEXT NOT NULL DEFAULT 'none'",
+    "asr_id": "TEXT NOT NULL DEFAULT 'whisper-large-v3'",
 }
 ACTIVE = ("queued", "running")
 TERMINAL = ("done", "failed", "cancelled")

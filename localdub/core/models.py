@@ -116,3 +116,73 @@ def ensure_model(
         if own:
             client.close()
     return target
+
+
+def ensure_archive_files(
+    url: str,
+    sha256: str,
+    members: dict[str, str],
+    dest_dir: Path,
+    *,
+    client: httpx.Client | None = None,
+    progress: ProgressFn | None = None,
+) -> None:
+    """Download a .tar.bz2 once, verify its SHA-256 and extract the named members into `dest_dir`.
+
+    `members` maps the exact path of a file inside the archive to the file name to write; nothing
+    else is extracted, so a hostile archive cannot write anywhere else. If every target already
+    exists and is readable, nothing is downloaded.
+    """
+    if all(
+        (dest_dir / name).is_file() and is_readable(dest_dir / name) for name in members.values()
+    ):
+        return
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    archive = dest_dir / ".archive.download"
+    own = client is None
+    client = client or httpx.Client(follow_redirects=True, timeout=httpx.Timeout(60.0, read=300.0))
+    h = hashlib.sha256()
+    written: list[Path] = []
+    try:
+        try:
+            with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                total = int(resp.headers.get("content-length") or 0)
+                done = 0
+                with archive.open("wb") as fh:
+                    for chunk in resp.iter_bytes(1 << 20):
+                        fh.write(chunk)
+                        h.update(chunk)
+                        done += len(chunk)
+                        if progress:
+                            progress(done, total)
+        except httpx.HTTPError as exc:
+            raise ModelDownloadError(f"Could not download {url.rsplit('/', 1)[-1]}: {exc}") from exc
+        if h.hexdigest() != sha256:
+            raise ModelDownloadError(
+                f"{url.rsplit('/', 1)[-1]}: checksum mismatch (expected {sha256[:12]}..., got "
+                f"{h.hexdigest()[:12]}...); nothing was installed"
+            )
+        with tarfile.open(archive, "r:bz2") as tar:
+            for inside, name in members.items():
+                info = tar.getmember(inside)  # exact name only: no path traversal
+                if not info.isfile():
+                    raise ModelDownloadError(f"{inside} is not a regular file")
+                src = tar.extractfile(info)
+                assert src is not None
+                part = dest_dir / (name + ".part")
+                with part.open("wb") as out:
+                    while chunk := src.read(1 << 20):
+                        out.write(chunk)
+                part.replace(dest_dir / name)
+                written.append(dest_dir / name)
+    except BaseException:
+        for f in written:  # never leave a half-installed model that looks complete
+            f.unlink(missing_ok=True)
+        raise
+    finally:
+        archive.unlink(missing_ok=True)
+        for part in dest_dir.glob("*.part"):
+            part.unlink(missing_ok=True)
+        if own:
+            client.close()

@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from localdub.config import Settings
+from localdub.core.modelmgr.catalog import load_catalog
 from localdub.core.platform import disable_power_throttling
 from localdub.pipeline import STAGES, Pipeline, PipelineError
 
@@ -46,7 +47,14 @@ def cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
 
 def cmd_run(args: argparse.Namespace, settings: Settings) -> int:
     if args.asr_model:
-        settings.asr_model = args.asr_model
+        known = {e.id for e in load_catalog().of_role("asr")}
+        # accept a catalogue id (parakeet-tdt-0.6b-v3) or a plain Whisper name (large-v3)
+        settings.asr_id = args.asr_model if args.asr_model in known else f"whisper-{args.asr_model}"
+        if settings.asr_id not in known:
+            print(
+                f"Unknown speech model '{args.asr_model}'. Choose from: {', '.join(sorted(known))}"
+            )
+            return 2
     if args.llm:
         settings.translation_model = args.llm
     if args.original_audio:
@@ -109,7 +117,10 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--source-lang", default="en", help="ISO code or 'auto'")
     run.add_argument("--voice", help="Supertonic voice, e.g. F1..F5, M1..M5")
     run.add_argument("--llm", help="Ollama model for translation")
-    run.add_argument("--asr-model", help="faster-whisper model, e.g. large-v3, medium")
+    run.add_argument(
+        "--asr-model",
+        help="speech model id, e.g. whisper-large-v3 or parakeet-tdt-0.6b-v3",
+    )
     run.add_argument(
         "--original-audio",
         choices=["duck", "mute"],

@@ -131,7 +131,7 @@ def test_updating_is_blocked_while_a_job_runs(client, monkeypatch):
 def test_the_tools_show_up_on_the_models_page_with_their_own_download(client, monkeypatch):
     monkeypatch.setattr(tools, "is_installed", lambda: False)
     rows = {m["id"]: m for m in client.get("/api/models").json()["models"]}
-    assert rows["youtube"]["installed"] is False and rows["youtube"]["group"] == "youtube"
+    assert rows["youtube"]["installed"] is False and rows["youtube"]["group"] == "tools"
     assert rows["youtube"]["required"] is False and rows["youtube"]["available"] is True
 
 

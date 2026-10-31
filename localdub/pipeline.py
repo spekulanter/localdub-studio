@@ -30,6 +30,7 @@ from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.export.srt import write_srt
 from localdub.core.jobs.checkpoints import CheckpointStore, atomic_write_json, fingerprint
 from localdub.core.media.ffmpeg import FFmpeg, MediaError, MediaInfo
+from localdub.core.modelmgr.resolve import resolve_asr
 from localdub.core.timeline.edits import apply_edits, ensure_edits_file, load_edits
 from localdub.core.timeline.fit import available_windows, decide, place
 from localdub.core.timeline.models import DialogueSegment, FitStatus, Transcript
@@ -82,14 +83,21 @@ class Providers:
 
 def default_providers(settings: Settings) -> Providers:
     def asr() -> ASRProvider:
+        choice = resolve_asr(settings)
+        if choice.engine == "parakeet":
+            from localdub.core.asr.parakeet_provider import ParakeetProvider
+
+            assert choice.folder is not None
+            return ParakeetProvider(choice.folder, num_threads=settings.tts_threads or 4)
         from localdub.core.asr.faster_whisper_provider import FasterWhisperProvider
 
         return FasterWhisperProvider(
-            settings.asr_model,
+            choice.name,
             device=settings.asr_device,
             compute_type=settings.asr_compute_type,
             download_root=settings.models_dir / "whisper",
             beam_size=settings.asr_beam_size,
+            repo=choice.repo,
         )
 
     def translator() -> TranslationProvider:
@@ -213,13 +221,16 @@ class Pipeline:
 
     def _spec(self, stage: str) -> tuple[dict[str, Any], list[Path], Callable[[], list[Path]]]:
         s = self.s
+        asr = resolve_asr(s)
         specs: dict[str, tuple[dict[str, Any], list[Path], Callable[[], list[Path]]]] = {
             "download": ({"source": self.remote.key if self.remote else None}, [], self._download),
             "probe": ({}, [self.input], self._probe),
             "extract": ({"sr": s.sample_rate}, [self.input], self._extract),
             "asr": (
                 {
-                    "model": s.asr_model,
+                    # "large-v3" for the default keeps the fingerprints of older work folders valid
+                    "model": asr.name,
+                    **({"engine": asr.engine} if asr.engine != "whisper" else {}),
                     "beam": s.asr_beam_size,
                     "compute": [s.asr_device, s.asr_compute_type],
                     "lang": self.source_lang,
@@ -808,7 +819,7 @@ class Pipeline:
                 # Supertonic's OpenRAIL-M licence requires disclosing machine-generated content.
                 comment=(
                     "AI-generated dub (LocalDub Studio): faster-whisper "
-                    f"{self.s.asr_model}, {self.s.translation_model}, {self.s.tts_model}"
+                    f"{resolve_asr(self.s).name}, {self.s.translation_model}, {self.s.tts_model}"
                 ),
             )
         except MediaError as exc:

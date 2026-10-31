@@ -65,6 +65,7 @@ def progress_fraction(stage: str, state: str, *, has_download: bool = False) -> 
 def project_settings(base: Settings, project: dict[str, object]) -> Settings:
     s = base.model_copy()
     s.translation_model = str(project["llm_model"])
+    s.asr_id = str(project.get("asr_id") or s.asr_id)
     mode = project["original_audio"]
     s.original_audio = mode if mode in ("mute", "background") else "duck"
     s.keep_original_track = bool(project["keep_original_track"])

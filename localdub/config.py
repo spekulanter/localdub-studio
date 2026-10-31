@@ -30,7 +30,9 @@ class Settings(BaseSettings):
     require_models_before_jobs: bool = True
 
     # ASR
-    asr_model: str = "large-v3"
+    # Speech recognition model: an id from the catalogue (core/modelmgr/catalog.json).
+    asr_id: str = "whisper-large-v3"
+    asr_model: str = "large-v3"  # legacy name, kept for old .env files; asr_id wins
     asr_device: str = "cuda"
     asr_compute_type: str = "float16"
     asr_beam_size: int = 5
