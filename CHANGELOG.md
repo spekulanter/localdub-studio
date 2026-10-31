@@ -3,6 +3,13 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Changed
+- AI models page: the model that the "Download the required models" button fetches for each required
+  step now carries a "Required" label instead of "Recommended".
+- Qwen3 8B removed from the model list (not recommended for Slovak; it can still be added by name).
+
 ## [0.4.1] - 2026-10-31
 
 ### Fixed

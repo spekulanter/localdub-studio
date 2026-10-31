@@ -162,9 +162,15 @@ function Card({
         <div className="min-w-0">
           <p className="font-medium">{m.title}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            <span className={`chip ${m.status === "recommended" ? "chip-ok" : m.status === "not_recommended" ? "chip-warn" : ""}`}>
-              {t(STATUS_LABEL[m.status])}
-            </span>
+            {m.required && m.default ? (
+              <span className="chip chip-accent" title={t("Dubbing needs one model for this step; this is the one the required download fetches.")}>
+                {t("Required")}
+              </span>
+            ) : (
+              <span className={`chip ${m.status === "recommended" ? "chip-ok" : m.status === "not_recommended" ? "chip-warn" : ""}`}>
+                {t(STATUS_LABEL[m.status])}
+              </span>
+            )}
             {m.installed && <span className="chip chip-ok">{t("✓ installed")}</span>}
             {m.selected && role?.selectable && <span className="chip chip-ok">{t("In use for new dubs")}</span>}
             {m.update.available && <span className="chip chip-warn">{t("Update available")}</span>}

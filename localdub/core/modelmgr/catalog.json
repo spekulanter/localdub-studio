@@ -395,45 +395,6 @@
       }
     },
     {
-      "id": "qwen3-8b",
-      "role": "translation",
-      "status": "not_recommended",
-      "title": "Qwen3 8B",
-      "summary": "A general-purpose model from Alibaba. Kept for comparison; not recommended for Slovak.",
-      "choose_if": [
-        "You want to compare it yourself."
-      ],
-      "avoid_if": [
-        "You want reliable Slovak: in our benchmark it mistranslated idioms and produced several nonsensical lines."
-      ],
-      "requirements": {
-        "vram_gb": 6,
-        "disk_gb": 5.2,
-        "runs_on": "gpu-or-cpu"
-      },
-      "size_bytes": 5230000000,
-      "license": {
-        "name": "Apache-2.0",
-        "url": "https://ollama.com/library/qwen3"
-      },
-      "measured": "12-line benchmark (docs/translation_benchmark.md): several wrong or nonsensical lines, 2.7 times slower to load than TranslateGemma 4B.",
-      "check_updates": true,
-      "source": {
-        "type": "ollama",
-        "tag": "qwen3:8b"
-      },
-      "sk": {
-        "summary": "Univerzálny model od Alibaby. Ponechaný na porovnanie; pre slovenčinu sa neodporúča.",
-        "choose_if": [
-          "Chcete si ho sami porovnať."
-        ],
-        "avoid_if": [
-          "Chcete spoľahlivú slovenčinu: v našom teste prekladal idiómy zle a dal niekoľko nezmyselných riadkov."
-        ],
-        "measured": "Test 12 riadkov (docs/translation_benchmark.md): niekoľko chybných alebo nezmyselných riadkov, načítanie 2,7-krát pomalšie než TranslateGemma 4B."
-      }
-    },
-    {
       "id": "supertonic",
       "role": "tts",
       "default": true,

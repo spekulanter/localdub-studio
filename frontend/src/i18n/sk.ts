@@ -143,6 +143,8 @@ export const sk: Record<string, string> = {
   "Add": "Pridať",
   "Found on ollama.com. LocalDub has not tested it for Slovak.": "Nájdete ho na ollama.com. LocalDub ho pre slovenčinu netestoval.",
   "Model list version {v}. New models arrive with program updates; nothing is checked online until you press “Check for updates”.": "Verzia zoznamu modelov {v}. Nové modely prichádzajú s aktualizáciami programu; online sa nič nekontroluje, kým nestlačíte „Skontrolovať aktualizácie“.",
+  "Required": "Povinný",
+  "Dubbing needs one model for this step; this is the one the required download fetches.": "Dabing potrebuje jeden model pre tento krok; toto je ten, ktorý stiahne povinné sťahovanie.",
   "Recommended": "Odporúčané",
   "Available": "Dostupné",
   "Experimental": "Experimentálne",
