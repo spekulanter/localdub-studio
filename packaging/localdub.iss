@@ -286,7 +286,7 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Uv, EnvPrefix: String;
-  ResultCode: Integer;
+  ResultCode, I: Integer;
 begin
   if CurStep = ssDone then
     Log('Setup is done');
@@ -303,6 +303,15 @@ begin
       try
         Exec(OldUninstaller, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         Log('Old uninstaller finished with code ' + IntToStr(ResultCode));
+        { The uninstaller finishes by a helper process that deletes its own files a moment later. Wait for
+          that, or it could delete the uninstaller of the version being installed now. }
+        for I := 1 to 120 do
+        begin
+          if not FileExists(OldUninstaller) then
+            Break;
+          Sleep(500);
+        end;
+        Log('Old uninstaller gone: ' + IntToStr(Ord(not FileExists(OldUninstaller))));
       finally
         HideProgress;
       end;
