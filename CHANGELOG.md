@@ -3,7 +3,7 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [Unreleased]
+## [0.4.6] - 2026-10-31
 
 ### Changed
 - Downloaded video and subtitles are named after the video (the YouTube title or the project name), for example
