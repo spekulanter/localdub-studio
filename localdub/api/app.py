@@ -655,8 +655,12 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
         active = db.active_job(pid)
         if active:
             jobs.cancel(active["id"])
+        job_ids = [j["id"] for j in db.list_jobs(pid)]
         db.delete_project(pid)
         shutil.rmtree(project_dir(pid), ignore_errors=True)
+        for job_id in job_ids:  # the job logs live outside the project folder
+            for log_file in (settings.data_dir / "logs").glob(f"job-{job_id}.log*"):
+                log_file.unlink(missing_ok=True)
 
     # ----- jobs --------------------------------------------------------------------------
     @app.post("/api/projects/{pid}/jobs", status_code=201)
@@ -1015,10 +1019,14 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             "srt": "application/x-subrip",
             "srt_en": "application/x-subrip",
         }
+        suffix = {"video": ".sk.mp4", "srt": ".sk.srt", "srt_en": ".en.srt"}[kind]
+        # named after the video (the YouTube title, or the project name), not "source"
+        clean = project["name"].replace("/", "-").replace("\\", "-")
+        title = safe_filename(clean, fallback="video")
         return FileResponse(
             path,
             media_type=media[kind],
-            filename=path.name,
+            filename=f"{title}{suffix}",
             content_disposition_type="inline" if inline else "attachment",
         )
 

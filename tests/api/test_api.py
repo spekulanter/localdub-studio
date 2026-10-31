@@ -151,6 +151,34 @@ def test_downloads_only_serve_known_outputs(
     assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
 
 
+def test_downloads_are_named_after_the_project(
+    client: TestClient, sample_mp4: Path, settings: Settings
+):
+    p = upload(client, sample_mp4, start="false").json()
+    client.patch(f"/api/projects/{p['id']}", json={"name": "Môj film: časť 1/2"})
+    wd = settings.data_dir / "projects" / str(p["id"]) / "work"
+    wd.mkdir(parents=True)
+    (wd / f"{sample_mp4.stem}.sk.srt").write_text("1\n", encoding="utf-8")
+    (wd / f"{sample_mp4.stem}.en.srt").write_text("1\n", encoding="utf-8")
+    sk = client.get(f"/api/projects/{p['id']}/files/srt").headers["content-disposition"]
+    en = client.get(f"/api/projects/{p['id']}/files/srt_en").headers["content-disposition"]
+    from urllib.parse import unquote
+
+    assert unquote(sk).endswith("Môj film_ časť 1-2.sk.srt")
+    assert unquote(en).endswith("Môj film_ časť 1-2.en.srt")
+
+
+def test_delete_project_removes_job_logs_too(
+    client: TestClient, sample_mp4: Path, settings: Settings
+):
+    p = upload(client, sample_mp4).json()
+    log = settings.data_dir / "logs" / f"job-{p['latest_job']['id']}.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text("secret title\n", encoding="utf-8")
+    assert client.delete(f"/api/projects/{p['id']}").status_code == 204
+    assert not log.exists()
+
+
 def test_delete_project_removes_files(client: TestClient, sample_mp4: Path, settings: Settings):
     p = upload(client, sample_mp4).json()
     assert client.delete(f"/api/projects/{p['id']}").status_code == 204

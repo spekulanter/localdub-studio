@@ -3,6 +3,14 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Changed
+- Downloaded video and subtitles are named after the video (the YouTube title or the project name), for example
+  "My film.sk.mp4", "My film.sk.srt", "My film.en.srt", instead of "source.sk.mp4".
+- Deleting a project now also removes its job logs, and the project database wipes deleted text instead of
+  leaving it in free pages, so nothing of the project stays behind.
+
 ## [0.4.5] - 2026-10-31
 
 ### Fixed
