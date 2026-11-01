@@ -66,9 +66,12 @@ Checked on every build, on a macOS 14 runner (Apple M1 virtual machine, no GPU):
 - the app's own Python imports every library, detects Apple Silicon and offers the Mac models;
 - the pinned FFmpeg, yt-dlp and Deno downloads match their checksums and start;
 - the local server starts from the installed app, serves the interface and keeps data outside the app;
-- Whisper tiny through the same MLX code transcribes a spoken sentence on the processor
-  (that step is allowed to fail and is then reported in the build log).
+- starting the installed app the way Finder does (`open`) runs the window code and the app logs that it
+  loaded the interface in its window (nobody saw that window);
+- Whisper tiny through the same MLX code transcribed a spoken sentence word for word on the processor
+  (about 11 s for a short sentence on the runner's 3 virtual cores; this says nothing about the GPU or
+  about large-v3).
 
-**Not checked** (needs a real Mac): that the window opens and looks right, the Dock icon and menu, saving a
+**Not checked** (needs a real Mac): that the window really appears and looks right, the Dock icon and menu, saving a
 downloaded video, Whisper large-v3 speed and memory on the GPU, a complete dub, Ollama on the Mac,
 the first-start prompts of macOS, sleep and battery behaviour during a long dub.
