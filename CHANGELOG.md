@@ -3,6 +3,13 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.1] - 2026-11-01
+
+### Fixed
+- The Mac build moved to the macOS 15 runner (GitHub is retiring macOS 14 images), so the Mac app now needs
+  macOS 15 Sequoia or newer. 0.5.0 was published for Windows only because its Mac build was cancelled by
+  that retirement; the Windows program is unchanged.
+
 ## [0.5.0] - 2026-11-01
 
 ### Added

@@ -1,6 +1,6 @@
 # Installing LocalDub Studio on a Mac (experimental)
 
-LocalDub Studio runs on Apple Silicon Macs (M1 and newer, macOS 14 Sonoma or newer). It opens in its
+LocalDub Studio runs on Apple Silicon Macs (M1 and newer, macOS 15 Sequoia or newer). It opens in its
 own window and keeps everything on your Mac; your videos are never uploaded.
 
 > **Status: experimental.** The Mac version is built and checked automatically on a macOS runner in
@@ -9,7 +9,7 @@ own window and keeps everything on your Mac; your videos are never uploaded.
 > Windows version is the one that was tested end to end.
 
 ## Requirements
-- A Mac with an M-series chip (not an Intel Mac) and macOS 14 or newer
+- A Mac with an M-series chip (not an Intel Mac) and macOS 15 or newer
 - 8 GB of memory works for the smaller models; 16 GB or more is comfortable
 - About 8 GB of free disk space for the app (1.5 GB) and the models
 - Internet while downloading models (afterwards it works offline)
@@ -60,7 +60,7 @@ Move the app to the Bin. To remove your data as well, delete
 - The Mac has no "Start menu" entry or installer wizard: the app is the single `.app` file.
 
 ## What was and was not checked
-Checked on every build, on a macOS 14 runner (Apple M1 virtual machine, no GPU):
+Checked on every build, on a macOS 15 runner (Apple M1 virtual machine, no GPU):
 - the unit tests and type checks pass on macOS;
 - the app builds, signs ad hoc, goes into a disk image, and installs from it;
 - the app's own Python imports every library, detects Apple Silicon and offers the Mac models;

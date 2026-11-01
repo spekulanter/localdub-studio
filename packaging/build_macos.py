@@ -29,7 +29,7 @@ OUT = ROOT / "release"
 BUILD = ROOT / "build" / "macos"
 APP_NAME = "LocalDub Studio"
 BUNDLE_ID = "com.localdub.studio"
-MIN_MACOS = "14.0"  # the MLX wheels are built for macOS 14 and newer
+MIN_MACOS = "15.0"  # built on macOS 15, so pip picks the MLX wheels made for macOS 15
 PYTHON = "3.12"
 
 APP_FILES = ["pyproject.toml", "uv.lock", ".python-version", "README.md", "CHANGELOG.md"]

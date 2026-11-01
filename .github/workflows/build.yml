@@ -145,7 +145,7 @@ jobs:
   macos:
     # Apple Silicon (M1 and newer). The runner has no GPU, so only the parts that do not need one are
     # exercised; what was and was not checked is written in docs/INSTALL-macOS.md.
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7

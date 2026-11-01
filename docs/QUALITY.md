@@ -294,7 +294,7 @@ it), and YouTube changes after today (yt-dlp has to be updated then).
 
 ## Apple Silicon Macs (unreleased, nothing measured on a Mac)
 
-The Mac version has only been run by an automated macOS 14 runner (virtual Apple M1, **no GPU**, no screen). What that
+The Mac version has only been run by an automated macOS 15 runner (virtual Apple M1, **no GPU**, no screen). What that
 runner checks is listed in docs/INSTALL-macOS.md. **Unverified, do not claim:** the speed and memory of Whisper
 large-v3 or turbo through MLX on an M-series GPU, its accuracy compared with faster-whisper (the MLX weights are a
 conversion; word timestamps and silence handling differ from faster-whisper, which also applies a voice-activity

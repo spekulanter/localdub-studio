@@ -16,7 +16,7 @@ See [docs/INSTALL.md](docs/INSTALL.md): run the setup wizard, then start *LocalD
 Build the setup yourself with `uv run python packaging/build_release.py`.
 
 ## Install (Mac, experimental)
-Apple Silicon (M1 or newer), macOS 14+: see [docs/INSTALL-macOS.md](docs/INSTALL-macOS.md). The Mac app is built by
+Apple Silicon (M1 or newer), macOS 15+: see [docs/INSTALL-macOS.md](docs/INSTALL-macOS.md). The Mac app is built by
 the GitHub Actions workflow (`packaging/build_macos.py`) and has not been used on a real Mac yet.
 
 ## First run from a source checkout
