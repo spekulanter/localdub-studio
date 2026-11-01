@@ -202,6 +202,21 @@ jobs:
           echo "--- broken symlinks"; find -L "$APP" -type l 2>/dev/null | head -20 || true
           echo "--- codesign"; codesign -vvv --deep --strict "$APP" 2>&1 | tail -15 || true
           echo "--- bundle"; ls -la "$APP/Contents" "$APP/Contents/MacOS" "$APP/Contents/Resources" || true
+          echo "--- every libonnxruntime in the app"; find "$APP" -name 'libonnxruntime*' | head || true
+          echo "--- what the two sherpa packages say they installed"
+          PYTHONNOUSERSITE=1 "$APP/Contents/Resources/python/bin/python3" -I -c "
+          from importlib.metadata import distribution
+          for n in ('sherpa-onnx', 'sherpa-onnx-core'):
+              d = distribution(n)
+              print(n, d.version, d._path)
+              for f in d.files: print('   ', f, f.locate().exists())
+          " || true
+          echo "--- the same two packages installed into a fresh venv on this runner"
+          for mode in clone copy hardlink; do
+            rm -rf "$RUNNER_TEMP/v-$mode"; uv venv -q "$RUNNER_TEMP/v-$mode"
+            uv pip install -q --python "$RUNNER_TEMP/v-$mode/bin/python" --link-mode $mode sherpa-onnx==2.0.1 sherpa-onnx-core==2.0.1
+            echo "link-mode $mode:"; ls "$RUNNER_TEMP/v-$mode/lib/python3.12/site-packages/sherpa_onnx/lib" || true
+          done
 
       - name: The app's own Python imports everything, finds Apple Silicon and the Mac catalogue
         run: |
