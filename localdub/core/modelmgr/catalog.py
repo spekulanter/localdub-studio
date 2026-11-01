@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from dataclasses import dataclass, field
 from importlib import resources
 from typing import Any
@@ -16,9 +17,10 @@ LANGS = ("sk",)  # languages that may carry translated texts next to the English
 STATUSES = ("recommended", "available", "experimental", "not_recommended", "custom")
 RUNS_ON = ("gpu", "cpu", "gpu-or-cpu")
 SOURCE_TYPES = (
-    "whisper", "ollama", "parakeet", "supertonic", "diarization", "demucs", "openvoice",
-    "youtube", "packages",
+    "whisper", "mlx-whisper", "ollama", "parakeet", "supertonic", "diarization", "demucs",
+    "openvoice", "youtube", "packages", "ffmpeg",
 )  # fmt: skip
+PLATFORMS = ("win32", "darwin")
 _OLLAMA_TAG = re.compile(r"^(?:[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*(?::[A-Za-z0-9._-]+)?$")
 _ID = re.compile(r"^[a-z0-9][a-z0-9._:~-]*$")
 
@@ -72,6 +74,7 @@ class Entry:
     replaced_by: str | None = None
     custom: bool = False
     source_langs: tuple[str, ...] | None = None  # None = every language
+    platforms: tuple[str, ...] | None = None  # None = every supported operating system
     translations: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def text(self, lang: str) -> dict[str, Any]:
@@ -163,6 +166,7 @@ def parse_entry(raw: dict[str, Any], *, custom: bool = False) -> Entry:
         replaced_by=raw.get("replaced_by"),
         custom=custom,
         source_langs=tuple(raw["source_langs"]) if raw.get("source_langs") else None,
+        platforms=tuple(raw["platforms"]) if raw.get("platforms") else None,
         translations={
             k: dict(v)
             for k, v in (raw.get("translations") or {k: raw[k] for k in LANGS if k in raw}).items()
@@ -170,7 +174,36 @@ def parse_entry(raw: dict[str, Any], *, custom: bool = False) -> Entry:
     )
 
 
-def parse_catalog(raw: dict[str, Any]) -> Catalog:
+def _merge(base: dict[str, Any], over: dict[str, Any]) -> dict[str, Any]:
+    """`over` laid on top of `base`; nested objects are merged, everything else is replaced."""
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def for_platform(raw_entry: dict[str, Any], platform: str) -> dict[str, Any] | None:
+    """The entry as it applies on `platform` (None: it does not exist there).
+
+    An entry may carry `"platforms": ["darwin"]` and, per operating system, an object named after it
+    (`"darwin": {...}`) whose fields replace the general ones, for example a different size.
+    """
+    platforms = raw_entry.get("platforms")
+    if platforms:
+        unknown = [p for p in platforms if p not in PLATFORMS]
+        if unknown:
+            raise CatalogError(f"entry {raw_entry.get('id', '?')}: unknown platform {unknown}")
+        if platform not in platforms:
+            return None
+    over = raw_entry.get(platform)
+    merged = _merge(raw_entry, over) if isinstance(over, dict) else dict(raw_entry)
+    for p in PLATFORMS:
+        merged.pop(p, None)
+    return merged
+
+
+def parse_catalog(raw: dict[str, Any], platform: str | None = None) -> Catalog:
+    platform = platform or sys.platform
     version = _need(raw, "catalog_version", str, "catalog")
     roles = tuple(
         Role(
@@ -183,7 +216,8 @@ def parse_catalog(raw: dict[str, Any]) -> Catalog:
         )
         for r in _need(raw, "roles", list, "catalog")
     )
-    entries = tuple(parse_entry(e) for e in _need(raw, "entries", list, "catalog"))
+    here = (for_platform(e, platform) for e in _need(raw, "entries", list, "catalog"))
+    entries = tuple(parse_entry(e) for e in here if e is not None)
     ids = [e.id for e in entries]
     if len(set(ids)) != len(ids):
         raise CatalogError("catalog: duplicate entry ids")
@@ -202,9 +236,10 @@ def parse_catalog(raw: dict[str, Any]) -> Catalog:
     return Catalog(version=version, roles=roles, entries=entries)
 
 
-def load_catalog() -> Catalog:
+def load_catalog(platform: str | None = None) -> Catalog:
+    """The catalogue for this operating system (entries of other systems are left out)."""
     text = (resources.files("localdub.core.modelmgr") / "catalog.json").read_text(encoding="utf-8")
-    return parse_catalog(json.loads(text))
+    return parse_catalog(json.loads(text), platform)
 
 
 def valid_ollama_tag(tag: str) -> bool:

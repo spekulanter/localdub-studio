@@ -89,17 +89,33 @@ def _which_fresh(name: str) -> str | None:
     return shutil.which(name, path=os.pathsep.join(d for d in dirs if d))
 
 
+# macOS: a program started from the Dock or Finder does not get the shell's PATH, so Homebrew's
+# folders are never on it. LocalDub's own copy (see media/ffmpeg_tools.py) is looked up first.
+MAC_TOOL_DIRS = ("/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin")
+
+
+def _which_mac(name: str) -> str | None:
+    if sys.platform != "darwin":
+        return None
+    from localdub.core.media.ffmpeg_tools import tools_dir
+
+    dirs = [str(tools_dir()), *MAC_TOOL_DIRS]
+    return shutil.which(name, path=":".join(dirs))
+
+
 def find_tool(name: str, configured: Path | None = None) -> Path:
     if configured is not None:
         if not configured.is_file():
             raise MediaError(f"Configured {name} not found at {configured}")
         return configured
-    found = shutil.which(name) or _which_fresh(name)
+    found = _which_mac(name) or shutil.which(name) or _which_fresh(name)
     if not found:
-        raise MediaError(
-            f"{name} not found on PATH. Install FFmpeg (e.g. `winget install Gyan.FFmpeg`) "
-            f"or set LOCALDUB_{name.upper()}_PATH."
+        how = (
+            "Download it on the AI models page, or install it with Homebrew (`brew install ffmpeg`)"
+            if sys.platform == "darwin"
+            else "Install FFmpeg (e.g. `winget install Gyan.FFmpeg`)"
         )
+        raise MediaError(f"{name} not found. {how}, or set LOCALDUB_{name.upper()}_PATH.")
     return Path(found)
 
 

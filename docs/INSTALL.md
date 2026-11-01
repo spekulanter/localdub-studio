@@ -1,5 +1,7 @@
 # Installing LocalDub Studio on Windows
 
+(On an Apple Silicon Mac, see [INSTALL-macOS.md](INSTALL-macOS.md).)
+
 LocalDub Studio is a normal Windows program: a setup wizard installs it, it opens in its own
 window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry and appears in
 *Settings → Apps*. Everything runs on your computer; your videos are never uploaded.

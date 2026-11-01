@@ -3,6 +3,24 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Added
+- **Apple Silicon Macs (experimental).** A self-contained `LocalDub Studio.app` in a `.dmg`, built by the CI on a
+  macOS runner. Speech recognition runs on the Mac's GPU through Apple's MLX (Whisper large-v3 and turbo, pinned
+  revisions); FFmpeg is fetched on request from a pinned, checksum-verified build; yt-dlp and Deno have macOS
+  builds; projects and models live in `~/Library/Application Support/LocalDub Studio`. Dock name and icon, a
+  macOS keep-awake request during dubbing, "open in Finder" and Metal-aware hardware text were added.
+  See docs/INSTALL-macOS.md for what was and was not checked. Nobody has dubbed a video on a real Mac yet.
+- The model catalogue can say which operating systems an entry is for (`platforms`) and override fields per
+  system, so each system lists only its own speech models and tools.
+
+### Changed
+- The lock file now covers Windows and Apple Silicon Macs. `extras.parse_pins` evaluates the markers of
+  `uv export` lines, so the optional-package plan only contains packages for the running system.
+- The release is now published by a separate job after the Windows build, with the Mac disk image added when
+  its build succeeded; a failing Mac build never blocks a Windows release.
+
 ## [0.4.6] - 2026-10-31
 
 ### Changed

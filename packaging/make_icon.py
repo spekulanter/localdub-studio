@@ -1,4 +1,5 @@
-"""Draw the LocalDub icon (rounded tile, audio waveform) into localdub/assets/localdub-orange.ico.
+"""Draw the LocalDub icon (rounded tile, audio waveform) into localdub/assets/localdub-orange.ico
+(Windows) and localdub-orange.icns (macOS).
 
 Pure numpy + zlib: no imaging library needed. Re-run to regenerate.
 """
@@ -13,6 +14,11 @@ import numpy as np
 
 OUT = Path(__file__).resolve().parents[1] / "localdub" / "assets" / "localdub-orange.ico"
 SIZES = (16, 24, 32, 48, 64, 128, 256)
+# macOS .icns: PNG-compressed entries. (type, pixel size); the @2x types reuse the next size up.
+ICNS_TYPES = (
+    (b"icp4", 16), (b"ic11", 32), (b"ic12", 64), (b"ic07", 128), (b"ic13", 256),
+    (b"ic08", 256), (b"ic14", 512), (b"ic09", 512),
+)  # fmt: skip
 
 
 def draw(size: int) -> np.ndarray:
@@ -87,6 +93,14 @@ def main() -> None:
         offset += len(data)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_bytes(header + entries + b"".join(images))
+    # macOS icon
+    drawn = {size: png(draw(size)) for size in sorted({sz for _, sz in ICNS_TYPES})}
+    body = b"".join(
+        kind + struct.pack(">I", 8 + len(drawn[size])) + drawn[size] for kind, size in ICNS_TYPES
+    )
+    icns = OUT.with_suffix(".icns")
+    icns.write_bytes(b"icns" + struct.pack(">I", 8 + len(body)) + body)
+    print(f"wrote {icns} ({icns.stat().st_size} bytes)")
     # a PNG preview for quick inspection
     (OUT.with_suffix(".png")).write_bytes(images[-1])
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes, sizes {SIZES})")

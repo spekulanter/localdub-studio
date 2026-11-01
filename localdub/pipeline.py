@@ -89,6 +89,17 @@ def default_providers(settings: Settings) -> Providers:
 
             assert choice.folder is not None
             return ParakeetProvider(choice.folder, num_threads=settings.tts_threads or 4)
+        if choice.engine == "mlx":
+            from localdub.core.asr.mlx_whisper_provider import MlxWhisperProvider
+
+            assert choice.repo is not None
+            return MlxWhisperProvider(
+                choice.repo,
+                choice.revision,
+                choice.name,
+                download_root=settings.models_dir / "whisper",
+                device="cpu" if settings.asr_device == "cpu" else None,
+            )
         from localdub.core.asr.faster_whisper_provider import FasterWhisperProvider
 
         return FasterWhisperProvider(

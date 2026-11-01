@@ -150,6 +150,7 @@ class JobManager:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=CREATE_NO_WINDOW,
+            start_new_session=sys.platform != "win32",  # its own process group on macOS
         )
         with self._lock:
             self._proc, self._current = proc, job_id

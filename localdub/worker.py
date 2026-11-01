@@ -19,7 +19,7 @@ from pathlib import Path
 from localdub.api.db import Database
 from localdub.config import Settings
 from localdub.core.gpu import register_cuda_dlls
-from localdub.core.platform import disable_power_throttling, pid_alive
+from localdub.core.platform import disable_power_throttling, keep_awake, pid_alive
 from localdub.core.youtube import ytdlp
 from localdub.core.youtube.remote import make_remote
 from localdub.pipeline import STAGES, Pipeline, PipelineError
@@ -119,6 +119,7 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
         )
 
     disable_power_throttling()
+    keep_awake()
     register_cuda_dlls()
     project_dir = data_dir / "projects" / str(project["id"])
     pipe = Pipeline(

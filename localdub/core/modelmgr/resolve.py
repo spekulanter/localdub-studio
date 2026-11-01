@@ -16,10 +16,11 @@ class UnknownModel(ValueError):
 @dataclass(frozen=True)
 class AsrChoice:
     entry_id: str
-    engine: str  # "whisper" | "parakeet"
+    engine: str  # "whisper" | "mlx" | "parakeet"
     name: str  # stable key used in the stage fingerprint: "large-v3", "parakeet-tdt-0.6b-v3-int8"
     repo: str | None  # Hugging Face repository (whisper)
     folder: Path | None  # model folder (parakeet)
+    revision: str | None = None  # pinned Hugging Face revision (mlx)
 
 
 def resolve_asr(settings: Settings, asr_id: str | None = None) -> AsrChoice:
@@ -30,6 +31,10 @@ def resolve_asr(settings: Settings, asr_id: str | None = None) -> AsrChoice:
     src = entry.source
     if src["type"] == "whisper":
         return AsrChoice(entry.id, "whisper", str(src["name"]), str(src["repo"]), None)
+    if src["type"] == "mlx-whisper":
+        return AsrChoice(
+            entry.id, "mlx", str(src["name"]), str(src["repo"]), None, str(src["revision"])
+        )
     if src["type"] == "parakeet":
         return AsrChoice(
             entry.id, "parakeet", str(src["dir"]), None, settings.models_dir / src["dir"]

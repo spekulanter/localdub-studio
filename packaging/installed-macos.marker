@@ -1,0 +1,1 @@
+This file tells LocalDub Studio it is installed as an app, so user data lives in ~/Library/Application Support/LocalDub Studio instead of inside the app.

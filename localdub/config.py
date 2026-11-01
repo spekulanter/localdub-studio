@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Literal
 
@@ -9,6 +10,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from localdub.paths import REPO_ROOT, user_dir
+
+DEFAULT_ASR_ID = "whisper-large-v3-mlx" if sys.platform == "darwin" else "whisper-large-v3"
 
 
 class Settings(BaseSettings):
@@ -31,7 +34,7 @@ class Settings(BaseSettings):
 
     # ASR
     # Speech recognition model: an id from the catalogue (core/modelmgr/catalog.json).
-    asr_id: str = "whisper-large-v3"
+    asr_id: str = Field(default_factory=lambda: DEFAULT_ASR_ID)
     asr_model: str = "large-v3"  # legacy name, kept for old .env files; asr_id wins
     asr_device: str = "cuda"
     asr_compute_type: str = "float16"

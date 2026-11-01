@@ -172,7 +172,7 @@ export interface ModelRole {
 }
 
 export interface HardwareInfo {
-  gpu: { name: string; vram_gb: number; vram_free_gb: number; driver: string } | null;
+  gpu: { name: string; vram_gb: number; vram_free_gb: number; driver: string; unified?: boolean } | null;
   ram_gb: number | null;
   cpu_threads: number;
   disk_free_bytes: number;

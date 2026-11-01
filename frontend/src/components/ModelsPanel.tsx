@@ -26,6 +26,14 @@ const FIT_CLASS: Record<string, string> = {
   no_gpu: "chip chip-warn",
 };
 
+/** On an Apple Silicon Mac the GPU has no card of its own: say "Mac" and "memory". */
+const FIT_LABEL_MAC: Record<string, string> = {
+  ok: "Fits your Mac",
+  partial: "Only partly fits your Mac",
+  too_big: "Too big for your Mac",
+  no_gpu: "No Apple Silicon chip found",
+};
+
 const FIT_LABEL: Record<string, string> = {
   ok: "Fits your graphics card",
   cpu: "Runs on the processor",
@@ -74,7 +82,7 @@ function Progress({ m }: { m: ModelInfo }) {
   );
 }
 
-function Details({ m }: { m: ModelInfo }) {
+function Details({ m, mac }: { m: ModelInfo; mac: boolean }) {
   const t = useT();
   const r = m.requirements;
   return (
@@ -104,7 +112,9 @@ function Details({ m }: { m: ModelInfo }) {
         <p className="text-muted">
           <span className="font-medium text-ink">{t("Needs:")}</span>{" "}
           {t("about {size} download, {disk} GB on disk", { size: formatBytes(m.size_bytes), disk: r.disk_gb })}
-          {r.vram_gb !== null ? `, ${t("about {gb} GB of graphics memory", { gb: r.vram_gb })}` : `, ${t("no graphics memory")}`}.
+          {r.vram_gb !== null
+            ? `, ${t(mac ? "about {gb} GB of the Mac's memory" : "about {gb} GB of graphics memory", { gb: r.vram_gb })}`
+            : `, ${t(mac ? "no extra memory" : "no graphics memory")}`}.
           {r.note ? ` ${r.note}` : ""}
           {r.needs_packages ? ` ${t("Needs the optional packages.")}` : ""}
         </p>
@@ -154,6 +164,7 @@ function Card({
   const d = m.download;
   const active = d?.status === "queued" || d?.status === "running";
   const shared = m.store_note !== null;
+  const mac = data.hardware?.gpu?.unified === true;
   const lastOfRequired =
     m.required && data.models.filter((x) => x.role === m.role && x.installed).length === 1;
   return (
@@ -176,7 +187,7 @@ function Card({
             {m.selected && role?.selectable && <span className="chip chip-ok">{t("In use for new dubs")}</span>}
             {m.update.available && <span className="chip chip-warn">{t("Update available")}</span>}
             <span className={FIT_CLASS[m.fits.level] ?? "chip"} title={m.fits.text}>
-              {t(FIT_LABEL[m.fits.level] ?? m.fits.level)}
+              {t((mac ? FIT_LABEL_MAC[m.fits.level] : undefined) ?? FIT_LABEL[m.fits.level] ?? m.fits.level)}
             </span>
           </div>
         </div>
@@ -253,7 +264,7 @@ function Card({
         </div>
       )}
       <Progress m={m} />
-      <Details m={m} />
+      <Details m={m} mac={mac} />
     </li>
   );
 }
@@ -324,8 +335,12 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
       {hw && (
         <div className="rounded-md border border-line p-3 text-sm" aria-label={t("This computer")}>
           <p>
-            <span className="font-medium">{t("Graphics card:")}</span>{" "}
-            {hw.gpu ? `${hw.gpu.name}, ${hw.gpu.vram_gb} GB` : t("no NVIDIA card found (models run on the processor, slowly)")}
+            <span className="font-medium">{t(hw.gpu?.unified ? "Chip:" : "Graphics card:")}</span>{" "}
+            {hw.gpu
+              ? hw.gpu.unified
+                ? t("{name}, {gb} GB usable by the GPU", { name: hw.gpu.name, gb: hw.gpu.vram_gb })
+                : `${hw.gpu.name}, ${hw.gpu.vram_gb} GB`
+              : t("no NVIDIA card found (models run on the processor, slowly)")}
             {" · "}
             <span className="font-medium">{t("Memory:")}</span> {hw.ram_gb ?? "?"} GB
             {" · "}

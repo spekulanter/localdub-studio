@@ -1,5 +1,5 @@
 {
-  "catalog_version": "2026.10.31",
+  "catalog_version": "2026.11.01",
   "roles": [
     {
       "id": "asr",
@@ -32,6 +32,17 @@
       "sk": {
         "title": "Slovenský hlas",
         "description": "Hovorí slovenský text. Je to jeden model s desiatimi hlasmi (F1 až M5); hlas vyberáte pri každom dabingu."
+      }
+    },
+    {
+      "id": "ffmpeg",
+      "title": "FFmpeg",
+      "required": true,
+      "selectable": false,
+      "description": "Reads and writes the video and audio. Every dub needs it.",
+      "sk": {
+        "title": "FFmpeg",
+        "description": "Číta a zapisuje video a zvuk. Potrebuje ho každý dabing."
       }
     },
     {
@@ -81,6 +92,60 @@
   ],
   "entries": [
     {
+      "id": "whisper-large-v3-mlx",
+      "role": "asr",
+      "default": true,
+      "status": "experimental",
+      "platforms": [
+        "darwin"
+      ],
+      "title": "Whisper large-v3 (Apple Silicon)",
+      "summary": "The most accurate Whisper, running on the Mac's GPU through Apple's MLX. Not measured on a Mac yet.",
+      "choose_if": [
+        "You have a Mac with an M-series chip and 8 GB or more of memory.",
+        "You want the best result on accents, background noise and fast speech."
+      ],
+      "avoid_if": [
+        "Your Mac has little free memory: the turbo version needs about half."
+      ],
+      "requirements": {
+        "vram_gb": 6,
+        "disk_gb": 3.1,
+        "runs_on": "gpu",
+        "note": "About 4 to 5 GB of the Mac's memory while it works; released again afterwards."
+      },
+      "size_bytes": 3083521000,
+      "license": {
+        "name": "MIT",
+        "url": "https://huggingface.co/mlx-community/whisper-large-v3-mlx"
+      },
+      "measured": null,
+      "pinned": "Pinned to one revision (49e6aa28) of the mlx-community repository.",
+      "source": {
+        "type": "mlx-whisper",
+        "repo": "mlx-community/whisper-large-v3-mlx",
+        "revision": "49e6aa286ad60c14352c404340ded53710378a11",
+        "name": "large-v3-mlx",
+        "files": [
+          "config.json",
+          "weights.npz"
+        ]
+      },
+      "sk": {
+        "title": "Whisper large-v3 (Apple Silicon)",
+        "summary": "Najpresnejší Whisper, beží na GPU Macu cez Apple MLX. Na Macu zatiaľ nemeraný.",
+        "choose_if": [
+          "Máte Mac s čipom M a 8 GB pamäte alebo viac.",
+          "Chcete najlepší výsledok pri prízvukoch, hluku v pozadí a rýchlej reči."
+        ],
+        "avoid_if": [
+          "Váš Mac má málo voľnej pamäte: verzia turbo potrebuje asi polovicu."
+        ],
+        "note": "Počas práce asi 4 až 5 GB pamäte Macu; potom sa uvoľní.",
+        "pinned": "Pripnuté na jednu revíziu (49e6aa28) repozitára mlx-community."
+      }
+    },
+    {
       "id": "whisper-large-v3",
       "role": "asr",
       "default": true,
@@ -123,7 +188,10 @@
         ],
         "note": "Počas práce asi 3,9 GB pamäte grafickej karty; potom sa uvoľní.",
         "measured": "Bezchybné na našich testovacích klipoch; asi 0,06 až 0,09-násobok reálneho času na RTX 5060 Laptop (5-minútové video za 31 s)."
-      }
+      },
+      "platforms": [
+        "win32"
+      ]
     },
     {
       "id": "whisper-large-v3-turbo",
@@ -164,6 +232,60 @@
         "avoid_if": [
           "Vaše videá sú hlučné, majú silný prízvuk alebo hudbu pod rečou: použite large-v3."
         ]
+      },
+      "platforms": [
+        "win32"
+      ]
+    },
+    {
+      "id": "whisper-large-v3-turbo-mlx",
+      "role": "asr",
+      "status": "experimental",
+      "platforms": [
+        "darwin"
+      ],
+      "title": "Whisper large-v3 turbo (Apple Silicon)",
+      "summary": "About half the size and faster than large-v3; slightly less accurate on difficult audio. Not measured on a Mac yet.",
+      "choose_if": [
+        "You want faster recognition or have a Mac with 8 GB of memory.",
+        "Your videos have clear speech."
+      ],
+      "avoid_if": [
+        "Your videos are noisy, have heavy accents or music under the speech: use large-v3."
+      ],
+      "requirements": {
+        "vram_gb": 3,
+        "disk_gb": 1.6,
+        "runs_on": "gpu"
+      },
+      "size_bytes": 1613978000,
+      "license": {
+        "name": "MIT (OpenAI Whisper)",
+        "url": "https://huggingface.co/mlx-community/whisper-large-v3-turbo"
+      },
+      "measured": null,
+      "pinned": "Pinned to one revision (a4aaeec0) of the mlx-community repository.",
+      "source": {
+        "type": "mlx-whisper",
+        "repo": "mlx-community/whisper-large-v3-turbo",
+        "revision": "a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb",
+        "name": "large-v3-turbo-mlx",
+        "files": [
+          "config.json",
+          "weights.safetensors"
+        ]
+      },
+      "sk": {
+        "title": "Whisper large-v3 turbo (Apple Silicon)",
+        "summary": "Asi polovičná veľkosť a rýchlejšie než large-v3; pri ťažkom zvuku trochu menej presné. Na Macu zatiaľ nemeraný.",
+        "choose_if": [
+          "Chcete rýchlejšie rozpoznávanie alebo máte Mac s 8 GB pamäte.",
+          "Vaše videá majú čistú reč."
+        ],
+        "avoid_if": [
+          "Vaše videá sú hlučné, majú silný prízvuk alebo hudbu pod rečou: použite large-v3."
+        ],
+        "pinned": "Pripnuté na jednu revíziu (a4aaeec0) repozitára mlx-community."
       }
     },
     {
@@ -208,6 +330,9 @@
       },
       "source_langs": [
         "en"
+      ],
+      "platforms": [
+        "win32"
       ]
     },
     {
@@ -435,6 +560,45 @@
       }
     },
     {
+      "id": "ffmpeg",
+      "role": "ffmpeg",
+      "default": true,
+      "status": "available",
+      "platforms": [
+        "darwin"
+      ],
+      "title": "FFmpeg (video and audio tools)",
+      "summary": "Reads and writes the video and audio. If FFmpeg from Homebrew is already on this Mac, LocalDub uses that one.",
+      "choose_if": [
+        "It is required: every dub needs it."
+      ],
+      "avoid_if": [],
+      "requirements": {
+        "vram_gb": null,
+        "disk_gb": 0.16,
+        "runs_on": "cpu",
+        "note": "Two programs, ffmpeg and ffprobe, about 57 MB to download."
+      },
+      "size_bytes": 57000000,
+      "license": {
+        "name": "GPL v3 (this build; FFmpeg itself is LGPL/GPL)",
+        "url": "https://ffmpeg.martin-riedl.de"
+      },
+      "measured": null,
+      "pinned": "Version 9.0.2 from Martin Riedl's build server; each file is pinned to a SHA-256.",
+      "source": {
+        "type": "ffmpeg"
+      },
+      "sk": {
+        "summary": "Číta a zapisuje video a zvuk. Ak už máte na tomto Macu FFmpeg z Homebrew, LocalDub použije ten.",
+        "choose_if": [
+          "Je povinný: potrebuje ho každý dabing."
+        ],
+        "note": "Dva programy, ffmpeg a ffprobe, stiahne sa asi 57 MB.",
+        "pinned": "Verzia 9.0.2 zo serverovej zostavy Martina Riedla; každý súbor je pripnutý na SHA-256."
+      }
+    },
+    {
       "id": "diarization",
       "role": "diarization",
       "default": true,
@@ -640,6 +804,34 @@
         ],
         "note": "Sťahovanie asi 2,9 GB, na disku 4,5 GB.",
         "pinned": "Verzie pochádzajú zo zamykacieho súboru programu."
+      },
+      "darwin": {
+        "summary": "The Demucs library that speech removal needs. PyTorch itself is already part of LocalDub on a Mac.",
+        "choose_if": [
+          "You want speech removal."
+        ],
+        "avoid_if": [
+          "You do not: nothing else needs it."
+        ],
+        "size_bytes": 60000000,
+        "requirements": {
+          "disk_gb": 0.15,
+          "note": "About 60 MB to download."
+        },
+        "license": {
+          "name": "MIT (Demucs), BSD-style (PyTorch)",
+          "url": "https://github.com/adefossez/demucs"
+        },
+        "sk": {
+          "summary": "Knižnica Demucs, ktorú potrebuje odstránenie reči. PyTorch je na Macu už súčasťou LocalDub.",
+          "choose_if": [
+            "Chcete odstraňovať reč."
+          ],
+          "avoid_if": [
+            "Nechcete: nič iné ju nepotrebuje."
+          ],
+          "note": "Stiahne sa asi 60 MB."
+        }
       }
     }
   ]

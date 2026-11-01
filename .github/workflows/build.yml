@@ -132,8 +132,157 @@ jobs:
           path: release/*
           if-no-files-found: error
 
-      - name: Publish pre-release (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+  macos:
+    # Apple Silicon (M1 and newer). The runner has no GPU, so only the parts that do not need one are
+    # exercised; what was and was not checked is written in docs/INSTALL-macOS.md.
+    runs-on: macos-14
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Tools (uv, FFmpeg for the tests)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/uvenv"
+          "$RUNNER_TEMP/uvenv/bin/pip" install --disable-pip-version-check uv==0.12.23
+          echo "$RUNNER_TEMP/uvenv/bin" >> "$GITHUB_PATH"
+          brew install ffmpeg
+          "$RUNNER_TEMP/uvenv/bin/uv" --version
+
+      - name: Python checks
+        run: |
+          uv sync --frozen
+          uv run ruff check .
+          uv run mypy localdub
+          uv run pytest -q
+
+      - name: Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build the app and the disk image
+        run: uv run python packaging/build_macos.py --skip-frontend
+
+      - name: Install the app from the disk image (as a user would)
+        run: |
+          dmg=$(ls release/LocalDub-Studio-*-macOS-arm64.dmg)
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint /Volumes/LocalDubTest
+          ls -la /Volumes/LocalDubTest
+          ditto "/Volumes/LocalDubTest/LocalDub Studio.app" "/Applications/LocalDub Studio.app"
+          hdiutil detach /Volumes/LocalDubTest
+          # what a download from a browser gets: Gatekeeper's quarantine flag
+          xattr -w com.apple.quarantine "0083;5f5e1000;Safari;" "/Applications/LocalDub Studio.app"
+          codesign --verify --deep --strict "/Applications/LocalDub Studio.app" && echo "signature seals"
+          du -sh "/Applications/LocalDub Studio.app"
+
+      - name: The app's own Python imports everything, finds Apple Silicon and the Mac catalogue
+        run: |
+          APP="/Applications/LocalDub Studio.app/Contents/Resources"
+          cd "$RUNNER_TEMP"
+          PYTHONPATH="$APP/app" PYTHONNOUSERSITE=1 "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" imports
+
+      - name: Download the pinned FFmpeg, yt-dlp and Deno for real, and run them
+        run: |
+          APP="/Applications/LocalDub Studio.app/Contents/Resources"
+          cd "$RUNNER_TEMP"
+          export PYTHONPATH="$APP/app" PYTHONNOUSERSITE=1
+          "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" ffmpeg
+          "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" youtube
+
+      - name: The optional Demucs packages can be planned from the app's lock file
+        run: |
+          APP="/Applications/LocalDub Studio.app/Contents/Resources"
+          cd "$RUNNER_TEMP"
+          PYTHONPATH="$APP/app" PYTHONNOUSERSITE=1 "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" extras
+
+      - name: The server starts from the installed app and serves the interface
+        run: |
+          APP="/Applications/LocalDub Studio.app/Contents/Resources"
+          cd "$RUNNER_TEMP"
+          export PYTHONPATH="$APP/app" PYTHONNOUSERSITE=1
+          "$APP/python/bin/python3" -m localdub.cli serve > "$RUNNER_TEMP/server.log" 2>&1 &
+          pid=$!
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8765/api/ping > /dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "$ok" != 1 ]; then cat "$RUNNER_TEMP/server.log"; kill $pid; exit 1; fi
+          curl -fsS http://127.0.0.1:8765/ | grep -q "LocalDub Studio"
+          curl -fsS "http://127.0.0.1:8765/api/options" | python3 -c "
+          import json, sys
+          o = json.load(sys.stdin)
+          ids = [c['id'] for c in o['asr_choices']]
+          print('speech models offered:', ids)
+          assert o['default_asr'] == 'whisper-large-v3-mlx', o['default_asr']
+          assert 'whisper-large-v3' not in ids
+          "
+          curl -fsS "http://127.0.0.1:8765/api/models" | python3 -c "
+          import json, sys
+          m = json.load(sys.stdin)
+          rows = {r['id']: r for r in m['models']}
+          print('hardware:', m['hardware'])
+          assert m['hardware']['gpu']['unified'] is True
+          assert 'ffmpeg' in rows and rows['ffmpeg']['required']
+          print('still to download:', m['required_missing'])
+          "
+          kill $pid
+          test -f "$HOME/Library/Application Support/LocalDub Studio/data/localdub.sqlite"
+          test ! -e "/Applications/LocalDub Studio.app/Contents/Resources/app/data"
+          echo "user data is in Application Support, not in the app"
+
+      - name: Open the app like a user (window, Dock). Not every runner has a screen.
+        continue-on-error: true
+        run: |
+          xattr -dr com.apple.quarantine "/Applications/LocalDub Studio.app"  # a user clicks "Open Anyway"
+          open -n -a "/Applications/LocalDub Studio.app"
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8765/api/ping > /dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          sleep 15
+          echo "--- launch.log"; cat "$HOME/Library/Logs/LocalDub Studio/launch.log" || true
+          echo "--- app.log"; cat "$HOME/Library/Application Support/LocalDub Studio/data/logs/app.log" || true
+          pkill -f "localdub.desktop" || true
+          test "$ok" = 1
+          grep -q "Window loaded" "$HOME/Library/Application Support/LocalDub Studio/data/logs/app.log"
+
+      - name: Whisper (MLX) transcribes a spoken sentence on the processor. The runner has no GPU.
+        continue-on-error: true
+        run: |
+          APP="/Applications/LocalDub Studio.app/Contents/Resources"
+          cd "$RUNNER_TEMP"
+          PYTHONPATH="$APP/app" PYTHONNOUSERSITE=1 "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" asr
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: LocalDub-Studio-macos
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    # Windows decides whether there is a release; the Mac build is added when it succeeded.
+    if: startsWith(github.ref, 'refs/tags/v') && always() && needs.windows.result == 'success'
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: LocalDub-Studio-*
+          path: release
+          merge-multiple: true
+
+      - name: Publish pre-release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -145,11 +294,21 @@ jobs:
           $footer = @'
 
           ---
-          **Unsigned installer**: Windows SmartScreen will warn (More info, then Run anyway). Compare the download with
-          the `.sha256` file. Needs Windows 10/11 64-bit; an NVIDIA GPU with 8 GB or more is recommended.
-          Setup installs the program and its Python libraries (about 2.5 GB). The AI models (about 6.7 GB) are
-          downloaded inside the app on first start. See docs/INSTALL.md and docs/QUALITY.md.
+          **Windows**: the installer is unsigned, so Windows SmartScreen will warn (More info, then Run anyway). Compare
+          the download with the `.sha256` file. Needs Windows 10/11 64-bit; an NVIDIA GPU with 8 GB or more is
+          recommended. Setup installs the program and its Python libraries (about 2.5 GB). The AI models (about
+          6.7 GB) are downloaded inside the app on first start. See docs/INSTALL.md and docs/QUALITY.md.
           '@
+          $files = Get-ChildItem release -File | Sort-Object Name | ForEach-Object { $_.FullName }
+          if ($files | Where-Object { $_ -like '*.dmg' }) {
+            $footer += @'
+
+          **macOS (Apple Silicon)**: `LocalDub-Studio-*-macOS-arm64.dmg`. Unsigned, so the first start needs a
+          right-click, Open (see docs/INSTALL-macOS.md). **Experimental**: the Mac version was built and checked
+          by an automated runner without a GPU and has not been used on a real Mac yet; speed and quality there
+          are unmeasured.
+          '@
+          }
           Set-Content -Path release-notes.md -Value ($m.Groups[1].Value.Trim() + "`n" + $footer) -Encoding UTF8
-          gh release create $env:GITHUB_REF_NAME release/*.exe release/*.zip release/*.sha256 `
+          gh release create $env:GITHUB_REF_NAME @files `
             --title "LocalDub Studio $env:GITHUB_REF_NAME" --notes-file release-notes.md --prerelease

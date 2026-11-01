@@ -28,9 +28,19 @@ from localdub.paths import user_dir
 log = logging.getLogger(__name__)
 
 TOOLS_ENV = "LOCALDUB_YOUTUBE_TOOLS_DIR"
-YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+
+
+def _spec(platform: str) -> tuple[str, str, str, str]:
+    """(yt-dlp release asset, yt-dlp file name, Deno archive, Deno file name) for an OS."""
+    if platform == "darwin":
+        return "yt-dlp_macos", "yt-dlp", "deno-aarch64-apple-darwin.zip", "deno"
+    return "yt-dlp.exe", "yt-dlp.exe", "deno-x86_64-pc-windows-msvc.zip", "deno.exe"
+
+
+# Which files to fetch: the release asset of each tool and the name it gets on disk.
+YTDLP_ASSET, YTDLP_FILE, DENO_ZIP, DENO_FILE = _spec(sys.platform)
+YTDLP_URL = f"https://github.com/yt-dlp/yt-dlp/releases/latest/download/{YTDLP_ASSET}"
 YTDLP_SUMS_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS"
-DENO_ZIP = "deno-x86_64-pc-windows-msvc.zip"
 DENO_URL = f"https://github.com/denoland/deno/releases/latest/download/{DENO_ZIP}"
 DENO_SUM_URL = f"{DENO_URL}.sha256sum"
 # only used for the size shown before the download starts
@@ -66,11 +76,11 @@ def _candidate(name: str, file: str) -> Path | None:
 
 
 def find_ytdlp() -> Path | None:
-    return _candidate("yt-dlp", "yt-dlp.exe")
+    return _candidate("yt-dlp", YTDLP_FILE)
 
 
 def find_deno() -> Path | None:
-    return _candidate("deno", "deno.exe")
+    return _candidate("deno", DENO_FILE)
 
 
 def _version(path: Path | None, arg: str) -> ToolInfo:
@@ -172,7 +182,7 @@ def _download(
 
 
 def install(progress: Progress, *, client: httpx.Client | None = None) -> None:
-    """Download and verify yt-dlp.exe and Deno into the managed folder. Blocking."""
+    """Download and verify yt-dlp and Deno into the managed folder. Blocking."""
     own = client is None
     client = client or httpx.Client(timeout=httpx.Timeout(30.0, read=120.0))
     target = tools_dir()
@@ -192,13 +202,13 @@ def install(progress: Progress, *, client: httpx.Client | None = None) -> None:
     try:
         try:
             progress(0, ESTIMATED_BYTES, "Reading the checksums...")
-            ytdlp_sum = parse_checksum(_get_text(client, YTDLP_SUMS_URL), "yt-dlp.exe")
+            ytdlp_sum = parse_checksum(_get_text(client, YTDLP_SUMS_URL), YTDLP_ASSET)
             deno_sum = parse_checksum(_get_text(client, DENO_SUM_URL), DENO_ZIP)
 
-            ytdlp_tmp = stage / "yt-dlp.exe"
+            ytdlp_tmp = stage / YTDLP_FILE
             got = _download(client, YTDLP_URL, ytdlp_tmp, report("yt", 0, "Downloading yt-dlp"))
             if got != ytdlp_sum:
-                raise _mismatch("yt-dlp.exe", ytdlp_sum, got)
+                raise _mismatch(YTDLP_ASSET, ytdlp_sum, got)
 
             zip_tmp = stage / DENO_ZIP
             got = _download(
@@ -214,12 +224,14 @@ def install(progress: Progress, *, client: httpx.Client | None = None) -> None:
         progress(sum(sizes.values()), max(sum(sizes.values()), 1), "Installing...")
         with zipfile.ZipFile(zip_tmp) as z:
             try:
-                info = z.getinfo("deno.exe")  # exact member name: no path traversal possible
+                info = z.getinfo(DENO_FILE)  # exact member name: no path traversal possible
             except KeyError as exc:
-                raise ToolsError("The Deno archive does not contain deno.exe") from exc
-            with z.open(info) as src, (stage / "deno.exe").open("wb") as out:
+                raise ToolsError(f"The Deno archive does not contain {DENO_FILE}") from exc
+            with z.open(info) as src, (stage / DENO_FILE).open("wb") as out:
                 shutil.copyfileobj(src, out)
-        for name in ("yt-dlp.exe", "deno.exe"):
+        for name in (YTDLP_FILE, DENO_FILE):
+            if sys.platform != "win32":
+                (stage / name).chmod(0o755)  # downloaded files are not executable by default
             (stage / name).replace(target / name)
     finally:
         shutil.rmtree(stage, ignore_errors=True)

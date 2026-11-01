@@ -34,6 +34,17 @@ LocalDub Studio incorporates the following third-party components. This document
 | **NVIDIA Parakeet TDT 0.6B v3** (sherpa-onnx int8 build) | Experimental speech recognition (optional) | SHA-256 5793d0fd…b16bf | **CC BY 4.0** — attribution: "parakeet-tdt-0.6b-v3 by NVIDIA, converted to ONNX by the k2-fsa/sherpa-onnx project" | [GitHub release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) | Yes (downloaded on request, checksum-verified) |
 | Silero VAD | Voice activity detection (bundled in faster-whisper) | bundled | MIT | [GitHub](https://github.com/snakers4/silero-vad) | Yes |
 
+#### macOS (Apple Silicon) only
+
+| Component | Role | Version / Revision | License | License Link | Runs Locally |
+|---|---|---|---|---|---|
+| mlx-whisper | Whisper inference on Apple's MLX (the Mac's GPU) | 0.4.3 | MIT | [PyPI](https://pypi.org/project/mlx-whisper/0.4.3/) | Yes |
+| MLX (`mlx`, `mlx-metal`) | Array framework by Apple | 0.32.4 (see `uv.lock`) | MIT | [PyPI](https://pypi.org/project/mlx/) | Yes |
+| mlx-community/whisper-large-v3-mlx | Whisper large-v3 converted for MLX | pinned @ `49e6aa286ad60c14352c404340ded53710378a11` | MIT (the repository declares `license:mit`; the weights are OpenAI's Whisper) | [HuggingFace](https://huggingface.co/mlx-community/whisper-large-v3-mlx) | Yes (downloaded on request) |
+| mlx-community/whisper-large-v3-turbo | Whisper large-v3 turbo converted for MLX | pinned @ `a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb` | MIT (OpenAI Whisper; the repository itself states no licence) | [HuggingFace](https://huggingface.co/mlx-community/whisper-large-v3-turbo) | Yes (downloaded on request) |
+| PyObjC (`pyobjc-*`) | Lets pywebview use the system web view | 13.0 | MIT | [PyPI](https://pypi.org/project/pyobjc-core/) | Yes |
+| PyTorch (macOS build) | Pulled in by mlx-whisper; also used by Demucs | 2.9.1 | BSD-style | [pytorch.org](https://pytorch.org/) | Yes |
+
 ### Speech Synthesis (TTS)
 
 | Component | Role | Version / Revision | License | License Link | Runs Locally |
@@ -110,6 +121,7 @@ The following uses are **prohibited** under the OpenRAIL-M license for the Super
 | nvidia-cudnn-cu12 | CUDA DNN (deep neural nets) | 9.27.0.42 | **NVIDIA Proprietary EULA** | [NVIDIA EULA](https://docs.nvidia.com/cuda/eula/index.html) | Yes |
 | FFmpeg | Audio/video processing (full build, gyan.dev) | 9.0.1 | **GPL v3** | [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) | Yes |
 | Rubber Band Library | Time-stretching (transitive via FFmpeg) | (FFmpeg build) | **GPL v2+** | [GitHub](https://github.com/breakfastquay/rubberband) | Yes |
+| **FFmpeg for macOS** (static arm64 build by Martin Riedl) | Audio/video processing; downloaded by the user inside the app, **not shipped in the disk image** | 9.0.2, `ffmpeg.zip` SHA-256 `c8ed4c4e…92d924`, `ffprobe.zip` SHA-256 `fcbe8395…7ea6` | **GPL v3** (`--enable-gpl --enable-version3`; no `--enable-nonfree`, checked in the binary) | [ffmpeg.martin-riedl.de](https://ffmpeg.martin-riedl.de) | Yes |
 | numpy | Numerical computing | ≥2.0, <2.6 | BSD-3-Clause (composite) | [PyPI](https://pypi.org/project/numpy/) | Yes |
 | soundfile | Audio I/O (wraps libsndfile) | 0.14.0 | BSD-3-Clause | [PyPI](https://pypi.org/project/soundfile/) | Yes |
 | libsndfile | Audio file I/O (native lib) | (system/bundled) | **LGPL-2.1** | [GitHub](https://github.com/libsndfile/libsndfile) | Yes |

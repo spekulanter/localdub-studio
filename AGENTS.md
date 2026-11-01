@@ -16,6 +16,12 @@ Agents working from WSL must call Windows binaries:
 Never use the Linux `python3`/`uv` on this repo (it would clobber `.venv`). Some sandboxed agents
 cannot reach Windows interop; they should say so and not claim test results.
 
+## macOS build
+The Mac app (`packaging/build_macos.py`) can only be built and tested on a macOS runner (the `macos` job of
+`.github/workflows/build.yml`); agents working from WSL cannot run it and must not claim it works on a Mac.
+Mac-specific code paths are unit-tested from any system by monkeypatching `sys.platform` (see
+`tests/unit/test_macos.py`). Do not call the Mac version tested beyond what docs/INSTALL-macOS.md lists.
+
 ## Rules
 - Work one milestone at a time (see PLAN.md / TASKS.md). Do not start the next one until the
   current one's acceptance tests pass.

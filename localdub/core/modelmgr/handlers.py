@@ -25,6 +25,8 @@ import httpx
 
 from localdub import extras
 from localdub.config import Settings
+from localdub.core.media import ffmpeg_tools
+from localdub.core.media.ffmpeg import MediaError, find_tool
 from localdub.core.modelmgr.catalog import Entry
 from localdub.core.models import ensure_archive_files, ensure_model, is_readable
 from localdub.core.youtube import tools as youtube_tools
@@ -294,9 +296,13 @@ class WhisperHandler(Handler):
         "tokenizer.json",
         "vocabulary.*",
     ]
+    WEIGHTS = "model.bin"
 
     def _cache(self, ctx: Ctx) -> Path:
         return ctx.models_dir / "whisper"
+
+    def _patterns(self, e: Entry) -> list[str]:
+        return list(self.PATTERNS)
 
     def _snapshot(self, e: Entry, ctx: Ctx) -> Path | None:
         from huggingface_hub import snapshot_download
@@ -304,8 +310,9 @@ class WhisperHandler(Handler):
         try:
             found: str = snapshot_download(
                 e.source["repo"],
+                revision=e.source.get("revision"),
                 cache_dir=str(self._cache(ctx)),
-                allow_patterns=self.PATTERNS,
+                allow_patterns=self._patterns(e),
                 local_files_only=True,
             )
         except Exception:  # noqa: BLE001 - not downloaded (or incomplete)
@@ -314,7 +321,7 @@ class WhisperHandler(Handler):
 
     def installed(self, e: Entry, ctx: Ctx) -> bool:
         snap = self._snapshot(e, ctx)
-        return snap is not None and is_readable(snap / "model.bin")
+        return snap is not None and is_readable(snap / self.WEIGHTS)
 
     def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
         from huggingface_hub import snapshot_download
@@ -323,7 +330,8 @@ class WhisperHandler(Handler):
         repo = e.source["repo"]
         snapshot_download(
             repo,
-            allow_patterns=self.PATTERNS,
+            revision=e.source.get("revision"),
+            allow_patterns=self._patterns(e),
             cache_dir=str(cache),
             tqdm_class=byte_progress(progress, e.size_bytes),
         )
@@ -356,6 +364,17 @@ class WhisperHandler(Handler):
             return str(HfApi().model_info(e.source["repo"]).sha)
         except Exception as exc:  # noqa: BLE001
             raise ModelError(f"Could not ask Hugging Face about {e.source['repo']}: {exc}") from exc
+
+
+class MlxWhisperHandler(WhisperHandler):
+    """Whisper converted for Apple's MLX (Apple Silicon), pinned to one repository revision."""
+
+    def _patterns(self, e: Entry) -> list[str]:
+        return list(e.source["files"])
+
+    def installed(self, e: Entry, ctx: Ctx) -> bool:
+        snap = self._snapshot(e, ctx)
+        return snap is not None and all(is_readable(snap / f) for f in e.source["files"])
 
 
 class OllamaHandler(Handler):
@@ -542,6 +561,42 @@ class DemucsHandler(Handler):
         self.delete(e, ctx)
 
 
+class FfmpegHandler(Handler):
+    """FFmpeg on macOS: LocalDub's own copy, or one the user already has (Homebrew)."""
+
+    def _found(self) -> Path | None:
+        try:
+            find_tool("ffprobe")
+            return find_tool("ffmpeg")
+        except MediaError:
+            return None
+
+    def installed(self, e: Entry, ctx: Ctx) -> bool:
+        return self._found() is not None
+
+    def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
+        try:
+            ffmpeg_tools.install(progress)
+        except ffmpeg_tools.FfmpegToolsError as exc:
+            raise ModelError(str(exc)) from exc
+
+    def locations(self, e: Entry, ctx: Ctx) -> list[Path]:
+        found = self._found()
+        return [found.parent] if found else []
+
+    def note(self, e: Entry, ctx: Ctx) -> str | None:
+        found = self._found()
+        if found is None or found.parent == ffmpeg_tools.tools_dir():
+            return None
+        return f"Found at {found.parent}; LocalDub did not install it and will not remove it."
+
+    def delete(self, e: Entry, ctx: Ctx) -> None:
+        if not ffmpeg_tools.remove():
+            raise NotDeletable(
+                "This FFmpeg was not installed by LocalDub, so it will not remove it."
+            )
+
+
 class YoutubeHandler(Handler):
     def installed(self, e: Entry, ctx: Ctx) -> bool:
         return youtube_tools.is_installed()
@@ -556,7 +611,7 @@ class YoutubeHandler(Handler):
     def delete(self, e: Entry, ctx: Ctx) -> None:
         d = youtube_tools.tools_dir()
         removed = False
-        for name in ("yt-dlp.exe", "deno.exe"):
+        for name in (youtube_tools.YTDLP_FILE, youtube_tools.DENO_FILE):
             f = d / name
             if f.is_file() and not is_link(f):
                 f.unlink()
@@ -623,6 +678,7 @@ def fetch_in_subprocess(model_id: str, should_stop: Callable[[], bool] = lambda:
 
 HANDLERS: dict[str, Handler] = {
     "whisper": WhisperHandler(),
+    "mlx-whisper": MlxWhisperHandler(),
     "ollama": OllamaHandler(),
     "parakeet": ParakeetHandler(),
     "supertonic": SupertonicHandler(),
@@ -631,4 +687,5 @@ HANDLERS: dict[str, Handler] = {
     "openvoice": OpenVoiceHandler(),
     "youtube": YoutubeHandler(),
     "packages": PackagesHandler(),
+    "ffmpeg": FfmpegHandler(),
 }

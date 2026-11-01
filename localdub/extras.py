@@ -2,8 +2,9 @@
 
 Why a separate folder: the program lives in `Program Files`, which a normal user cannot write to,
 and an elevated installer must not download 3 GB of optional packages the user may never use. So
-the app installs them, as the user, into `%LOCALAPPDATA%\\LocalDub Studio\\extras` and adds that
-folder to the *end* of `sys.path` (packages already in the main environment always win).
+the app installs them, as the user, into `%LOCALAPPDATA%\\LocalDub Studio\\extras` (macOS:
+`~/Library/Application Support/LocalDub Studio/extras`) and adds that folder to the *end* of
+`sys.path` (packages already in the main environment always win).
 
 What gets installed is exactly what `uv.lock` pins, minus what the base install already has. The
 wheels are downloaded here (visible byte-level progress, resumable, SHA-256 checked against the
@@ -98,7 +99,7 @@ class Wheel:
 
 
 def find_uv() -> Path | None:
-    bundled = REPO_ROOT / "tools" / "uv.exe"
+    bundled = REPO_ROOT / "tools" / ("uv.exe" if sys.platform == "win32" else "uv")
     if bundled.is_file():
         return bundled
     found = shutil.which("uv")
@@ -125,7 +126,10 @@ def _run(
     return proc.stdout
 
 
-_PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)")
+# The environment the markers of `uv export` lines are evaluated in; None = this computer (tests
+# set it to pretend to be another one).
+MARKER_ENV: dict[str, str] | None = None
+_PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;]+)(?:\s*;\s*(.+?))?\s*\\?$")
 
 
 def normalize(name: str) -> str:
@@ -134,11 +138,26 @@ def normalize(name: str) -> str:
 
 def parse_pins(requirements: str) -> dict[str, str]:
     """{normalised name: version} from `uv export` output (hash/comment lines are skipped)."""
+    from packaging.markers import (
+        InvalidMarker,
+        Marker,
+        UndefinedComparison,
+        UndefinedEnvironmentName,
+    )
+
     pins: dict[str, str] = {}
     for line in requirements.splitlines():
         m = _PIN.match(line)
-        if m:
-            pins[normalize(m.group(1))] = m.group(2)
+        if not m:
+            continue
+        marker = m.group(3)
+        if marker:  # the lock covers Windows and macOS: keep only what applies to this computer
+            try:
+                if not Marker(marker).evaluate(MARKER_ENV):
+                    continue
+            except (InvalidMarker, UndefinedComparison, UndefinedEnvironmentName):
+                continue
+        pins[normalize(m.group(1))] = m.group(2)
     return pins
 
 
@@ -165,7 +184,7 @@ def pick_wheel(package: dict[str, Any], tags: list[Any] | None = None) -> Wheel:
     if best is None:
         raise ExtrasError(
             f"No prebuilt wheel of {package['name']} {package['version']} fits this computer "
-            "(64-bit Windows with Python 3.12 is required)."
+            "(64-bit Windows, or a Mac with an M-series chip, with Python 3.12 is required)."
         )
     w = best[1]
     digest = str(w.get("hash", ""))

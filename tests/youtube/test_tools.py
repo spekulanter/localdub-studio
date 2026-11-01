@@ -14,7 +14,7 @@ from localdub.core.youtube.tools import ToolsError
 EXE = b"MZ fake yt-dlp"
 
 
-def deno_zip(member: str = "deno.exe") -> bytes:
+def deno_zip(member: str = tools.DENO_FILE) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr(member, b"MZ fake deno")
@@ -24,12 +24,12 @@ def deno_zip(member: str = "deno.exe") -> bytes:
 def make_client(exe: bytes = EXE, zipped: bytes | None = None, *, wrong_sum: bool = False):
     zipped = zipped if zipped is not None else deno_zip()
     sums = {
-        tools.YTDLP_SUMS_URL: f"{hashlib.sha256(exe).hexdigest()}  yt-dlp.exe\n"
+        tools.YTDLP_SUMS_URL: f"{hashlib.sha256(exe).hexdigest()}  {tools.YTDLP_ASSET}\n"
         f"{'0' * 64}  yt-dlp_x86.exe\n",
         tools.DENO_SUM_URL: f"{hashlib.sha256(zipped).hexdigest()}  {tools.DENO_ZIP}\n",
     }
     if wrong_sum:
-        sums[tools.YTDLP_SUMS_URL] = f"{'a' * 64}  yt-dlp.exe\n"
+        sums[tools.YTDLP_SUMS_URL] = f"{'a' * 64}  {tools.YTDLP_ASSET}\n"
     files = {tools.YTDLP_URL: exe, tools.DENO_URL: zipped}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -54,6 +54,16 @@ def managed(tmp_path, monkeypatch):
         lambda: {k: tools.ToolInfo(True, Path("x"), "1") for k in ("yt_dlp", "deno")},
     )
     return tmp_path / "tools"
+
+
+def test_each_platform_downloads_its_own_files():
+    """Checked against the publishers' real asset names (yt-dlp and Deno release pages)."""
+    assert tools._spec("win32") == (
+        "yt-dlp.exe", "yt-dlp.exe", "deno-x86_64-pc-windows-msvc.zip", "deno.exe"
+    )
+    assert tools._spec("darwin") == (
+        "yt-dlp_macos", "yt-dlp", "deno-aarch64-apple-darwin.zip", "deno"
+    )
 
 
 def test_parse_checksum_picks_the_right_line_and_tolerates_a_bare_hash():
@@ -87,9 +97,11 @@ def test_denos_real_checksum_format_is_understood():
 def test_install_downloads_verifies_extracts_and_cleans_up(managed):
     events: list[tuple[int, int, str]] = []
     tools.install(lambda d, t, m: events.append((d, t, m)), client=make_client())
-    assert (managed / "yt-dlp.exe").read_bytes() == EXE
-    assert (managed / "deno.exe").read_bytes() == b"MZ fake deno"
-    assert sorted(p.name for p in managed.iterdir()) == ["deno.exe", "yt-dlp.exe"]  # no leftovers
+    assert (managed / tools.YTDLP_FILE).read_bytes() == EXE
+    assert (managed / tools.DENO_FILE).read_bytes() == b"MZ fake deno"
+    assert sorted(p.name for p in managed.iterdir()) == sorted(
+        [tools.DENO_FILE, tools.YTDLP_FILE]
+    )  # no leftovers
     assert events[0][2] == "Reading the checksums..." and events[-1][2] == "Done"
     assert all(d <= t for d, t, _ in events)
     assert any(m == "Downloading yt-dlp" for _, _, m in events) and any(
@@ -100,14 +112,15 @@ def test_install_downloads_verifies_extracts_and_cleans_up(managed):
 def test_a_checksum_mismatch_installs_nothing(managed):
     with pytest.raises(ToolsError, match="checksum mismatch"):
         tools.install(lambda *a: None, client=make_client(wrong_sum=True))
-    assert not (managed / "yt-dlp.exe").exists() and not (managed / "deno.exe").exists()
+    assert not (managed / tools.YTDLP_FILE).exists() and not (managed / tools.DENO_FILE).exists()
     assert not (managed / ".download").exists()
 
 
-def test_a_deno_archive_without_deno_exe_is_rejected(managed):
-    with pytest.raises(ToolsError, match="does not contain deno.exe"):
+def test_a_deno_archive_without_the_deno_program_is_rejected(managed):
+    with pytest.raises(ToolsError, match=f"does not contain {tools.DENO_FILE}"):
         tools.install(lambda *a: None, client=make_client(zipped=deno_zip("..\\evil.exe")))
-    assert not (managed.parent / "evil.exe").exists() and not (managed / "yt-dlp.exe").exists()
+    assert not (managed.parent / "evil.exe").exists()
+    assert not (managed / tools.YTDLP_FILE).exists()
 
 
 def test_network_problems_are_explained(managed):
@@ -120,8 +133,8 @@ def test_network_problems_are_explained(managed):
 
 def test_the_managed_folder_wins_over_path(managed, monkeypatch):
     managed.mkdir()
-    (managed / "yt-dlp.exe").write_bytes(b"x")
+    (managed / tools.YTDLP_FILE).write_bytes(b"x")
     monkeypatch.setattr(tools.shutil, "which", lambda name: "C:/elsewhere/yt-dlp.exe")
-    assert tools.find_ytdlp() == managed / "yt-dlp.exe"
-    (managed / "yt-dlp.exe").unlink()
+    assert tools.find_ytdlp() == managed / tools.YTDLP_FILE
+    (managed / tools.YTDLP_FILE).unlink()
     assert tools.find_ytdlp() == Path("C:/elsewhere/yt-dlp.exe")

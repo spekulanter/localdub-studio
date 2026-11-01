@@ -292,6 +292,16 @@ updater is used for updates (it does its own verification).
 a PO-token requirement, region-locked videos, very long videos, Firefox/Chrome cookie access (Chrome may block
 it), and YouTube changes after today (yt-dlp has to be updated then).
 
+## Apple Silicon Macs (unreleased, nothing measured on a Mac)
+
+The Mac version has only been run by an automated macOS 14 runner (virtual Apple M1, **no GPU**, no screen). What that
+runner checks is listed in docs/INSTALL-macOS.md. **Unverified, do not claim:** the speed and memory of Whisper
+large-v3 or turbo through MLX on an M-series GPU, its accuracy compared with faster-whisper (the MLX weights are a
+conversion; word timestamps and silence handling differ from faster-whisper, which also applies a voice-activity
+filter that MLX lacks), a complete dub on a Mac, the window, menu, Dock icon and file downloads of the WebKit view,
+Ollama on a Mac, and Demucs on the processor of a Mac. The memory figures in the catalogue (about 4 to 5 GB for
+large-v3) are estimates from the file sizes, not measurements.
+
 ## Speech recognition models (0.3.0)
 
 Measured on this laptop (RTX 5060 8 GB) with four English clips (44 s, 50 s, 53 s, 5.7 min); Whisper

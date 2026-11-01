@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -141,6 +142,9 @@ class ModelManager:
         tts = self.catalog.default_of("tts")
         if tts is not None and not self.handler(tts).installed(tts, ctx):
             out.append(f"Slovak voice: {tts.title}")
+        ffmpeg = self.catalog.default_of("ffmpeg")  # only exists where LocalDub installs it (macOS)
+        if ffmpeg is not None and not self.handler(ffmpeg).installed(ffmpeg, ctx):
+            out.append("FFmpeg")
         return out
 
     def required_missing(self, ctx: Ctx | None = None) -> list[str]:
@@ -241,6 +245,7 @@ class ModelManager:
                         "vram_gb": round(hw.gpu.vram_gb, 1),
                         "vram_free_gb": round(hw.gpu.vram_free_mb / 1024, 1),
                         "driver": hw.gpu.driver,
+                        "unified": hw.gpu.unified,
                     }
                     if hw.gpu
                     else None
@@ -485,7 +490,7 @@ class ModelManager:
 
     # ----- where is it ------------------------------------------------------------------------
     def open_folder(self, entry_id: str | None) -> str:
-        """Open Explorer on an entry's folder (or the models folder)."""
+        """Open Explorer (Finder) on an entry's folder (or the models folder)."""
         ctx = self.ctx()
         if entry_id:
             e = self.get(entry_id)
@@ -496,7 +501,10 @@ class ModelManager:
         else:
             target = self.settings.models_dir
         target.mkdir(parents=True, exist_ok=True)
-        if sys.platform != "win32":
-            raise ModelError("Opening folders is only supported on Windows.")
-        os.startfile(str(target))  # type: ignore[attr-defined,unused-ignore]  # noqa: S606
+        if sys.platform == "win32":
+            os.startfile(str(target))  # type: ignore[attr-defined,unused-ignore]  # noqa: S606
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(target)])  # noqa: S603,S607 - Finder; list args, no shell
+        else:
+            raise ModelError("Opening folders is only supported on Windows and macOS.")
         return str(target)

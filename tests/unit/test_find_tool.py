@@ -28,7 +28,8 @@ def test_falls_back_to_the_fresh_registry_path(monkeypatch, tmp_path: Path):
 def test_missing_tool_gives_install_hint(monkeypatch):
     monkeypatch.setattr(ffmpeg.shutil, "which", lambda name, path=None: None)
     monkeypatch.setattr(ffmpeg, "_which_fresh", lambda name: None)
-    with pytest.raises(MediaError, match="winget install Gyan.FFmpeg"):
+    hint = "brew install ffmpeg" if sys.platform == "darwin" else "winget install Gyan.FFmpeg"
+    with pytest.raises(MediaError, match=hint):
         find_tool("ffmpeg")
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,7 @@ class Gpu:
     vram_total_mb: int
     vram_free_mb: int
     driver: str
+    unified: bool = False  # Apple Silicon: the GPU shares the Mac's memory
 
     @property
     def vram_gb(self) -> float:
@@ -61,12 +63,41 @@ def parse_smi(output: str) -> Gpu | None:
     return None
 
 
+def _sysctl(key: str) -> str | None:
+    try:
+        proc = subprocess.run(  # noqa: S603 - fixed system tool, list arguments, no shell
+            ["sysctl", "-n", key],  # noqa: S607
+            capture_output=True, text=True, timeout=10, stdin=subprocess.DEVNULL, check=False,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def apple_gpu(chip: str | None, memory_bytes: int | None) -> Gpu | None:
+    """The GPU of an Apple Silicon Mac. It has no memory of its own: Metal lets it use about two
+    thirds of the Mac's memory on small machines and three quarters on big ones."""
+    if not chip or not chip.startswith("Apple") or not memory_bytes:
+        return None
+    total_mb = memory_bytes // 1024**2
+    usable = int(total_mb * (0.67 if memory_bytes <= 36 * 1024**3 else 0.75))
+    return Gpu(f"{chip} (GPU)", usable, usable, "Metal", unified=True)
+
+
 def detect_gpu(max_age_s: float = 20.0) -> Gpu | None:
     global _gpu_cache
     now = time.monotonic()
     if _gpu_cache is not None and now - _gpu_cache[0] < max_age_s:
         return _gpu_cache[1]
     gpu: Gpu | None = None
+    if sys.platform == "darwin":
+        mem = _sysctl("hw.memsize")
+        gpu = apple_gpu(
+            _sysctl("machdep.cpu.brand_string") if platform.machine() == "arm64" else None,
+            int(mem) if mem and mem.isdigit() else None,
+        )
+        _gpu_cache = (now, gpu)
+        return gpu
     smi = _smi()
     if smi:
         try:
@@ -84,6 +115,9 @@ def detect_gpu(max_age_s: float = 20.0) -> Gpu | None:
 
 
 def detect_ram_gb() -> float | None:
+    if sys.platform == "darwin":
+        mem = _sysctl("hw.memsize")
+        return float(round(int(mem) / 1024**3, 1)) if mem and mem.isdigit() else None
     if sys.platform == "win32":
 
         class _Mem(ctypes.Structure):
@@ -125,7 +159,13 @@ def detect(models_dir: Path) -> Hardware:
 
 CPU_TEXT = "Runs on the processor; the graphics card stays free."
 NO_GPU_TEXT = "No NVIDIA graphics card was found, so this runs on the processor, much slower."
+NO_APPLE_GPU_TEXT = (
+    "This Mac has no Apple Silicon chip, so this runs on the processor, much slower."
+)
 _SK = {
+    NO_APPLE_GPU_TEXT: (
+        "Tento Mac nemá čip Apple Silicon, takže to beží na procesore, oveľa pomalšie."
+    ),
     CPU_TEXT: "Beží na procesore; grafická karta zostane voľná.",
     NO_GPU_TEXT: "Nenašla sa grafická karta NVIDIA, takže to beží na procesore, oveľa pomalšie.",
 }
@@ -138,29 +178,37 @@ def fits(req: Requirements, hw: Hardware, lang: str = "en") -> dict[str, Any]:
         text = CPU_TEXT
         return {"level": "cpu", "text": _SK[text] if sk else text}
     if hw.gpu is None:
-        text = NO_GPU_TEXT
+        text = NO_APPLE_GPU_TEXT if sys.platform == "darwin" else NO_GPU_TEXT
         return {"level": "no_gpu", "text": _SK[text] if sk else text}
     have, want = hw.gpu.vram_gb, req.vram_gb
+    mac = hw.gpu.unified
     if have >= want:
-        text = (
-            f"Sedí vašej grafickej karte ({have:.0f} GB; potrebuje asi {want:g} GB)."
-            if sk
-            else f"Fits your graphics card ({have:.0f} GB; about {want:g} GB wanted)."
-        )
+        if sk:
+            text = (
+                f"Sedí vášmu Macu ({have:.0f} GB použiteľných pre GPU; potrebuje asi {want:g} GB)."
+                if mac
+                else f"Sedí vašej grafickej karte ({have:.0f} GB; potrebuje asi {want:g} GB)."
+            )
+        elif mac:
+            text = f"Fits your Mac ({have:.0f} GB usable by the GPU; about {want:g} GB wanted)."
+        else:
+            text = f"Fits your graphics card ({have:.0f} GB; about {want:g} GB wanted)."
         return {"level": "ok", "text": text}
+    what_sk = "pamäte Macu pre GPU" if mac else "pamäte grafickej karty"
+    what_en = "usable Mac memory" if mac else "graphics memory"
     if have >= want * 0.5:
         text = (
-            f"Chce asi {want:g} GB pamäte grafickej karty, vy máte {have:.0f} GB: časť pobeží na "
+            f"Chce asi {want:g} GB {what_sk}, vy máte {have:.0f} GB: časť pobeží na "
             "procesore, citeľne pomalšie."
             if sk
-            else f"Wants about {want:g} GB of graphics memory, you have {have:.0f} GB: "
+            else f"Wants about {want:g} GB of {what_en}, you have {have:.0f} GB: "
             "part of it will run on the processor, noticeably slower."
         )
         return {"level": "partial", "text": text}
     text = (
-        f"Chce asi {want:g} GB pamäte grafickej karty, vy máte {have:.0f} GB: bude to veľmi pomalé."
+        f"Chce asi {want:g} GB {what_sk}, vy máte {have:.0f} GB: bude to veľmi pomalé."
         if sk
-        else f"Wants about {want:g} GB of graphics memory, you have {have:.0f} GB: "
+        else f"Wants about {want:g} GB of {what_en}, you have {have:.0f} GB: "
         "it would be very slow."
     )
     return {"level": "too_big", "text": text}

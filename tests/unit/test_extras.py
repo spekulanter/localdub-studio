@@ -11,6 +11,15 @@ from packaging.tags import Tag
 from localdub import extras
 from localdub.extras import ExtrasError, Wheel
 
+
+@pytest.fixture(autouse=True)
+def _windows_markers(monkeypatch):
+    """The export fixtures below are Windows lock lines; evaluate their markers as on Windows."""
+    monkeypatch.setattr(
+        extras, "MARKER_ENV", {"sys_platform": "win32", "platform_machine": "AMD64"}
+    )
+
+
 EXPORT_BASE = """annotated-types==0.8.0 ; sys_platform == 'win32' \\
     --hash=sha256:aa \\
     --hash=sha256:bb

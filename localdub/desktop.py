@@ -1,4 +1,6 @@
-"""LocalDub Studio as a desktop program: its own window (Edge WebView2) around the local app.
+"""LocalDub Studio as a desktop program: its own window around the local app.
+
+The window is Edge WebView2 on Windows and the system WebKit view on macOS.
 
 The server runs inside this process; closing the window stops it (a running job is paused and
 resumes the next time). If the window component is unavailable the app opens in the browser.
@@ -8,6 +10,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import subprocess
 import sys
 import threading
 import time
@@ -17,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from localdub.config import Settings
-from localdub.core.platform import disable_power_throttling
+from localdub.core.platform import disable_power_throttling, keep_awake
 
 log = logging.getLogger("localdub.desktop")
 
@@ -25,6 +28,7 @@ TITLE = "LocalDub Studio"
 APP_ID = "LocalDub.Studio"
 MUTEX_NAME = "LocalDubStudioRunning"
 ICON = Path(__file__).resolve().parent / "assets" / "localdub-orange.ico"
+ICON_PNG = Path(__file__).resolve().parent / "assets" / "localdub-orange.png"
 
 SPLASH = """<!doctype html><meta charset="utf-8"><title>LocalDub Studio</title>
 <style>
@@ -60,6 +64,20 @@ def healthy(url: str, timeout: float = 2.0) -> bool:
 def message_box(text: str, title: str = TITLE) -> None:
     if sys.platform == "win32":
         ctypes.windll.user32.MessageBoxW(None, text, title, 0x40)
+    elif sys.platform == "darwin":
+        script = (
+            'on run argv\n'
+            'display dialog (item 1 of argv) with title (item 2 of argv) '
+            'buttons {"OK"} default button "OK"\n'
+            "end run"
+        )
+        try:
+            subprocess.run(  # noqa: S603
+                ["osascript", "-e", script, text, title],  # noqa: S607
+                timeout=600, stdin=subprocess.DEVNULL, capture_output=True, check=False,
+            )  # fmt: skip
+        except (OSError, subprocess.TimeoutExpired):
+            log.warning("Could not show a dialog: %s", text)
 
 
 def _setup_file_logging(settings: Settings) -> Path:
@@ -141,6 +159,22 @@ def _set_window_icon(window: Any) -> None:
         log.debug("Could not set the window icon", exc_info=True)
 
 
+def _mac_identity() -> None:
+    """A Python process shows up as "Python" with a rocket; give it LocalDub's name and icon."""
+    try:
+        from AppKit import NSApplication, NSImage  # type: ignore[import-not-found,unused-ignore]
+        from Foundation import NSBundle  # type: ignore[import-not-found,unused-ignore]
+
+        info = NSBundle.mainBundle().infoDictionary()
+        info["CFBundleName"] = TITLE
+        NSApplication.sharedApplication()
+        image = NSImage.alloc().initWithContentsOfFile_(str(ICON_PNG))
+        if image is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(image)
+    except Exception:  # noqa: BLE001 - cosmetic only
+        log.debug("Could not set the Dock name and icon", exc_info=True)
+
+
 def run_app(settings: Settings | None = None) -> int:
     settings = settings or Settings()
     log_path = _setup_file_logging(settings)
@@ -148,8 +182,11 @@ def run_app(settings: Settings | None = None) -> int:
         # Lets the installer notice a running app (AppMutex) and refuse to overwrite it.
         ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX_NAME)
     disable_power_throttling()
+    keep_awake()
     if sys.platform == "win32":
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    elif sys.platform == "darwin":
+        _mac_identity()
 
     url = f"http://{settings.api_host}:{settings.api_port}"
     server: EmbeddedServer | None = None
@@ -198,10 +235,15 @@ def run_app(settings: Settings | None = None) -> int:
             )
             return
         window.load_url(url)
+        log.info("Window loaded %s", url)
 
     window.events.closing += on_closing
     try:
-        webview.start(boot, storage_path=str(settings.data_dir / "webview"), icon=str(ICON))
+        webview.start(
+            boot,
+            storage_path=str(settings.data_dir / "webview"),
+            icon=str(ICON) if sys.platform == "win32" else None,
+        )
     except Exception:  # noqa: BLE001 - e.g. WebView2 runtime missing
         log.exception("The window could not be created; falling back to the browser")
         return _browser_fallback(server, url, log_path)
@@ -216,8 +258,9 @@ def _browser_fallback(server: EmbeddedServer | None, url: str, log_path: Path) -
         message_box(f"LocalDub Studio could not start.\n\nLog: {log_path}")
         return 1
     webbrowser.open(url)
+    component = "Microsoft Edge WebView2" if sys.platform == "win32" else "window"
     message_box(
-        "The Microsoft Edge WebView2 component is not available, so LocalDub Studio opened in "
+        f"The {component} component is not available, so LocalDub Studio opened in "
         "your browser.\n\nClick OK to quit LocalDub Studio."
     )
     if server is not None:

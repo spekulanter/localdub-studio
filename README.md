@@ -1,6 +1,6 @@
 # LocalDub Studio
 
-Local-first English → Slovak video dubbing for Windows. Speech recognition (faster-whisper),
+Local-first English → Slovak video dubbing for Windows (and, experimentally, Apple Silicon Macs). Speech recognition (faster-whisper; on a Mac Whisper through Apple MLX),
 translation (Ollama) and Slovak speech (Supertonic 3) all run on your computer; no media is
 uploaded anywhere and no paid API is used. Plan: [PLAN.md](PLAN.md), status: [TASKS.md](TASKS.md),
 measured quality and limits: [docs/QUALITY.md](docs/QUALITY.md), licences: [docs/LICENSES.md](docs/LICENSES.md).
@@ -14,6 +14,10 @@ measured quality and limits: [docs/QUALITY.md](docs/QUALITY.md), licences: [docs
 ## Install (Windows)
 See [docs/INSTALL.md](docs/INSTALL.md): run the setup wizard, then start *LocalDub Studio* from the Start menu (it opens in its own window).
 Build the setup yourself with `uv run python packaging/build_release.py`.
+
+## Install (Mac, experimental)
+Apple Silicon (M1 or newer), macOS 14+: see [docs/INSTALL-macOS.md](docs/INSTALL-macOS.md). The Mac app is built by
+the GitHub Actions workflow (`packaging/build_macos.py`) and has not been used on a real Mac yet.
 
 ## First run from a source checkout
 ```powershell

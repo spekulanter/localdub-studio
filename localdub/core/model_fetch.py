@@ -8,6 +8,7 @@ sha256-pinned) and the Demucs CDN (separation). Only data files are downloaded, 
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -18,6 +19,18 @@ Say = Callable[[str], None]
 
 
 def fetch_whisper(settings: Settings, say: Say) -> Path:
+    if sys.platform == "darwin":  # the MLX Whisper of the catalogue instead of faster-whisper
+        from localdub.core.modelmgr.catalog import load_catalog
+        from localdub.core.modelmgr.handlers import HANDLERS, Ctx
+
+        entry = load_catalog().entry(settings.asr_id)
+        if entry is None or entry.source["type"] != "mlx-whisper":
+            raise SystemExit(f"'{settings.asr_id}' is not a speech model for this Mac")
+        say(f"Speech recognition model '{entry.title}' (about {entry.size_bytes / 1e9:.1f} GB)...")
+        HANDLERS["mlx-whisper"].download(entry, Ctx(settings), lambda *_: None)
+        path = settings.models_dir / "whisper"
+        say(f"  ready: {path}")
+        return path
     from faster_whisper.utils import download_model
 
     cache = settings.models_dir / "whisper"
@@ -80,8 +93,6 @@ def fetch_models(
 if __name__ == "__main__":
     # `python -m localdub.core.model_fetch separation|cloning`: used by the app to download the
     # PyTorch-based models in a child process.
-    import sys
-
     jobs = {
         "separation": fetch_separation,
         "cloning": fetch_voice_cloning,
