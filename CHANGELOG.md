@@ -5,6 +5,14 @@ has not been tested before relying on a feature.
 
 ## [Unreleased]
 
+### Changed
+- The server code is split by topic (`localdub/api/routes/`: meta, update, models, projects, jobs, segments, results)
+  instead of one 1150-line function; behaviour is unchanged and all tests pass.
+- The update state is now one small class that always holds its lock.
+- A page view used to ask Ollama for its model list four or five times in a row; the answers are shared for two
+  seconds, and forgotten at once after a model is pulled or deleted or Ollama is started.
+- Test coverage is measured (`pytest --cov`; 77 % of lines, see docs/QUALITY.md) and printed by the Windows CI job.
+
 ### Fixed
 - **Faster start on Windows.** The program lives in Program Files, which the user running it cannot write to, so
   Python could not save its compiled files and recompiled every library on every start. Setup now compiles them

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from typing import Any
 from urllib.parse import urlparse
@@ -30,6 +31,43 @@ log = logging.getLogger(__name__)
 
 class OllamaError(RuntimeError):
     pass
+
+
+_tags_cache: dict[str, tuple[float, list[dict[str, Any]] | None, str | None]] = {}
+_tags_lock = threading.Lock()
+TAGS_TTL_S = 2.0
+
+
+def cached_tags(
+    base_url: str, timeout: float = 3.0
+) -> tuple[list[dict[str, Any]] | None, str | None]:
+    """(installed models, None), or (None, the problem) when Ollama does not answer.
+
+    One page view asks for the list several times within a moment (health, options, models); they
+    share one answer for a couple of seconds instead of calling Ollama each time.
+    """
+    key = base_url.rstrip("/")
+    with _tags_lock:
+        hit = _tags_cache.get(key)
+        if hit is not None and time.monotonic() - hit[0] < TAGS_TTL_S:
+            return hit[1], hit[2]
+    client = OllamaClient(base_url, timeout=timeout)
+    tags: list[dict[str, Any]] | None
+    try:
+        tags, error = client.tags(), None
+    except Exception as exc:  # noqa: BLE001 - "not running" is a normal state
+        tags, error = None, f"{type(exc).__name__}: {exc}"
+    finally:
+        client.close()
+    with _tags_lock:
+        _tags_cache[key] = (time.monotonic(), tags, error)
+    return tags, error
+
+
+def forget_tags() -> None:
+    """Drop the shared answer (a model was pulled or deleted, or Ollama was just started)."""
+    with _tags_lock:
+        _tags_cache.clear()
 
 
 class OllamaClient:

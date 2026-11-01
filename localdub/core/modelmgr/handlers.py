@@ -30,6 +30,7 @@ from localdub.core.media.ffmpeg import MediaError, find_tool
 from localdub.core.modelmgr.catalog import Entry
 from localdub.core.models import ensure_archive_files, ensure_model, is_readable
 from localdub.core.translation import ollama_setup
+from localdub.core.translation.ollama_provider import cached_tags, forget_tags
 from localdub.core.youtube import tools as youtube_tools
 
 log = logging.getLogger(__name__)
@@ -230,15 +231,7 @@ class Ctx:
     def ollama_tags(self) -> list[dict[str, Any]] | None:
         """Installed Ollama models [{name, digest, size}], or None when Ollama is not running."""
         if not self._ollama_loaded:
-            from localdub.core.translation.ollama_provider import OllamaClient
-
-            client = OllamaClient(self.settings.ollama_url, timeout=3.0)
-            try:
-                self._ollama = client.tags()
-            except Exception:  # noqa: BLE001 - "not running" is a normal state
-                self._ollama = None
-            finally:
-                client.close()
+            self._ollama, _ = cached_tags(self.settings.ollama_url)
             self._ollama_loaded = True
         return self._ollama
 
@@ -391,6 +384,7 @@ def ensure_ollama(ctx: Ctx, progress: Progress) -> None:
             )
     except ollama_setup.OllamaSetupError as exc:
         raise ModelError(str(exc)) from exc
+    forget_tags()
     ctx._ollama_loaded = False  # the model list was cached while Ollama was away
 
 
@@ -421,6 +415,7 @@ class OllamaHandler(Handler):
                     sum(t for _, t in layers.values()),
                     str(msg.get("status", "")),
                 )
+        forget_tags()  # the new model has to show up at once
 
     def delete(self, e: Entry, ctx: Ctx) -> None:
         from localdub.core.translation.ollama_provider import OllamaClient
@@ -432,6 +427,7 @@ class OllamaHandler(Handler):
             raise ModelError(f"Ollama could not remove the model: {exc}") from exc
         finally:
             client.close()
+            forget_tags()
 
     def disk_bytes(self, e: Entry, ctx: Ctx) -> int | None:
         found = ollama_find(ctx.ollama_tags(), e.source["tag"])

@@ -292,6 +292,24 @@ updater is used for updates (it does its own verification).
 a PO-token requirement, region-locked videos, very long videos, Firefox/Chrome cookie access (Chrome may block
 it), and YouTube changes after today (yt-dlp has to be updated then).
 
+## Test coverage (2026-11-01)
+
+`uv run pytest --cov=localdub` on Windows, 326 tests: **77 % of the lines of `localdub/`** run during the tests
+(the Windows CI job prints the same table). Lines that never run are mostly the parts that need what a test
+machine does not have, so they are the least verified parts of the program:
+
+| Part | Covered | Why |
+|---|---|---|
+| `faster_whisper_provider`, `supertonic_provider` | 0 % | need the real models and a GPU; only the GPU-marked tests touch them (skipped by default) |
+| `cli.py`, `diagnostics.py` | 0 % | command-line helpers, never run by the tests |
+| `desktop.py` | 39 % | the window itself cannot be opened by an automated test |
+| `core/modelmgr/handlers.py` | 55 % | downloads and deletes of real models |
+| `core/model_fetch.py`, `openvoice_converter.py`, `sherpa_diarizer.py`, `demucs_separator.py` | 29 to 50 % | need downloaded models or PyTorch |
+| `pipeline.py` | 76 % | the stages are tested with fake providers, not with real models |
+
+Everything else is between 75 % and 99 %. A high number does not mean the quality is good: it only says the
+code ran. What was actually measured on real videos is in the sections above.
+
 ## Apple Silicon Macs (unreleased, nothing measured on a Mac)
 
 The Mac version has only been run by an automated macOS 15 runner (virtual Apple M1, **no GPU**, no screen). What that

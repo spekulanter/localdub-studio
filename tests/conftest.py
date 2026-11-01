@@ -22,3 +22,11 @@ def _windows_catalogue() -> Iterator[None]:
         # the CI machines have no Ollama; tests that care say so themselves
         mp.setattr(ollama_setup, "is_present", lambda: True)
         yield
+
+
+@pytest.fixture(autouse=True)
+def _fresh_ollama_answers() -> None:
+    """The short-lived shared answer about Ollama's models must not leak from one test to the next."""
+    from localdub.core.translation.ollama_provider import forget_tags
+
+    forget_tags()

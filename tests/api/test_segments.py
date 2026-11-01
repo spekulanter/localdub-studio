@@ -203,7 +203,7 @@ def test_preview_uses_unsaved_text_and_voice_and_speeds_up_to_fit(
 ):
     write_stage(project["wd"], "translation.json", SEGS)
     stub = StubTTS()
-    client.app.state.preview_tts = stub  # type: ignore[attr-defined]
+    client.app.state.ctx.preview_tts = stub  # type: ignore[attr-defined]
     r = client.post(
         url(project, "/1/preview"),
         json={"text": "Ahoj, ako sa dnes máš €? " + "veľmi dlhá veta " * 6, "voice": "M2"},

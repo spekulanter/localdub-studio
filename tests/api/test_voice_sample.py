@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from localdub.api import app as app_module
 from localdub.api.app import create_app
+from localdub.api.routes import segments as segments_module
 from localdub.config import Settings
 from localdub.core.modelmgr import handlers as H
 
@@ -30,7 +30,7 @@ class FakeTts:
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
-        app_module, "default_providers", lambda s: type("P", (), {"tts": lambda self: FakeTts()})()
+        segments_module, "default_providers", lambda s: type("P", (), {"tts": lambda self: FakeTts()})()
     )
     s = Settings(
         data_dir=tmp_path / "d", models_dir=tmp_path / "m", ollama_url="http://127.0.0.1:9"
