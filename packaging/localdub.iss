@@ -57,6 +57,7 @@ Source: "..\docs\QUALITY.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "tools\uv.exe"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "installed.marker"; DestDir: "{app}"; DestName: ".installed"; Flags: ignoreversion
 Source: "THIRD-PARTY-uv.txt"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "precompile.py"; DestDir: "{app}\tools"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\localdub\assets\localdub-orange.ico"
@@ -361,7 +362,12 @@ begin
   end;
 
   if not AppInstalled then
-    Problems := Problems + #13#10 + '- LocalDub Studio could not be set up: the program files are missing. See install.log.';
+    Problems := Problems + #13#10 + '- LocalDub Studio could not be set up: the program files are missing. See install.log.'
+  else
+    { Program Files is read-only for the user who runs the program, so Python could never save its compiled
+      files and would compile every library again on every start (about 5 seconds slower). }
+    RunStep('Preparing the program for a fast start...', 'Compiling the program files once.',
+      '"' + ExpandConstant('{app}\.venv\Scripts\python.exe') + '" "' + ExpandConstant('{app}\tools\precompile.py') + '"', False);
   Log('Post-install finished; problems: [' + Problems + ']');
   if (Problems <> '') and (not WizardSilent) then
     MsgBox('Setup finished, but some steps need attention:' + #13#10 + Problems + #13#10#13#10 + 'Details: ' + ExpandConstant('{app}\install.log') + #13#10 + 'You can repeat a step later; see docs in the install folder.', mbInformation, MB_OK);

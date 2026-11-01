@@ -3,6 +3,14 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Fixed
+- **Faster start on Windows.** The program lives in Program Files, which the user running it cannot write to, so
+  Python could not save its compiled files and recompiled every library on every start. Setup now compiles them
+  once, while it has administrator rights. Measured on the installed program: importing the server took
+  5 to 9 seconds without the compiled files and 1.2 to 2.9 seconds with them.
+
 ## [0.5.4] - 2026-11-01
 
 ### Changed

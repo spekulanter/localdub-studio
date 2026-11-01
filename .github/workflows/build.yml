@@ -92,10 +92,13 @@ jobs:
           }
           Get-Content C:\ld-setup.log -Tail 30
           if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
-          foreach ($f in '.venv\Scripts\localdub-app.exe', '.venv\Scripts\python.exe', 'python', '.installed', 'frontend\dist\index.html', 'tools\uv.exe', 'docs\LICENSES.md') {
+          foreach ($f in '.venv\Scripts\localdub-app.exe', '.venv\Scripts\python.exe', 'python', '.installed', 'frontend\dist\index.html', 'tools\uv.exe', 'docs\LICENSES.md', 'localdub\__pycache__', '.venv\Lib\site-packages\fastapi\__pycache__') {
             if (-not (Test-Path (Join-Path $dir $f))) { throw "Missing after install: $f" }
           }
           & "$dir\.venv\Scripts\python.exe" -c "import localdub, fastapi, webview, sherpa_onnx; print('imports ok')"
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          & "$dir\.venv\Scripts\python.exe" -c "import localdub.api.app, uvicorn, webview"
+          Write-Host "Importing the server takes $($sw.Elapsed.TotalSeconds) s (about 1.5 s with compiled files, about 6 s without)"
           $srv = Start-Process -FilePath "$dir\.venv\Scripts\localdub.exe" -ArgumentList 'serve' -PassThru -WindowStyle Hidden -WorkingDirectory $dir
           $ok = $false
           for ($i = 0; $i -lt 40 -and -not $ok; $i++) {
