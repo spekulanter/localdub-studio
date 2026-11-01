@@ -3,7 +3,7 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [Unreleased]
+## [0.5.2] - 2026-11-01
 
 ### Added
 - **Ollama is installed and started by the program.** If it is missing, "Download the required models" on the AI
