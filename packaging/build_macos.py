@@ -262,6 +262,12 @@ def main() -> int:
     app_dir = resources / "app"
     copy_app_files(app_dir, uv)
     run([python, "-m", "compileall", "-q", app_dir / "localdub"])
+    # Python's own library too: the launcher forbids writing bytecode at run time (that would break
+    # the app's signature), so whatever is not compiled here is compiled again on every start.
+    stdlib = next((resources / "python" / "lib").glob("python3.*"))
+    subprocess.run(  # noqa: S603 - the interpreter we just copied; failures in test files are fine
+        [str(python), "-m", "compileall", "-q", "-j", "0", str(stdlib)], check=False
+    )
     sign(app)
     size = sum(f.stat().st_size for f in app.rglob("*") if f.is_file()) / 1e9
     print(f"{app} is {size:.2f} GB")
