@@ -21,6 +21,7 @@ SOURCE_TYPES = (
     "openvoice", "youtube", "packages", "ffmpeg",
 )  # fmt: skip
 PLATFORMS = ("win32", "darwin")
+PLATFORM = sys.platform  # the system whose entries are shown (tests change it)
 _OLLAMA_TAG = re.compile(r"^(?:[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*(?::[A-Za-z0-9._-]+)?$")
 _ID = re.compile(r"^[a-z0-9][a-z0-9._:~-]*$")
 
@@ -203,7 +204,7 @@ def for_platform(raw_entry: dict[str, Any], platform: str) -> dict[str, Any] | N
 
 
 def parse_catalog(raw: dict[str, Any], platform: str | None = None) -> Catalog:
-    platform = platform or sys.platform
+    platform = platform or PLATFORM
     version = _need(raw, "catalog_version", str, "catalog")
     roles = tuple(
         Role(
