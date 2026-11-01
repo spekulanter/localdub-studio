@@ -2,7 +2,7 @@
 
     <app>/Contents/Resources/python/bin/python3 packaging/smoke_macos.py <check>
 
-where <check> is imports, ffmpeg, youtube, extras or asr.
+where <check> is imports, ffmpeg, youtube, ollama, extras or asr.
 
 Each check prints what it found and exits non-zero when something is wrong.
 """
@@ -66,6 +66,19 @@ def youtube() -> None:
             assert info.available, info
 
 
+def ollama() -> None:
+    """The real Ollama download: checksum list, the zip, `ditto`; the program is not started."""
+    from localdub.core.translation import ollama_setup
+
+    with tempfile.TemporaryDirectory() as tmp:
+        app = ollama_setup.install_mac(lambda d, t, m: None, target=Path(tmp) / "Applications")
+        print("unpacked", app)
+        assert (app / "Contents" / "Info.plist").is_file()
+        binary = next((app / "Contents" / "MacOS").iterdir())
+        print("main program:", binary.name, oct(binary.stat().st_mode & 0o777))
+        assert os.access(binary, os.X_OK), "ditto lost the executable bit"
+
+
 def extras() -> None:
     from localdub import extras as ex
 
@@ -109,7 +122,10 @@ def asr() -> None:
         assert all(w.end >= w.start for w in res.words)
 
 
-CHECKS = {"imports": imports, "ffmpeg": ffmpeg, "youtube": youtube, "extras": extras, "asr": asr}
+CHECKS = {
+    "imports": imports, "ffmpeg": ffmpeg, "youtube": youtube, "ollama": ollama, "extras": extras,
+    "asr": asr,
+}  # fmt: skip
 
 if __name__ == "__main__":
     if len(sys.argv) != 2 or sys.argv[1] not in CHECKS:

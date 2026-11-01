@@ -58,7 +58,7 @@ export interface Options {
 
 export interface Health {
   ok: boolean;
-  ollama: { reachable: boolean; error: string | null; models: string[] };
+  ollama: { reachable: boolean; error: string | null; models: string[]; installed?: boolean };
 }
 
 export type ReviewStatus = "pending" | "edited" | "approved";
@@ -272,6 +272,7 @@ const json = (method: string, body?: unknown): RequestInit => ({
 export const api = {
   setUploadLimit: (mb: number | null) =>
     request<{ max_upload_mb: number; default_max_upload_mb: number }>("/api/settings", json("PUT", { max_upload_mb: mb })),
+  startOllama: () => request<{ reachable: boolean }>("/api/ollama/start", json("POST", {})),
   health: () => request<Health>("/api/health"),
   models: (sizes = false) => request<ModelsResponse>(`/api/models?lang=${apiLang}${sizes ? "&sizes=true" : ""}`),
   selectModel: (id: string) => request<{ ok: boolean }>(`/api/models/${encodeURIComponent(id)}/select`, json("POST", {})),

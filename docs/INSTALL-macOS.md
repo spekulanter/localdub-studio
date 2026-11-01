@@ -13,7 +13,7 @@ own window and keeps everything on your Mac; your videos are never uploaded.
 - 8 GB of memory works for the smaller models; 16 GB or more is comfortable
 - About 8 GB of free disk space for the app (1.5 GB) and the models
 - Internet while downloading models (afterwards it works offline)
-- [Ollama](https://ollama.com) for translation. Install it yourself; LocalDub does not install it.
+- Nothing to install beforehand: LocalDub installs and starts Ollama (translation) and FFmpeg itself when you press the download button
 
 ## Install
 1. Open `LocalDub-Studio-<version>-macOS-arm64.dmg` and drag **LocalDub Studio** onto **Applications**.
@@ -33,7 +33,8 @@ own window and keeps everything on your Mac; your videos are never uploaded.
 | FFmpeg (`ffmpeg`, `ffprobe`), required, unless you already have it from Homebrew | ffmpeg.martin-riedl.de, SHA-256 pinned in the program | about 57 MB |
 | Speech recognition, Whisper large-v3 for MLX, required | Hugging Face `mlx-community`, pinned revision | about 3.1 GB |
 | Slovak voice (Supertonic 3), required | Hugging Face | about 0.4 GB |
-| Translation model `translategemma:4b`, required | Ollama registry (Ollama must be running) | about 3.3 GB |
+| Ollama, the program that runs translation, required, unless it is already installed | Ollama's GitHub release (`Ollama-darwin.zip`), checked against the SHA-256 list published with it; unpacked into `~/Applications`, no password needed | about 230 MB |
+| Translation model `translategemma:4b`, required | Ollama registry | about 3.3 GB |
 | Speech removal (Demucs, optional) | PyPI, SHA-256 from `uv.lock`; then the model from Hugging Face | about 60 MB + 80 MB |
 
    Nothing is downloaded until you press the button.

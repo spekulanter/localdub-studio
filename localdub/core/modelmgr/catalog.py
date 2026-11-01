@@ -18,7 +18,7 @@ STATUSES = ("recommended", "available", "experimental", "not_recommended", "cust
 RUNS_ON = ("gpu", "cpu", "gpu-or-cpu")
 SOURCE_TYPES = (
     "whisper", "mlx-whisper", "ollama", "parakeet", "supertonic", "diarization", "demucs",
-    "openvoice", "youtube", "packages", "ffmpeg",
+    "openvoice", "youtube", "packages", "ffmpeg", "ollama-app",
 )  # fmt: skip
 PLATFORMS = ("win32", "darwin")
 PLATFORM = sys.platform  # the system whose entries are shown (tests change it)

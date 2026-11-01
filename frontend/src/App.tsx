@@ -83,6 +83,7 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  const [startingOllama, setStartingOllama] = useState(false);
   const ollamaOk = health?.ollama.reachable ?? false;
   const modelsNeeded = (models?.required_missing.length ?? 0) > 0;
 
@@ -128,8 +129,25 @@ export default function App() {
               ? t("Cannot reach the LocalDub server.")
               : ollamaOk
                 ? t("Ollama connected · {n} models", { n: health.ollama.models.length })
-                : t("Ollama is not running. Translation will fail until you start it.")}
+                : health.ollama.installed === false
+                  ? t("Ollama is not installed. Install it on the AI models page: one click.")
+                  : t("Ollama is not running. Translation will fail until you start it.")}
           </span>
+          {health !== null && !ollamaOk && health.ollama.installed !== false && (
+            <button
+              className="underline underline-offset-2"
+              disabled={startingOllama}
+              onClick={() => {
+                setStartingOllama(true);
+                api.startOllama().catch(() => undefined).finally(() => {
+                  setStartingOllama(false);
+                  refreshHealth();
+                });
+              }}
+            >
+              {startingOllama ? t("starting…") : t("Start Ollama")}
+            </button>
+          )}
           <button className="underline underline-offset-2" onClick={refreshHealth}>
             {t("recheck")}
           </button>

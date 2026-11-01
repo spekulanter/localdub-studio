@@ -163,7 +163,7 @@ def test_models_listed_with_roles_hardware_and_required_missing(
     assert {"whisper-large-v3", "parakeet-tdt-0.6b-v3", "translategemma-4b", "translategemma-12b",
             "supertonic", "youtube", "packages"} <= set(ids)  # fmt: skip
     assert set(data["required_missing"]) == {"whisper-large-v3", "translategemma-4b", "supertonic"}
-    assert [r["id"] for r in data["roles"]][:3] == ["asr", "translation", "tts"]
+    assert [r["id"] for r in data["roles"]][:4] == ["asr", "ollama", "translation", "tts"]
     assert "cpu_threads" in data["hardware"] and data["catalog_version"]
     row = next(m for m in data["models"] if m["id"] == "translategemma-12b")
     assert row["choose_if"] and row["requirements"]["disk_gb"] > 8 and row["license"]["name"]

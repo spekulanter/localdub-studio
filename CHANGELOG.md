@@ -3,6 +3,14 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Added
+- **Ollama is installed and started by the program.** If it is missing, "Download the required models" on the AI
+  models page installs it (Windows: `winget`, package Ollama.Ollama; Mac: Ollama's own download, checked against its
+  published SHA-256 list) and starts it before fetching the translation model, so nothing has to be installed by
+  hand. A "Start Ollama" button appears in the sidebar when it is installed but not running.
+
 ## [0.5.1] - 2026-11-01
 
 ### Fixed

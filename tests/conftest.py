@@ -14,8 +14,11 @@ def _windows_catalogue() -> Iterator[None]:
     any module-level fixture builds its settings."""
     from localdub import config
     from localdub.core.modelmgr import catalog
+    from localdub.core.translation import ollama_setup
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(catalog, "PLATFORM", "win32")
         mp.setattr(config, "DEFAULT_ASR_ID", "whisper-large-v3")
+        # the CI machines have no Ollama; tests that care say so themselves
+        mp.setattr(ollama_setup, "is_present", lambda: True)
         yield

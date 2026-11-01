@@ -44,6 +44,7 @@ from localdub.core.timeline.edits import (
 )
 from localdub.core.timeline.fit import available_windows
 from localdub.core.timeline.models import DialogueSegment, ReviewStatus
+from localdub.core.translation import ollama_setup
 from localdub.core.translation.prompts import normalize_punctuation
 from localdub.core.tts.base import VOICES, default_speaker_voices
 from localdub.core.youtube import tools as youtube_tools
@@ -262,8 +263,24 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
             client.close()
         return {
             "ok": True,
-            "ollama": {"reachable": error is None, "error": error, "models": models},
+            "ollama": {
+                "reachable": error is None,
+                "error": error,
+                "models": models,
+                "installed": error is None or ollama_setup.is_present(),
+            },
         }
+
+    @app.post("/api/ollama/start")
+    async def start_ollama() -> dict[str, bool]:
+        """Start Ollama (if it is installed) and wait until it answers."""
+        if not ollama_setup.is_present():
+            raise HTTPException(409, "Ollama is not installed. Install it on the AI models page.")
+        try:
+            ok = await asyncio.to_thread(ollama_setup.ensure_running, settings.ollama_url)
+        except ollama_setup.OllamaSetupError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return {"reachable": ok}
 
     @app.get("/api/options")
     def options(lang: str = "en") -> dict[str, Any]:

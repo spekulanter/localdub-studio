@@ -1,5 +1,5 @@
 {
-  "catalog_version": "2026.11.01",
+  "catalog_version": "2026.11.02",
   "roles": [
     {
       "id": "asr",
@@ -10,6 +10,17 @@
       "sk": {
         "title": "Rozpoznávanie reči",
         "description": "Počúva video a zapisuje, čo sa hovorí, s časom každého slova. Používa sa pri každom dabingu. Výber sa pamätá pre každý dabing zvlášť, takže zmena predvoleného modelu nikdy nezmení hotovú prácu."
+      }
+    },
+    {
+      "id": "ollama",
+      "title": "Ollama",
+      "required": true,
+      "selectable": false,
+      "description": "The program that runs the translation models. One click installs and starts it.",
+      "sk": {
+        "title": "Ollama",
+        "description": "Program, ktorý spúšťa prekladové modely. Jedno kliknutie ho nainštaluje a spustí."
       }
     },
     {
@@ -398,6 +409,51 @@
         "pl",
         "hu"
       ]
+    },
+    {
+      "id": "ollama-app",
+      "role": "ollama",
+      "default": true,
+      "status": "available",
+      "title": "Ollama (runs the translation models)",
+      "summary": "Installs Ollama and starts it. Ollama keeps its models for every program on this computer.",
+      "choose_if": [
+        "It is required: translation runs inside it."
+      ],
+      "avoid_if": [],
+      "requirements": {
+        "vram_gb": null,
+        "disk_gb": 1.7,
+        "runs_on": "cpu",
+        "note": "On Windows it is installed with winget (package Ollama.Ollama, about 1.7 GB); on a Mac it is Ollama's own download (about 230 MB)."
+      },
+      "size_bytes": 1676266440,
+      "license": {
+        "name": "MIT",
+        "url": "https://github.com/ollama/ollama/blob/main/LICENSE"
+      },
+      "measured": null,
+      "pinned": "Not pinned: the newest Ollama is installed. On a Mac the download is checked against the SHA-256 list that Ollama publishes with it.",
+      "source": {
+        "type": "ollama-app"
+      },
+      "darwin": {
+        "size_bytes": 229773910,
+        "requirements": {
+          "disk_gb": 0.6
+        },
+        "sk": {
+          "note": "Na Macu je to priame stiahnutie od Ollamy (asi 230 MB)."
+        }
+      },
+      "sk": {
+        "summary": "Nainštaluje Ollamu a spustí ju. Ollama drží svoje modely pre všetky programy na tomto počítači.",
+        "choose_if": [
+          "Je povinná: preklad beží v nej."
+        ],
+        "note": "Vo Windowse sa inštaluje cez winget (balík Ollama.Ollama, asi 1,7 GB); na Macu je to priame stiahnutie od Ollamy (asi 230 MB).",
+        "pinned": "Nepripnuté: nainštaluje sa najnovšia Ollama. Na Macu sa stiahnutie overí podľa zoznamu SHA-256, ktorý Ollama zverejňuje s ním."
+      }
     },
     {
       "id": "translategemma-4b",

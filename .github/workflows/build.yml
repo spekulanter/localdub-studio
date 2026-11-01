@@ -224,13 +224,14 @@ jobs:
           cd "$RUNNER_TEMP"
           PYTHONPATH="$APP/app" PYTHONNOUSERSITE=1 "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" imports
 
-      - name: Download the pinned FFmpeg, yt-dlp and Deno for real, and run them
+      - name: Download FFmpeg, yt-dlp, Deno and Ollama for real, and run or unpack them
         run: |
           APP="/Applications/LocalDub Studio.app/Contents/Resources"
           cd "$RUNNER_TEMP"
           export PYTHONPATH="$APP/app" PYTHONNOUSERSITE=1
           "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" ffmpeg
           "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" youtube
+          "$APP/python/bin/python3" "$GITHUB_WORKSPACE/packaging/smoke_macos.py" ollama
 
       - name: The optional Demucs packages can be planned from the app's lock file
         run: |

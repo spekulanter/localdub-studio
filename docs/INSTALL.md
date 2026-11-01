@@ -21,7 +21,7 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
 
 | Step | Source | Size |
 |---|---|---|
-| FFmpeg and Ollama, if missing (asks first) | `winget` (`Gyan.FFmpeg`, `Ollama.Ollama`) | 100-200 MB each |
+| FFmpeg and Ollama, if missing (asks first) | `winget` (`Gyan.FFmpeg`, `Ollama.Ollama`) | 100 MB and 1.7 GB |
 | Python 3.12 and the app libraries | uv (bundled), python-build-standalone, PyPI | about 2.5 GB |
 
    **The AI models and the optional packages are not part of the setup.** On first start the program shows a notice and an

@@ -134,9 +134,14 @@ class ModelManager:
         if tag is None:
             d = self.default_entry("translation", ctx)
             tag = str(d.source["tag"]) if d is not None else None
+        runtime = self.catalog.default_of("ollama")
+        runtime_ok = runtime is None or self.handler(runtime).installed(runtime, ctx)
+        if not runtime_ok:
+            out.append("Ollama (the program that runs the translation models)")
         tags = ctx.ollama_tags()
         if tags is None:
-            out.append("Translation: Ollama is not running")
+            if runtime_ok:
+                out.append("Translation: Ollama is not running")
         elif tag and ollama_find(tags, str(tag)) is None:
             out.append(f"Translation model: {tag}")
         tts = self.catalog.default_of("tts")

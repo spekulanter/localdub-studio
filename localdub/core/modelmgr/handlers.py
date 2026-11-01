@@ -29,6 +29,7 @@ from localdub.core.media import ffmpeg_tools
 from localdub.core.media.ffmpeg import MediaError, find_tool
 from localdub.core.modelmgr.catalog import Entry
 from localdub.core.models import ensure_archive_files, ensure_model, is_readable
+from localdub.core.translation import ollama_setup
 from localdub.core.youtube import tools as youtube_tools
 
 log = logging.getLogger(__name__)
@@ -377,15 +378,29 @@ class MlxWhisperHandler(WhisperHandler):
         return snap is not None and all(is_readable(snap / f) for f in e.source["files"])
 
 
+def ensure_ollama(ctx: Ctx, progress: Progress) -> None:
+    """Make sure Ollama is installed and answering, doing whatever is missing."""
+    try:
+        if not (ollama_setup.is_present() or ctx.ollama_tags() is not None):
+            ollama_setup.install(progress)
+        progress(0, 0, "Starting Ollama...")
+        if not ollama_setup.ensure_running(ctx.settings.ollama_url):
+            raise ModelError(
+                "Ollama is installed but did not answer within a minute. Open it yourself once "
+                "(it may be asking for a permission), then try again."
+            )
+    except ollama_setup.OllamaSetupError as exc:
+        raise ModelError(str(exc)) from exc
+    ctx._ollama_loaded = False  # the model list was cached while Ollama was away
+
+
 class OllamaHandler(Handler):
     def installed(self, e: Entry, ctx: Ctx) -> bool:
         return ollama_find(ctx.ollama_tags(), e.source["tag"]) is not None
 
     def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
         if ctx.ollama_tags() is None:
-            raise ModelError(
-                "Ollama is not running. Start Ollama (or install it from ollama.com) and retry."
-            )
+            ensure_ollama(ctx, progress)  # a model can be fetched with one click, Ollama or not
         url = ctx.settings.ollama_url.rstrip("/") + "/api/pull"
         with (
             httpx.Client(timeout=httpx.Timeout(30.0, read=None)) as client,
@@ -597,6 +612,23 @@ class FfmpegHandler(Handler):
             )
 
 
+class OllamaAppHandler(Handler):
+    """The Ollama program itself (not its models): installed on request, started afterwards."""
+
+    def installed(self, e: Entry, ctx: Ctx) -> bool:
+        return ollama_setup.is_present() or ctx.ollama_tags() is not None
+
+    def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
+        ensure_ollama(ctx, progress)
+
+    def note(self, e: Entry, ctx: Ctx) -> str | None:
+        cli = ollama_setup.find_cli()
+        return f"Found at {cli.parent}; LocalDub never removes it." if cli else None
+
+    def delete(self, e: Entry, ctx: Ctx) -> None:
+        raise NotDeletable("LocalDub does not remove Ollama: other programs may use it.")
+
+
 class YoutubeHandler(Handler):
     def installed(self, e: Entry, ctx: Ctx) -> bool:
         return youtube_tools.is_installed()
@@ -688,4 +720,5 @@ HANDLERS: dict[str, Handler] = {
     "youtube": YoutubeHandler(),
     "packages": PackagesHandler(),
     "ffmpeg": FfmpegHandler(),
+    "ollama-app": OllamaAppHandler(),
 }
