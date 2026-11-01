@@ -111,8 +111,47 @@ def install_libraries(uv: str, python: Path) -> None:
     reqs = BUILD / "requirements.txt"
     run([uv, "export", "--frozen", "--no-dev", "--no-emit-project", "--no-header",
          "--output-file", reqs], cwd=ROOT)  # fmt: skip
+    # copy, not clone/hardlink: the app must not depend on uv's cache, and two packages that share a
+    # folder (sherpa-onnx and sherpa-onnx-core) must both land in it.
     run([uv, "pip", "install", "--python", python, "--break-system-packages", "--require-hashes",
-         "--no-deps", "--compile-bytecode", "-r", reqs], cwd=ROOT)  # fmt: skip
+         "--no-deps", "--compile-bytecode", "--link-mode", "copy",
+         "-r", reqs], cwd=ROOT)  # fmt: skip
+
+
+CHECK_RECORDS = """
+import sys
+from importlib.metadata import distributions
+
+missing = []
+for dist in distributions():
+    for f in dist.files or []:
+        if f.suffix in (".pyc",) or "__pycache__" in f.parts or f.name == "RECORD":
+            continue
+        if not f.locate().exists():
+            missing.append(f"{dist.metadata['Name']}: {f}")
+print(f"{len(missing)} files listed by the installed packages are missing")
+for m in missing[:40]:
+    print("  ", m)
+sys.exit(1 if missing else 0)
+"""
+
+
+def check_installed_files(python: Path) -> None:
+    """Every file a package says it installed must be there (catches silently dropped files)."""
+    run([python, "-I", "-c", CHECK_RECORDS])
+
+
+def fix_dangling_symlinks(root: Path) -> None:
+    """A link that points nowhere makes codesign fail. Python's `etc/openssl/cert.pem` is one:
+    point it at certifi's bundle, which the libraries brought along."""
+    certifi = next((root / "lib").glob("python3.*/site-packages/certifi/cacert.pem"), None)
+    for link in sorted(p for p in root.rglob("*") if p.is_symlink()):
+        if link.exists():
+            continue
+        print("dangling link:", link.relative_to(root), "->", os.readlink(link))
+        link.unlink()
+        if link.name == "cert.pem" and certifi is not None:
+            link.symlink_to(os.path.relpath(certifi, link.parent))
 
 
 def copy_app_files(app_dir: Path, uv: str) -> None:
@@ -208,6 +247,8 @@ def main() -> int:
     resources = write_bundle(app, ver)
     python = copy_python(uv, resources / "python")
     install_libraries(uv, python)
+    check_installed_files(python)
+    fix_dangling_symlinks(resources / "python")
     app_dir = resources / "app"
     copy_app_files(app_dir, uv)
     run([python, "-m", "compileall", "-q", app_dir / "localdub"])
