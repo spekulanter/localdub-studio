@@ -56,6 +56,18 @@ export interface Options {
   separation_available: boolean;
 }
 
+export interface UpdateInfo {
+  current: string;
+  available: boolean;
+  version: string | null;
+  notes: string | null;
+  page: string | null;
+  asset: string | null;
+  size: number | null;
+  error: string | null;
+  download: { status: "idle" | "running" | "ready" | "error"; done: number; total: number; error: string | null };
+}
+
 export interface Health {
   ok: boolean;
   ollama: { reachable: boolean; error: string | null; models: string[]; installed?: boolean };
@@ -272,6 +284,9 @@ const json = (method: string, body?: unknown): RequestInit => ({
 export const api = {
   setUploadLimit: (mb: number | null) =>
     request<{ max_upload_mb: number; default_max_upload_mb: number }>("/api/settings", json("PUT", { max_upload_mb: mb })),
+  update: (refresh = false) => request<UpdateInfo>(`/api/update${refresh ? "?refresh=true" : ""}`),
+  startUpdateDownload: () => request<UpdateInfo>("/api/update/download", json("POST", {})),
+  installUpdate: (force: boolean) => request<{ closing: boolean }>("/api/update/install", json("POST", { force })),
   startOllama: () => request<{ reachable: boolean }>("/api/ollama/start", json("POST", {})),
   health: () => request<Health>("/api/health"),
   models: (sizes = false) => request<ModelsResponse>(`/api/models?lang=${apiLang}${sizes ? "&sizes=true" : ""}`),

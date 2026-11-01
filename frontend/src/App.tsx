@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Health, type ModelsResponse, type Options, type Project } from "./api";
 import { Cpu, Plus } from "lucide-react";
 import { Logo } from "./components/Logo";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { ModelsPanel } from "./components/ModelsPanel";
 import { NewProject } from "./components/NewProject";
 import { ProjectList } from "./components/ProjectList";
@@ -85,6 +86,13 @@ export default function App() {
 
   const [startingOllama, setStartingOllama] = useState(false);
   const [newFormKey, setNewFormKey] = useState(0);
+  const [checkUpdates, setCheckUpdates] = useState(() => {
+    try {
+      return localStorage.getItem("localdub.updates") !== "off";
+    } catch {
+      return true;
+    }
+  });
   const ollamaOk = health?.ollama.reachable ?? false;
   const modelsNeeded = (models?.required_missing.length ?? 0) > 0;
 
@@ -181,6 +189,22 @@ export default function App() {
             <option value="dark">{t("Dark")}</option>
           </select>
         </label>
+        <label className="flex items-start gap-2 text-xs text-muted">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={checkUpdates}
+            onChange={(e) => {
+              setCheckUpdates(e.target.checked);
+              try {
+                localStorage.setItem("localdub.updates", e.target.checked ? "on" : "off");
+              } catch {
+                /* only this session then */
+              }
+            }}
+          />
+          <span>{t("Look for a new version when the program starts (asks GitHub; nothing else is sent)")}</span>
+        </label>
       </aside>
 
       <main className="min-w-0 px-5 py-7 lg:px-10">
@@ -190,6 +214,7 @@ export default function App() {
               {loadError}
             </p>
           )}
+          <UpdateBanner enabled={checkUpdates} />
           {modelsNeeded && selected !== "models" && (
             <div className="alert alert-warn flex flex-wrap items-center justify-between gap-3" role="status">
               <span>

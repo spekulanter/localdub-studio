@@ -9,9 +9,11 @@ import asyncio
 import io
 import json
 import logging
+import os
 import re
 import shutil
 import threading
+import time
 import unicodedata
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -28,7 +30,7 @@ from localdub import extras
 from localdub.api.db import Database
 from localdub.api.jobs import JobManager
 from localdub.config import Settings
-from localdub.core import usersettings
+from localdub.core import updates, usersettings
 from localdub.core.audio.waveform import peaks_payload
 from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.media.ffmpeg import FFmpeg, MediaError
@@ -91,6 +93,10 @@ class ProjectOut(BaseModel):
     created_at: float
     latest_job: dict[str, Any] | None = None
     has_output: bool = False
+
+
+class InstallBody(BaseModel):
+    force: bool = False
 
 
 class SettingsPatch(BaseModel):
@@ -270,6 +276,94 @@ def create_app(settings: Settings | None = None, *, start_queue: bool = True) ->
                 "installed": error is None or ollama_setup.is_present(),
             },
         }
+
+    # ----- updates -----------------------------------------------------------------------
+    upd: dict[str, Any] = {
+        "checked": 0.0, "update": None, "error": None,
+        "download": {"status": "idle", "done": 0, "total": 0, "error": None},
+        "file": None,
+    }  # fmt: skip
+    upd_lock = threading.Lock()
+    app.state.quit = None  # the window sets this so an update can close the program properly
+
+    def update_view() -> dict[str, Any]:
+        u = upd["update"]
+        return {
+            "current": updates.current_version(),
+            "available": u is not None,
+            "version": u.version if u else None,
+            "notes": u.notes if u else None,
+            "page": u.page if u else None,
+            "asset": u.asset if u else None,
+            "size": u.size if u else None,
+            "error": upd["error"],
+            "download": dict(upd["download"]),
+        }
+
+    @app.get("/api/update")
+    async def get_update(refresh: bool = False) -> dict[str, Any]:
+        """Is there a newer normal release? Looked up at most every 6 hours (or when asked)."""
+        busy = upd["download"]["status"] in ("running", "ready")
+        if not busy and (refresh or time.time() - upd["checked"] > 6 * 3600):
+            try:
+                found = await asyncio.to_thread(updates.check)
+                upd.update(update=found, error=None)
+            except updates.UpdateError as exc:
+                upd.update(update=None, error=str(exc))
+            upd["checked"] = time.time()
+        return update_view()
+
+    @app.post("/api/update/download", status_code=202)
+    def start_update_download() -> dict[str, Any]:
+        u = upd["update"]
+        if u is None:
+            raise HTTPException(409, "There is no newer version to download.")
+        with upd_lock:
+            if upd["download"]["status"] == "running":
+                return update_view()
+            upd["download"] = {"status": "running", "done": 0, "total": u.size, "error": None}
+
+        def work() -> None:
+            def progress(done: int, total: int) -> None:
+                upd["download"].update(done=done, total=total or u.size)
+
+            try:
+                upd["file"] = updates.download(u, settings.data_dir / "updates", progress)
+                upd["download"]["status"] = "ready"
+            except updates.UpdateError as exc:
+                upd["download"].update(status="error", error=str(exc))
+            except Exception as exc:  # noqa: BLE001 - shown to the user, never silent
+                log.exception("Update download failed")
+                upd["download"].update(status="error", error=f"{type(exc).__name__}: {exc}")
+
+        threading.Thread(target=work, name="update-download", daemon=True).start()
+        return update_view()
+
+    @app.post("/api/update/install")
+    def install_update(body: InstallBody) -> dict[str, bool]:
+        """Start the downloaded installer, then close the program so it can replace it."""
+        path = upd["file"]
+        if upd["download"]["status"] != "ready" or path is None or not Path(path).is_file():
+            raise HTTPException(409, "The update has not been downloaded yet.")
+        if db.any_active() and not body.force:
+            raise HTTPException(
+                409,
+                "A dubbing job is running or waiting. It is paused and continues after the update.",
+            )
+        try:
+            updates.launch_installer(Path(path))
+        except updates.UpdateError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+        def leave() -> None:
+            quit_app = app.state.quit
+            if quit_app is not None:
+                quit_app()
+            else:
+                os._exit(0)  # a server without a window (the browser fallback)
+
+        threading.Timer(1.5, leave).start()  # let this answer reach the page first
+        return {"closing": True}
 
     @app.post("/api/ollama/start")
     async def start_ollama() -> dict[str, bool]:

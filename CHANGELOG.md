@@ -3,6 +3,16 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Added
+- **Update check at start.** When the program starts it asks GitHub (only the public "latest release" page) whether
+  a newer normal release exists; pre-releases are ignored. If so, a banner offers "Download and update": the
+  installer is downloaded from this project's release page, checked against its published SHA-256, then started
+  and the program closes (a running dub is paused and continues afterwards; you are asked first). On a Mac the
+  disk image is opened for you to drag the app into Applications. "Later" hides that version; a checkbox in the
+  sidebar switches the check off.
+
 ## [0.5.2] - 2026-11-01
 
 ### Added

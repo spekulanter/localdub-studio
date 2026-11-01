@@ -212,7 +212,11 @@ def run_app(settings: Settings | None = None) -> int:
     )
     assert window is not None
 
+    leaving: list[bool] = []
+
     def on_closing() -> bool | None:
+        if leaving:
+            return None
         if server is not None and server.has_active_jobs():
             ok = window.create_confirmation_dialog(
                 TITLE,
@@ -238,6 +242,13 @@ def run_app(settings: Settings | None = None) -> int:
         log.info("Window loaded %s", url)
 
     window.events.closing += on_closing
+    if server is not None:
+
+        def quit_for_update() -> None:
+            leaving.append(True)  # the user already agreed: no "close anyway?" question
+            window.destroy()
+
+        server.app.state.quit = quit_for_update
     try:
         webview.start(
             boot,
