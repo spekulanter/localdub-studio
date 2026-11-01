@@ -171,9 +171,10 @@ def sign(app: Path) -> None:
     """Ad-hoc signature: seals the bundle (no developer identity, so Gatekeeper still asks)."""
     try:
         run(["codesign", "--force", "--deep", "--sign", "-", "--timestamp=none", app])
-        run(["codesign", "--verify", "--deep", "--strict", app])
+        run(["codesign", "-vvv", "--deep", "--strict", app])
     except subprocess.CalledProcessError as exc:
         print(f"WARNING: ad-hoc signing failed ({exc}); continuing with an unsealed bundle")
+        subprocess.run(["codesign", "-dvvv", str(app)], check=False)  # noqa: S603,S607
 
 
 def build_dmg(app: Path, ver: str) -> Path:
