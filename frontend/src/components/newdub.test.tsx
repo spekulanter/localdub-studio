@@ -23,10 +23,25 @@ describe("the defaults of a new dub", () => {
     expect(initialSettings({ ...options, separation_available: true }, {}).original_audio).toBe("background");
   });
 
+  it("tells speakers apart by default, and clones the voice by default only where it can work", () => {
+    const first = initialSettings(options, {});
+    expect(first.diarize).toBe(true);
+    expect(first.clone_voice).toBe(false); // its packages are not installed in this setup
+    const ready = initialSettings({ ...options, separation_available: true }, {});
+    expect(ready.clone_voice).toBe(true);
+    expect(ready.clone_consent).toBe(false); // the permission to imitate voices is never pre-ticked
+    expect(initialSettings({ ...options, separation_available: true }, { clone_voice: false, diarize: false })).toMatchObject({ clone_voice: false, diarize: false });
+  });
+
+  it("does not keep the untouched original as a second track unless asked", () => {
+    expect(initialSettings(options, {}).keep_original_track).toBe(false);
+    expect(initialSettings(options, { keep_original_track: true }).keep_original_track).toBe(true);
+  });
+
   it("remembers the last choices but never the permission to clone a voice", () => {
-    const s = initialSettings(options, { voice: "F2", original_audio: "mute", source_lang: "de", diarize: true, num_speakers: 3 });
+    const s = initialSettings({ ...options, separation_available: true }, { voice: "F2", original_audio: "mute", source_lang: "de", diarize: true, num_speakers: 3, clone_voice: true });
     expect([s.voice, s.original_audio, s.source_lang, s.diarize, s.num_speakers]).toEqual(["F2", "mute", "de", true, 3]);
-    expect(s.clone_voice).toBe(false);
+    expect(s.clone_voice).toBe(true);
     expect(s.clone_consent).toBe(false);
   });
 

@@ -52,7 +52,7 @@ describe("several YouTube links at once", () => {
   const options: Options = {
     voices: ["F1"], source_languages: { en: "English", de: "German" }, target_language: "sk", default_voice: "F1",
     default_llm: "m", default_asr: "whisper-large-v3", asr_choices: [], translation_choices: [],
-    stages: [], max_upload_mb: 100, default_max_upload_mb: 4096, free_disk_mb: 100000, separation_available: true,
+    stages: [], max_upload_mb: 100, default_max_upload_mb: 4096, free_disk_mb: 100000, separation_available: false,
   };
   const health: Health = { ok: true, ollama: { reachable: true, error: null, models: [] } };
 

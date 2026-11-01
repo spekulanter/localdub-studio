@@ -15,6 +15,9 @@ has not been tested before relying on a feature.
 - New dub starts with a male voice (M1) and offers "Remove the speech, keep music and effects" first and, when
   its packages are installed, selected. Without those packages the first start selects "Keep quietly under the dub"
   and the button for speech removal waits until they are installed.
+- New dub starts with speaker detection on, voice cloning on where its packages are installed (the permission to
+  imitate voices still has to be ticked by you each time) and "keep the untouched original as a 2nd audio track"
+  off. Each choice is remembered once you change it.
 - New dub remembers your choices: visiting AI models or a finished dub and coming back keeps the chosen files,
   link and settings, and the last settings are kept after closing the program too (the permission to clone a
   voice is never kept). After a dub is created the form is emptied for the next video, the settings stay.

@@ -64,7 +64,7 @@ function UploadLimit({ options, onChanged }: { options: Options; onChanged?: () 
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 const SAVED = "localdub.newdub";
 /** What is remembered between visits: the choices, never the permission to clone a voice. */
-type Remembered = Pick<Settings, "source_lang" | "voice" | "llm_model" | "asr_id" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers">;
+type Remembered = Pick<Settings, "source_lang" | "voice" | "llm_model" | "asr_id" | "original_audio" | "keep_original_track" | "diarize" | "clone_voice" | "num_speakers">;
 
 function loadRemembered(): Partial<Remembered> {
   try {
@@ -88,9 +88,10 @@ export function initialSettings(options: Options, saved: Partial<Remembered> = l
     llm_model: typeof saved.llm_model === "string" && saved.llm_model ? saved.llm_model : options.default_llm,
     asr_id,
     original_audio: audio === "background" || audio === "duck" || audio === "mute" ? audio : options.separation_available ? "background" : "duck",
-    keep_original_track: typeof saved.keep_original_track === "boolean" ? saved.keep_original_track : true,
-    diarize: saved.diarize === true,
-    clone_voice: false,
+    keep_original_track: saved.keep_original_track === true, // off unless the user switched it on
+    diarize: saved.diarize !== false, // on unless the user switched it off
+    // on when it can work (its packages are there); the permission to imitate voices is never pre-ticked
+    clone_voice: options.separation_available && saved.clone_voice !== false,
     clone_consent: false,
     num_speakers: typeof saved.num_speakers === "number" ? saved.num_speakers : null,
   };
@@ -104,9 +105,9 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
   const [progress, setProgress] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => initialSettings(options));
   useEffect(() => {
-    const { source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, num_speakers } = settings;
+    const { source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, clone_voice, num_speakers } = settings;
     try {
-      localStorage.setItem(SAVED, JSON.stringify({ source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, num_speakers }));
+      localStorage.setItem(SAVED, JSON.stringify({ source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, clone_voice, num_speakers }));
     } catch {
       /* private window or blocked storage: the form still works, it just forgets */
     }
@@ -290,6 +291,9 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
         </button>
         {modelsMissing && (
           <span className="text-xs text-warn">{t("Download the AI models first (see the notice above).")}</span>
+        )}
+        {settings.clone_voice && !settings.clone_consent && (
+          <span className="text-xs text-warn">{t("Voice cloning is on: confirm in Advanced options that you may imitate the voices, or switch it off.")}</span>
         )}
         {settings.original_audio === "background" && !options.separation_available && (
           <span className="text-xs text-warn">{t("Install the extra packages for speech removal above, or choose another option.")}</span>

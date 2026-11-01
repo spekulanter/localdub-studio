@@ -153,7 +153,7 @@ describe("NewProject with a YouTube link", () => {
   const options: Options = {
     voices: ["F1", "M1"], source_languages: { en: "English" }, target_language: "sk", default_voice: "F1",
     default_llm: "translategemma:4b", default_asr: "whisper-large-v3", asr_choices: [], translation_choices: [],
-    stages: [], max_upload_mb: 100, default_max_upload_mb: 4096, free_disk_mb: 100000, separation_available: true,
+    stages: [], max_upload_mb: 100, default_max_upload_mb: 4096, free_disk_mb: 100000, separation_available: false,
   };
   const health: Health = { ok: true, ollama: { reachable: true, error: null, models: ["translategemma:4b"] } };
 
@@ -180,7 +180,7 @@ describe("NewProject with a YouTube link", () => {
     const body = calls.find((c) => c.url === "/api/projects/from-youtube")?.body as Record<string, unknown>;
     expect(body).toMatchObject({
       url: "https://youtu.be/abc", quality: "auto", cookies_browser: "none", voice: "M1",
-      original_audio: "mute", keep_original_track: true, diarize: false, clone_voice: false,
+      original_audio: "mute", keep_original_track: false, diarize: true, clone_voice: false,
     });
     expect(body).not.toHaveProperty("file");
   });

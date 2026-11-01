@@ -84,11 +84,10 @@ const field = "field";
 
 export function OptionFields({ options, health, value, onChange, lockSource, disabled, onPackagesInstalled }: Props) {
   const t = useT();
-  // open from the start when something advanced is already switched on (e.g. a saved dub)
+  // open from the start when something in there needs attention (a choice that is not the default, or the voice-cloning permission)
   const [advancedOpen, setAdvancedOpen] = useState(
     () =>
-      value.diarize ||
-      value.clone_voice ||
+      (value.clone_voice && !value.clone_consent) || // the permission has to be given in there
       value.asr_id !== options.default_asr ||
       value.llm_model !== options.default_llm,
   );
