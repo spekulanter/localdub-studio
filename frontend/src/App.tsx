@@ -84,6 +84,7 @@ export default function App() {
   }, []);
 
   const [startingOllama, setStartingOllama] = useState(false);
+  const [newFormKey, setNewFormKey] = useState(0);
   const ollamaOk = health?.ollama.reachable ?? false;
   const modelsNeeded = (models?.required_missing.length ?? 0) > 0;
 
@@ -201,37 +202,48 @@ export default function App() {
               </button>
             </div>
           )}
-          <div key={String(selected)} className="rise">
-            {options === null ? (
-              <p className="text-muted">{t("Loading…")}</p>
-            ) : selected === "models" ? (
-              <ModelsPanel data={models} onChanged={refreshModels} />
-            ) : selected === "new" ? (
-              <NewProject
-                options={options}
-                health={health}
-                modelsMissing={modelsNeeded}
-                onOptionsChanged={refreshOptions}
-                onCreated={(p) => {
-                  void refreshProjects();
-                  setSelected(p.id);
-                }}
-              />
-            ) : (
-              <ProjectView
-                key={selected}
-                projectId={selected}
-                options={options}
-                health={health}
-                onChanged={refreshProjects}
-                onOptionsChanged={refreshOptions}
-                onDeleted={() => {
-                  void refreshProjects();
-                  setSelected("new");
-                }}
-              />
-            )}
-          </div>
+          {options === null ? (
+            <p className="text-muted">{t("Loading…")}</p>
+          ) : (
+            <>
+              {/* Never unmounted, only hidden: the chosen files, link and settings survive a visit to another page. */}
+              <div hidden={selected !== "new"} className="rise">
+                <NewProject
+                  key={newFormKey}
+                  options={options}
+                  health={health}
+                  modelsMissing={modelsNeeded}
+                  onOptionsChanged={refreshOptions}
+                  onCreated={(p) => {
+                    void refreshProjects();
+                    setNewFormKey((k) => k + 1); // a fresh form for the next video; settings are kept
+                    setSelected(p.id);
+                  }}
+                />
+              </div>
+              {selected === "models" && (
+                <div key="models" className="rise">
+                  <ModelsPanel data={models} onChanged={refreshModels} />
+                </div>
+              )}
+              {selected !== "new" && selected !== "models" && (
+                <div key={String(selected)} className="rise">
+                  <ProjectView
+                    key={selected}
+                    projectId={selected}
+                    options={options}
+                    health={health}
+                    onChanged={refreshProjects}
+                    onOptionsChanged={refreshOptions}
+                    onDeleted={() => {
+                      void refreshProjects();
+                      setSelected("new");
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
       </main>
     </div>

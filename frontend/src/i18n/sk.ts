@@ -145,6 +145,7 @@ export const sk: Record<string, string> = {
   "Found on ollama.com. LocalDub has not tested it for Slovak.": "Nájdete ho na ollama.com. LocalDub ho pre slovenčinu netestoval.",
   "Model list version {v}. New models arrive with program updates; nothing is checked online until you press “Check for updates”.": "Verzia zoznamu modelov {v}. Nové modely prichádzajú s aktualizáciami programu; online sa nič nekontroluje, kým nestlačíte „Skontrolovať aktualizácie“.",
   "Required": "Povinný",
+  "Install the extra packages for speech removal above, or choose another option.": "Nainštalujte vyššie dodatočné balíky na odstránenie reči, alebo vyberte inú možnosť.",
   "Three steps: choose the video, check the language and voice, press the button. Speech recognition, translation and the Slovak voice all run on this computer.": "Tri kroky: vyberte video, skontrolujte jazyk a hlas, stlačte tlačidlo. Rozpoznávanie reči, preklad aj slovenský hlas bežia na tomto počítači.",
   "1 · The video": "1 · Video",
   "2 · Language and voice": "2 · Jazyk a hlas",

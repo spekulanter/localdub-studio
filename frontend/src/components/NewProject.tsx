@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type Health, type Options, type Project, type YoutubeChoice } from "../api";
 import { useT } from "../i18n";
 import { OptionFields, type Settings } from "./OptionFields";
@@ -62,6 +62,39 @@ function UploadLimit({ options, onChanged }: { options: Options; onChanged?: () 
 }
 
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
+const SAVED = "localdub.newdub";
+/** What is remembered between visits: the choices, never the permission to clone a voice. */
+type Remembered = Pick<Settings, "source_lang" | "voice" | "llm_model" | "asr_id" | "original_audio" | "keep_original_track" | "diarize" | "num_speakers">;
+
+function loadRemembered(): Partial<Remembered> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SAVED) ?? "{}") as unknown;
+    return raw !== null && typeof raw === "object" ? (raw as Partial<Remembered>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Defaults for a first-time user (a male voice; speech removal when its packages are there), then what the user chose last time. */
+export function initialSettings(options: Options, saved: Partial<Remembered> = loadRemembered()): Settings {
+  const voice = saved.voice && options.voices.includes(saved.voice) ? saved.voice : options.voices.includes("M1") ? "M1" : options.default_voice;
+  const lang = saved.source_lang && saved.source_lang in options.source_languages ? saved.source_lang : "en";
+  const asrKnown = (options.asr_choices ?? []).find((c) => c.id === saved.asr_id);
+  const asr_id = asrKnown && (asrKnown.source_langs === null || (lang !== "auto" && asrKnown.source_langs.includes(lang))) ? asrKnown.id : options.default_asr;
+  const audio = saved.original_audio;
+  return {
+    source_lang: lang,
+    voice,
+    llm_model: typeof saved.llm_model === "string" && saved.llm_model ? saved.llm_model : options.default_llm,
+    asr_id,
+    original_audio: audio === "background" || audio === "duck" || audio === "mute" ? audio : options.separation_available ? "background" : "duck",
+    keep_original_track: typeof saved.keep_original_track === "boolean" ? saved.keep_original_track : true,
+    diarize: saved.diarize === true,
+    clone_voice: false,
+    clone_consent: false,
+    num_speakers: typeof saved.num_speakers === "number" ? saved.num_speakers : null,
+  };
+}
 
 export function NewProject({ options, health, onCreated, modelsMissing = false, onOptionsChanged }: Props) {
   const t = useT();
@@ -69,18 +102,15 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
   const [youtube, setYoutube] = useState<YoutubeChoice[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
-  const [settings, setSettings] = useState<Settings>({
-    source_lang: "en",
-    voice: options.default_voice,
-    llm_model: options.default_llm,
-    asr_id: options.default_asr,
-    original_audio: "duck",
-    keep_original_track: true,
-    diarize: false,
-    clone_voice: false,
-    clone_consent: false,
-    num_speakers: null,
-  });
+  const [settings, setSettings] = useState<Settings>(() => initialSettings(options));
+  useEffect(() => {
+    const { source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, num_speakers } = settings;
+    try {
+      localStorage.setItem(SAVED, JSON.stringify({ source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, num_speakers }));
+    } catch {
+      /* private window or blocked storage: the form still works, it just forgets */
+    }
+  }, [settings]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -245,7 +275,7 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
         </p>
       )}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={modelsMissing || (source === "file" ? files.length === 0 || tooBig.length > 0 : youtube.length === 0) || busy || (settings.clone_voice && !settings.clone_consent)} className="btn-primary">
+        <button type="submit" disabled={modelsMissing || (source === "file" ? files.length === 0 || tooBig.length > 0 : youtube.length === 0) || busy || (settings.clone_voice && !settings.clone_consent) || (settings.original_audio === "background" && !options.separation_available)} className="btn-primary">
           {source === "youtube"
             ? busy
               ? (progress ?? t("Starting…"))
@@ -260,6 +290,9 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
         </button>
         {modelsMissing && (
           <span className="text-xs text-warn">{t("Download the AI models first (see the notice above).")}</span>
+        )}
+        {settings.original_audio === "background" && !options.separation_available && (
+          <span className="text-xs text-warn">{t("Install the extra packages for speech removal above, or choose another option.")}</span>
         )}
         <span className="text-xs text-muted">
           {source === "youtube"

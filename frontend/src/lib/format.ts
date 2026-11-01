@@ -67,8 +67,9 @@ export function restartStage(before: Tunable, after: Tunable): Stage | null {
   return null;
 }
 
+// The order here is the order of the choices on screen: the best result first.
 export const ORIGINAL_AUDIO_LABELS: Record<OriginalAudio, string> = {
+  background: "Remove the speech, keep music and effects",
   duck: "Keep quietly under the dub",
   mute: "Mute completely (dub only)",
-  background: "Remove the speech, keep music and effects",
 };

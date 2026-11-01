@@ -179,7 +179,7 @@ describe("NewProject with a YouTube link", () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(project));
     const body = calls.find((c) => c.url === "/api/projects/from-youtube")?.body as Record<string, unknown>;
     expect(body).toMatchObject({
-      url: "https://youtu.be/abc", quality: "auto", cookies_browser: "none", voice: "F1",
+      url: "https://youtu.be/abc", quality: "auto", cookies_browser: "none", voice: "M1",
       original_audio: "mute", keep_original_track: true, diarize: false, clone_voice: false,
     });
     expect(body).not.toHaveProperty("file");

@@ -12,6 +12,12 @@ has not been tested before relying on a feature.
   hand. A "Start Ollama" button appears in the sidebar when it is installed but not running.
 
 ### Changed
+- New dub starts with a male voice (M1) and offers "Remove the speech, keep music and effects" first and, when
+  its packages are installed, selected. Without those packages the first start selects "Keep quietly under the dub"
+  and the button for speech removal waits until they are installed.
+- New dub remembers your choices: visiting AI models or a finished dub and coming back keeps the chosen files,
+  link and settings, and the last settings are kept after closing the program too (the permission to clone a
+  voice is never kept). After a dub is created the form is emptied for the next video, the settings stay.
 - **A simpler New dub page.** Three numbered steps (video, language and voice, start). Only what most videos need
   is shown; the speech model, the translation model, speaker detection and voice cloning moved into a collapsed
   "Advanced options" section, which opens by itself when one of them is already switched on.
