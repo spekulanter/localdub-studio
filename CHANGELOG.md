@@ -3,7 +3,7 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [Unreleased]
+## [0.5.4] - 2026-11-01
 
 ### Changed
 - The statement "I have the right to imitate the voices in this video" is ticked from the start whenever voice

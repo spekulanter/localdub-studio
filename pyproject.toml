@@ -1,6 +1,6 @@
 [project]
 name = "localdub"
-version = "0.5.3"
+version = "0.5.4"
 description = "LocalDub Studio - local-first English-to-Slovak video dubbing"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
