@@ -13,7 +13,7 @@ interface Props {
 const STATUS_LABEL: Record<ModelInfo["status"], string> = {
   recommended: "Recommended",
   available: "Available",
-  experimental: "Experimental",
+  experimental: "Advanced",
   not_recommended: "Not recommended",
   custom: "Added by you",
 };

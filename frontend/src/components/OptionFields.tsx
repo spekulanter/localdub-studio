@@ -84,6 +84,14 @@ const field = "field";
 
 export function OptionFields({ options, health, value, onChange, lockSource, disabled, onPackagesInstalled }: Props) {
   const t = useT();
+  // open from the start when something advanced is already switched on (e.g. a saved dub)
+  const [advancedOpen, setAdvancedOpen] = useState(
+    () =>
+      value.diarize ||
+      value.clone_voice ||
+      value.asr_id !== options.default_asr ||
+      value.llm_model !== options.default_llm,
+  );
   const packagesInstalled = onPackagesInstalled ?? (() => undefined);
   const pytorchIntro = (size: string) => t("This needs an extra download of about {size} (PyTorch).", { size });
   const set = <K extends keyof Settings>(key: K, v: Settings[K]) => onChange({ ...value, [key]: v });
@@ -133,29 +141,6 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
         </div>
         <span className="mt-1 block text-xs text-muted">{t("Press Listen to hear the selected voice.")}</span>
       </div>
-      <label className="text-sm">
-        <span className="mb-1 block font-medium">{t("Speech recognition")}</span>
-        <select className={field} value={value.asr_id} onChange={(e) => set("asr_id", e.target.value)}>
-          {(asrChoices.some((c) => c.id === value.asr_id) ? asrChoices : [...asrChoices, { id: value.asr_id, title: value.asr_id, status: "available" as const, summary: "", tag: null, source_langs: null, installed: false }]).map((c) => (
-            <option key={c.id} value={c.id} disabled={!knows(c, value.source_lang)}>
-              {c.title}
-              {c.status === "experimental" ? ` [${t("experimental")}]` : ""}
-              {knows(c, value.source_lang) ? (c.installed ? "" : ` (${t("not downloaded")})`) : ` (${t("does not know this language")})`}
-            </option>
-          ))}
-        </select>
-        <span className="mt-1 block text-xs text-muted">{t("Choose and download models on the AI models page.")}</span>
-      </label>
-      <label className="text-sm">
-        <span className="mb-1 block font-medium">{t("Translation model (Ollama)")}</span>
-        <select className={field} value={value.llm_model} onChange={(e) => set("llm_model", e.target.value)}>
-          {llmChoices.map((m) => (
-            <option key={m} value={m}>
-              {llmLabel(m)}
-            </option>
-          ))}
-        </select>
-      </label>
       <div className="text-sm">
         <span className="mb-1 block font-medium">{t("Original voice")}</span>
         {(Object.keys(ORIGINAL_AUDIO_LABELS) as OriginalAudio[]).map((k) => (
@@ -168,9 +153,6 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
               onChange={() => set("original_audio", k)}
             />
             {t(ORIGINAL_AUDIO_LABELS[k])}
-            {k === "background" && (
-              <span className="chip chip-warn">{t("experimental")}</span>
-            )}
           </label>
         ))}
         {!options.separation_available && <InstallNotice ids={["packages", "separation"]} intro={pytorchIntro} onInstalled={packagesInstalled} />}
@@ -189,61 +171,97 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
           </p>
         )}
       </div>
-      <div className="sm:col-span-2 border-t border-line pt-4">
-        <p className="eyebrow">{t("Experimental")}</p>
-      </div>
-      <div className="text-sm sm:col-span-2">
-        <label className="flex items-center gap-2 py-0.5">
-          <input type="checkbox" checked={value.diarize} onChange={(e) => set("diarize", e.target.checked)} />
-          {t("Detect different speakers and give each its own voice")} <span className="chip chip-warn">{t("experimental")}</span>
-        </label>
-        {value.diarize && (
-          <div className="ml-6 mt-1 space-y-1">
-            <label className="flex items-center gap-2">
-              {t("Number of speakers (leave empty to detect)")}
-              <input
-                type="number"
-                min={1}
-                max={10}
-                className="btn-secondary btn-sm w-20"
-                value={value.num_speakers ?? ""}
-                onChange={(e) => set("num_speakers", e.target.value === "" ? null : Number(e.target.value))}
-              />
-            </label>
-            <p className="text-xs text-muted">
-              {t("Runs on the CPU. The first use downloads two small model files (about 46 MB) from GitHub. Giving the exact speaker count is much more reliable than automatic detection.")}
-            </p>
+      <details
+        className="sm:col-span-2 rounded-md border border-line p-3"
+        open={advancedOpen}
+        onToggle={(e) => setAdvancedOpen((e.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer text-sm font-medium">
+          {t("Advanced options")}
+          <span className="ml-2 font-normal text-muted">
+            {t("models, speakers, voice cloning. The defaults are fine for most videos.")}
+          </span>
+        </summary>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">{t("Speech recognition")}</span>
+            <select className={field} value={value.asr_id} onChange={(e) => set("asr_id", e.target.value)}>
+              {(asrChoices.some((c) => c.id === value.asr_id) ? asrChoices : [...asrChoices, { id: value.asr_id, title: value.asr_id, status: "available" as const, summary: "", tag: null, source_langs: null, installed: false }]).map((c) => (
+                <option key={c.id} value={c.id} disabled={!knows(c, value.source_lang)}>
+                  {c.title}
+                  {c.status === "experimental" ? ` [${t("advanced")}]` : ""}
+                  {knows(c, value.source_lang) ? (c.installed ? "" : ` (${t("not downloaded")})`) : ` (${t("does not know this language")})`}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-muted">{t("Choose and download models on the AI models page.")}</span>
+          </label>
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">{t("Translation model (Ollama)")}</span>
+            <select className={field} value={value.llm_model} onChange={(e) => set("llm_model", e.target.value)}>
+              {llmChoices.map((m) => (
+                <option key={m} value={m}>
+                  {llmLabel(m)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="sm:col-span-2 space-y-3">
+            <div className="text-sm">
+              <label className="flex items-center gap-2 py-0.5">
+                <input type="checkbox" checked={value.diarize} onChange={(e) => set("diarize", e.target.checked)} />
+                {t("Detect different speakers and give each its own voice")}
+              </label>
+              {value.diarize && (
+                <div className="ml-6 mt-1 space-y-1">
+                  <label className="flex items-center gap-2">
+                    {t("Number of speakers (leave empty to detect)")}
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      className="btn-secondary btn-sm w-20"
+                      value={value.num_speakers ?? ""}
+                      onChange={(e) => set("num_speakers", e.target.value === "" ? null : Number(e.target.value))}
+                    />
+                  </label>
+                  <p className="text-xs text-muted">
+                    {t("Runs on the CPU. The first use downloads two small model files (about 46 MB) from GitHub. Giving the exact speaker count is much more reliable than automatic detection.")}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="text-sm sm:col-span-2">
+              <label className="flex items-center gap-2 py-0.5">
+                <input
+                  type="checkbox"
+                  checked={value.clone_voice}
+                  disabled={!options.separation_available && !value.clone_voice}
+                  onChange={(e) => onChange({ ...value, clone_voice: e.target.checked, clone_consent: e.target.checked ? value.clone_consent : false })}
+                />
+                {t("Make the Slovak voice sound like the original speaker")}{" "}
+               
+              </label>
+              {value.clone_voice && (
+                <div className="ml-6 mt-1 space-y-1">
+                  <label className="flex items-start gap-2">
+                    <input type="checkbox" className="mt-1" checked={value.clone_consent} onChange={(e) => set("clone_consent", e.target.checked)} />
+                    <span>{t("I have the right to imitate the voices in this video (they are my own, or I have the speakers' permission).")}</span>
+                  </label>
+                  <p className="text-xs text-muted">
+                    {t("Runs locally on your GPU. It shifts the timbre of the generated voice towards the speaker; it is not a perfect copy. The finished file is marked as AI-generated.")}
+                  </p>
+                </div>
+              )}
+              {!options.separation_available && (
+                <div className="ml-6">
+                  <InstallNotice ids={["packages", "cloning"]} intro={pytorchIntro} onInstalled={packagesInstalled} />
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-      <div className="text-sm sm:col-span-2">
-        <label className="flex items-center gap-2 py-0.5">
-          <input
-            type="checkbox"
-            checked={value.clone_voice}
-            disabled={!options.separation_available && !value.clone_voice}
-            onChange={(e) => onChange({ ...value, clone_voice: e.target.checked, clone_consent: e.target.checked ? value.clone_consent : false })}
-          />
-          {t("Make the Slovak voice sound like the original speaker")}{" "}
-          <span className="chip chip-warn">{t("experimental")}</span>
-        </label>
-        {value.clone_voice && (
-          <div className="ml-6 mt-1 space-y-1">
-            <label className="flex items-start gap-2">
-              <input type="checkbox" className="mt-1" checked={value.clone_consent} onChange={(e) => set("clone_consent", e.target.checked)} />
-              <span>{t("I have the right to imitate the voices in this video (they are my own, or I have the speakers' permission).")}</span>
-            </label>
-            <p className="text-xs text-muted">
-              {t("Runs locally on your GPU. It shifts the timbre of the generated voice towards the speaker; it is not a perfect copy. The finished file is marked as AI-generated.")}
-            </p>
-          </div>
-        )}
-        {!options.separation_available && (
-          <div className="ml-6">
-            <InstallNotice ids={["packages", "cloning"]} intro={pytorchIntro} onInstalled={packagesInstalled} />
-          </div>
-        )}
-      </div>
+        </div>
+      </details>
     </fieldset>
   );
 }

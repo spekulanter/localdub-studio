@@ -266,7 +266,7 @@ describe("ModelsPanel", () => {
     expect(screen.getByRole("region", { name: "Speech recognition" })).toBeTruthy();
     expect(screen.getByText("Translates.")).toBeTruthy();
     expect(screen.getByText(/RTX 5060 Laptop, 8 GB/)).toBeTruthy();
-    expect(screen.getByText("Experimental")).toBeTruthy();
+    expect(screen.getByText("Advanced")).toBeTruthy();
     expect(screen.getByText("Only partly fits your card")).toBeTruthy();
     expect(screen.getByText("Runs on the processor")).toBeTruthy();
     expect(screen.getByText("In use for new dubs")).toBeTruthy();

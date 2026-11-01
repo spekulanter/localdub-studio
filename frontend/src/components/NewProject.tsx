@@ -172,8 +172,9 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
       <div>
         <p className="eyebrow mb-1.5">{t("New dub")}</p>
         <h2 className="font-display text-[30px] font-semibold leading-tight">{t("Dub a video into Slovak")}</h2>
-        <p className="mt-1 text-sm text-muted">{t("Pick a file or paste a YouTube link. Speech recognition, translation and the Slovak voice all run on this computer.")}</p>
+        <p className="mt-1 text-sm text-muted">{t("Three steps: choose the video, check the language and voice, press the button. Speech recognition, translation and the Slovak voice all run on this computer.")}</p>
       </div>
+      <p className="eyebrow">{t("1 · The video")}</p>
       <div role="tablist" aria-label={t("Where is the video?")} className="seg">
         {(["file", "youtube"] as const).map((k) => (
           <button
@@ -234,7 +235,9 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
         {tooBig.length > 0 && <p className="text-sm text-bad">{t("{names} is larger than {mb} MB.", { names: tooBig.map((f) => f.name).join(", "), mb: options.max_upload_mb })}</p>}
       </div>
 
+      <p className="eyebrow">{t("2 · Language and voice")}</p>
       <OptionFields options={options} health={health} value={settings} onChange={setSettings} disabled={busy} onPackagesInstalled={onOptionsChanged} />
+      <p className="eyebrow">{t("3 · Start")}</p>
 
       {error && (
         <p className="alert alert-bad" role="alert">

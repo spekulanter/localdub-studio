@@ -11,6 +11,13 @@ has not been tested before relying on a feature.
   published SHA-256 list) and starts it before fetching the translation model, so nothing has to be installed by
   hand. A "Start Ollama" button appears in the sidebar when it is installed but not running.
 
+### Changed
+- **A simpler New dub page.** Three numbered steps (video, language and voice, start). Only what most videos need
+  is shown; the speech model, the translation model, speaker detection and voice cloning moved into a collapsed
+  "Advanced options" section, which opens by itself when one of them is already switched on.
+- Features that work are no longer labelled "experimental": they are called "advanced" (on the AI models page too).
+  What was and was not measured is still stated in each model's description and in docs/QUALITY.md.
+
 ## [0.5.1] - 2026-11-01
 
 ### Fixed
