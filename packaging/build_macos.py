@@ -93,15 +93,25 @@ def copy_python(uv: str, dest: Path) -> Path:
     install_dir = BUILD / "python-install"
     env = {**os.environ, "UV_PYTHON_INSTALL_DIR": str(install_dir)}
     run([uv, "python", "install", PYTHON, "--managed-python"], env=env)
-    found = subprocess.run(  # noqa: S603
-        [uv, "python", "find", PYTHON, "--managed-python"], env=env,
-        capture_output=True, text=True, check=True,
-    ).stdout.strip()  # fmt: skip
-    prefix = Path(found).resolve().parent.parent  # .../bin/python3.12 -> the install prefix
+    # Not `uv python find`: on a machine with another Python 3.12 (the CI runner has python.org's)
+    # it answers with that one, which is not relocatable.
+    prefixes = sorted(
+        p for p in install_dir.glob(f"cpython-{PYTHON}.*-macos-aarch64-none") if not p.is_symlink()
+    )
+    if not prefixes:
+        raise SystemExit(f"uv did not install a managed Python {PYTHON} in {install_dir}")
+    prefix = prefixes[-1]
+    print("bundling", prefix.name)
     shutil.copytree(prefix, dest, symlinks=True)
     python = dest / "bin" / "python3"
     if not python.exists():
         raise SystemExit(f"{python} is missing after copying Python from {prefix}")
+    where = subprocess.run(  # noqa: S603
+        [str(python), "-I", "-c", "import sys; print(sys.prefix)"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()  # fmt: skip
+    if Path(where).resolve() != dest.resolve():
+        raise SystemExit(f"the bundled Python reports its home as {where}, not inside the app")
     return python
 
 
