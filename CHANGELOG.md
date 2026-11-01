@@ -3,7 +3,7 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [Unreleased]
+## [0.5.5] - 2026-11-01
 
 ### Changed
 - The server code is split by topic (`localdub/api/routes/`: meta, update, models, projects, jobs, segments, results)
