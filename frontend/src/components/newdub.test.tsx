@@ -29,7 +29,7 @@ describe("the defaults of a new dub", () => {
     expect(first.clone_voice).toBe(false); // its packages are not installed in this setup
     const ready = initialSettings({ ...options, separation_available: true }, {});
     expect(ready.clone_voice).toBe(true);
-    expect(ready.clone_consent).toBe(false); // the permission to imitate voices is never pre-ticked
+    expect(ready.clone_consent).toBe(false); // a first-time user has to tick the permission themselves
     expect(initialSettings({ ...options, separation_available: true }, { clone_voice: false, diarize: false })).toMatchObject({ clone_voice: false, diarize: false });
   });
 
@@ -38,11 +38,17 @@ describe("the defaults of a new dub", () => {
     expect(initialSettings(options, { keep_original_track: true }).keep_original_track).toBe(true);
   });
 
-  it("remembers the last choices but never the permission to clone a voice", () => {
+  it("keeps the permission to imitate voices once the user has ticked it, and only while cloning is on", () => {
+    const on = { ...options, separation_available: true };
+    expect(initialSettings(on, { clone_voice: true, clone_consent: true }).clone_consent).toBe(true);
+    expect(initialSettings(on, { clone_voice: false, clone_consent: true }).clone_consent).toBe(false);
+    expect(initialSettings(options, { clone_voice: true, clone_consent: true }).clone_consent).toBe(false); // no packages
+  });
+
+  it("remembers the last choices", () => {
     const s = initialSettings({ ...options, separation_available: true }, { voice: "F2", original_audio: "mute", source_lang: "de", diarize: true, num_speakers: 3, clone_voice: true });
     expect([s.voice, s.original_audio, s.source_lang, s.diarize, s.num_speakers]).toEqual(["F2", "mute", "de", true, 3]);
     expect(s.clone_voice).toBe(true);
-    expect(s.clone_consent).toBe(false);
   });
 
   it("ignores remembered values that no longer exist", () => {

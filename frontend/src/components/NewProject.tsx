@@ -63,8 +63,8 @@ function UploadLimit({ options, onChanged }: { options: Options; onChanged?: () 
 
 const ACCEPT = ".mp4,.m4v,.mov,.mkv,video/mp4";
 const SAVED = "localdub.newdub";
-/** What is remembered between visits: the choices, never the permission to clone a voice. */
-type Remembered = Pick<Settings, "source_lang" | "voice" | "llm_model" | "asr_id" | "original_audio" | "keep_original_track" | "diarize" | "clone_voice" | "num_speakers">;
+/** What is remembered between visits. The permission to imitate voices is kept only after the user ticked it themselves. */
+type Remembered = Pick<Settings, "source_lang" | "voice" | "llm_model" | "asr_id" | "original_audio" | "keep_original_track" | "diarize" | "clone_voice" | "clone_consent" | "num_speakers">;
 
 function loadRemembered(): Partial<Remembered> {
   try {
@@ -90,9 +90,9 @@ export function initialSettings(options: Options, saved: Partial<Remembered> = l
     original_audio: audio === "background" || audio === "duck" || audio === "mute" ? audio : options.separation_available ? "background" : "duck",
     keep_original_track: saved.keep_original_track === true, // off unless the user switched it on
     diarize: saved.diarize !== false, // on unless the user switched it off
-    // on when it can work (its packages are there); the permission to imitate voices is never pre-ticked
+    // on when it can work (its packages are there); the permission to imitate voices is ticked by the user once, then remembered
     clone_voice: options.separation_available && saved.clone_voice !== false,
-    clone_consent: false,
+    clone_consent: options.separation_available && saved.clone_voice !== false && saved.clone_consent === true,
     num_speakers: typeof saved.num_speakers === "number" ? saved.num_speakers : null,
   };
 }
@@ -105,9 +105,9 @@ export function NewProject({ options, health, onCreated, modelsMissing = false, 
   const [progress, setProgress] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => initialSettings(options));
   useEffect(() => {
-    const { source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, clone_voice, num_speakers } = settings;
+    const { source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, clone_voice, clone_consent, num_speakers } = settings;
     try {
-      localStorage.setItem(SAVED, JSON.stringify({ source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, clone_voice, num_speakers }));
+      localStorage.setItem(SAVED, JSON.stringify({ source_lang, voice, llm_model, asr_id, original_audio, keep_original_track, diarize, clone_voice, clone_consent, num_speakers }));
     } catch {
       /* private window or blocked storage: the form still works, it just forgets */
     }

@@ -3,6 +3,12 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [Unreleased]
+
+### Changed
+- The permission to imitate the voices in a video is ticked by the user once and then remembered (it used to be
+  asked for every dub). It is still never pre-ticked for a first-time user.
+
 ## [0.5.3] - 2026-11-01
 
 ### Added
