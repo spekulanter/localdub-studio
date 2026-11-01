@@ -3,7 +3,7 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
-## [Unreleased]
+## [0.5.3] - 2026-11-01
 
 ### Added
 - **Update check at start.** When the program starts it asks GitHub (only the public "latest release" page) whether
