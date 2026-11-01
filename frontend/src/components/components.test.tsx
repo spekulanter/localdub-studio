@@ -185,17 +185,21 @@ describe("original voice options", () => {
 });
 
 describe("voice cloning consent", () => {
-  it("cannot start until the consent box is ticked", () => {
+  it("is ticked from the start, and the dub cannot start once the user unticks it", () => {
+    localStorage.clear();
     render(<NewProject options={{ ...options, separation_available: true }} health={health} onCreated={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [new File([new Uint8Array(5)], "a.mp4")] } });
     const submit = screen.getByRole("button", { name: /upload and start/i }) as HTMLButtonElement;
+    const consent = screen.getByLabelText(/I have the right to imitate/) as HTMLInputElement;
+    expect(consent.checked).toBe(true);
     expect(submit.disabled).toBe(false);
-    fireEvent.click(screen.getByLabelText(/sound like the original speaker/));
+    fireEvent.click(consent);
     expect(submit.disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText(/I have the right to imitate/));
+    fireEvent.click(consent);
     expect(submit.disabled).toBe(false);
     fireEvent.click(screen.getByLabelText(/sound like the original speaker/));
     expect(screen.queryByLabelText(/I have the right to imitate/)).toBeNull();
+    expect(submit.disabled).toBe(false);
   });
 
   it("is unavailable without the optional packages", () => {

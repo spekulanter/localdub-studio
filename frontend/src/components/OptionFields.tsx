@@ -236,7 +236,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
                   type="checkbox"
                   checked={value.clone_voice}
                   disabled={!options.separation_available && !value.clone_voice}
-                  onChange={(e) => onChange({ ...value, clone_voice: e.target.checked, clone_consent: e.target.checked ? value.clone_consent : false })}
+                  onChange={(e) => onChange({ ...value, clone_voice: e.target.checked, clone_consent: e.target.checked })}
                 />
                 {t("Make the Slovak voice sound like the original speaker")}{" "}
                

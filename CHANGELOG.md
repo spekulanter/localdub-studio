@@ -6,8 +6,10 @@ has not been tested before relying on a feature.
 ## [Unreleased]
 
 ### Changed
-- The permission to imitate the voices in a video is ticked by the user once and then remembered (it used to be
-  asked for every dub). It is still never pre-ticked for a first-time user.
+- The statement "I have the right to imitate the voices in this video" is ticked from the start whenever voice
+  cloning is on, so a dub can be started without that extra click. It is still shown and can be unticked (the
+  choice is remembered). Using other people's voices without their permission remains the user's responsibility
+  (see docs/LICENSES.md, Supertonic OpenRAIL-M).
 
 ## [0.5.3] - 2026-11-01
 
