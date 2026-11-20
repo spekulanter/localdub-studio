@@ -3,6 +3,18 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.12] - 2026-11-20
+
+### Added
+- **Remaining time.** A running dub shows roughly how long it still needs ("about 25 min left"). The estimate
+  starts from speeds measured on the development laptop and learns this computer's own speed after each finished
+  dub, separately for each model; while a step runs, its own pace takes over. On the 5.7-minute sample it was off by
+  3.5 to 7 seconds on average (docs/QUALITY.md); long videos and slower computers are not measured yet.
+
+### Changed
+- Speech recognition, translation and speaker detection report how far they are, so the progress bar moves during
+  them instead of standing still, and steps that are switched off no longer take a share of the bar.
+
 ## [0.5.11] - 2026-11-20
 
 ### Fixed
