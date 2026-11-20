@@ -3,6 +3,20 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.7] - 2026-11-20
+
+### Fixed
+- **No more "download needed" for a model that is already there.** When the window opened before Ollama was
+  answering (both start with Windows), the translation model looked missing and the page offered to download it,
+  until the program was restarted. Now, while Ollama is installed but not answering, its models are not called
+  missing; the page checks again every 5 seconds and updates as soon as Ollama answers, and the AI models page
+  says that Ollama is not running, with a button to start it.
+
+### Changed
+- The button on a running dub is called **Pause** (it was "Cancel"), and a stopped dub is "Paused": it always only
+  stopped the dub, and Resume continues it. The step that was running when you paused starts again from its
+  beginning.
+
 ## [0.5.6] - 2026-11-20
 
 ### Fixed
