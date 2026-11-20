@@ -155,13 +155,28 @@ class ModelManager:
     def required_missing(self, ctx: Ctx | None = None) -> list[str]:
         """Default entries of required roles that have no installed model at all."""
         ctx = ctx or self.ctx()
+        ollama_down = ctx.ollama_tags() is None and self._ollama_installed(ctx)
         missing = []
         for role in self.catalog.roles:
+            if ollama_down and self._served_by_ollama(role.id):
+                # Ollama is installed but not answering (yet: it may still be starting), so
+                # whether its models are there cannot be known. The page offers to start it
+                # instead of offering a download of a model the user may already have.
+                continue
             if role.required and self.selected_entry(role.id, ctx) is None:
                 d = self.catalog.default_of(role.id)
                 if d is not None:
                     missing.append(d.id)
         return missing
+
+    def _ollama_installed(self, ctx: Ctx) -> bool:
+        runtime = self.catalog.default_of("ollama")
+        return runtime is not None and self.handler(runtime).installed(runtime, ctx)
+
+    def _served_by_ollama(self, role: str) -> bool:
+        """Every model of this role is kept by Ollama (translation)."""
+        entries = [e for e in self.entries() if e.role == role]
+        return bool(entries) and all(e.source["type"] == "ollama" for e in entries)
 
     # ----- the view the page needs -----------------------------------------------------------
     def snapshot(self, *, sizes: bool = False, lang: str = "en") -> dict[str, Any]:
@@ -242,6 +257,7 @@ class ModelManager:
             ],
             "models": rows,
             "required_missing": self.required_missing(ctx),
+            "ollama_running": ctx.ollama_tags() is not None,
             "busy": any(v["status"] in ACTIVE for v in downloads.values()),
             "hardware": {
                 "gpu": (

@@ -36,8 +36,8 @@ export function statusLabel(job: Job | null): string {
       return "Finished";
     case "failed":
       return "Failed";
-    case "cancelled":
-      return "Cancelled";
+    case "cancelled": // stopped by the user; Resume continues it
+      return "Paused";
   }
 }
 

@@ -85,13 +85,21 @@ describe("NewProject batch", () => {
 });
 
 describe("ProgressPanel", () => {
-  it("shows percent, stage and a cancel button while running", () => {
+  it("shows percent, stage and a pause button while running", () => {
     const onCancel = vi.fn();
     render(<ProgressPanel job={job({})} onCancel={onCancel} onRetry={vi.fn()} busy={false} />);
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("50");
     expect(screen.getByRole("heading", { name: /Generating Slovak voice/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("calls a stopped job paused and offers to resume it", () => {
+    const onRetry = vi.fn();
+    render(<ProgressPanel job={job({ status: "cancelled" })} onCancel={vi.fn()} onRetry={onRetry} busy={false} />);
+    expect(screen.getByRole("heading", { name: "Paused" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 
   it("shows the error and offers a retry after a failure", () => {

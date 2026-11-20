@@ -143,6 +143,7 @@ def test_model_fetch_module_rejects_unknown_ids(capsys):
 def nothing_installed(monkeypatch):
     """No model is installed, and nothing is downloaded for real."""
     monkeypatch.setattr(H.Handler, "installed", lambda self, e, ctx: False)
+    monkeypatch.setattr(H.OllamaAppHandler, "installed", lambda self, e, ctx: False)  # own override
     monkeypatch.setattr("localdub.extras.packages_available", lambda: False)
 
 
@@ -162,7 +163,9 @@ def test_models_listed_with_roles_hardware_and_required_missing(
     ids = [m["id"] for m in data["models"]]
     assert {"whisper-large-v3", "parakeet-tdt-0.6b-v3", "translategemma-4b", "translategemma-12b",
             "supertonic", "youtube", "packages"} <= set(ids)  # fmt: skip
-    assert set(data["required_missing"]) == {"whisper-large-v3", "translategemma-4b", "supertonic"}
+    assert set(data["required_missing"]) == {
+        "whisper-large-v3", "ollama-app", "translategemma-4b", "supertonic"
+    }  # fmt: skip
     assert [r["id"] for r in data["roles"]][:4] == ["asr", "ollama", "translation", "tts"]
     assert "cpu_threads" in data["hardware"] and data["catalog_version"]
     row = next(m for m in data["models"] if m["id"] == "translategemma-12b")

@@ -96,6 +96,23 @@ export default function App() {
   const ollamaOk = health?.ollama.reachable ?? false;
   const modelsNeeded = (models?.required_missing.length ?? 0) > 0;
 
+  // Ollama often starts a little after this window (both start with Windows), and until it answers nobody
+  // knows which translation models it holds. Keep asking, and reload the model list as soon as it answers
+  // (or stops), so a stale "download needed" is never left on screen.
+  const ollamaWaiting = health !== null && !ollamaOk && health.ollama.installed !== false;
+  useEffect(() => {
+    if (!ollamaWaiting) return;
+    const timer = window.setInterval(refreshHealth, 5000);
+    return () => window.clearInterval(timer);
+  }, [ollamaWaiting, refreshHealth]);
+  const lastOllamaOk = useRef(ollamaOk);
+  useEffect(() => {
+    if (lastOllamaOk.current === ollamaOk) return;
+    lastOllamaOk.current = ollamaOk;
+    refreshModels();
+    refreshOptions();
+  }, [ollamaOk, refreshModels, refreshOptions]);
+
   return (
     <div className="grid min-h-screen lg:grid-cols-[304px_minmax(0,1fr)]">
       <aside className="flex flex-col gap-5 border-b border-line bg-surface/70 p-5 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">

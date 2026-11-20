@@ -200,6 +200,25 @@ def test_a_missing_ollama_is_one_of_the_things_a_dub_still_needs(monkeypatch, tm
     assert "ollama-app" in mgr.required_missing()
 
 
+def test_an_ollama_that_is_not_running_yet_does_not_ask_for_its_models(monkeypatch, tmp_path):
+    """Ollama starting after the app must not make an installed translation model look missing."""
+    from localdub.core.modelmgr.manager import ModelManager
+
+    monkeypatch.setattr(ollama_setup, "is_present", lambda: True)
+    mgr = ModelManager(Settings(models_dir=tmp_path / "m", data_dir=tmp_path / "d"), lambda: False)
+    monkeypatch.setattr(handlers.Ctx, "ollama_tags", lambda self: None)
+    missing = mgr.required_missing()
+    assert not {"translategemma-4b", "ollama-app"} & set(missing)
+    # a dub started now still says why it cannot translate
+    assert "Translation: Ollama is not running" in mgr.missing_for(None, None)
+
+    monkeypatch.setattr(handlers.Ctx, "ollama_tags", lambda self: [])  # running, model not pulled
+    assert "translategemma-4b" in mgr.required_missing()
+    tags = [{"name": "translategemma:4b", "digest": "d", "size": 1}]
+    monkeypatch.setattr(handlers.Ctx, "ollama_tags", lambda self: tags)
+    assert "translategemma-4b" not in mgr.required_missing()
+
+
 @pytest.mark.skipif(sys.platform == "darwin", reason="uses the Windows paths")
 def test_the_windows_program_folder_is_under_localappdata(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))

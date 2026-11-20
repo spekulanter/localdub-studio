@@ -83,6 +83,9 @@ export const sk: Record<string, string> = {
   "Installed": "Nainštalované",
   "Cancelling...": "Ruší sa...",
   "Cancelled": "Zrušené",
+  "Pause": "Pozastaviť",
+  "Paused": "Pozastavené",
+  "Stops the dub. Resume continues after the last finished step; the step that was running starts again.": "Zastaví dabing. Tlačidlo Pokračovať nadviaže za posledným dokončeným krokom; krok, ktorý práve bežal, sa spustí odznova.",
   "Preparing…": "Pripravuje sa…",
 
   // models page
@@ -164,6 +167,7 @@ export const sk: Record<string, string> = {
   "3 · Start": "3 · Spustenie",
   "Ollama is not installed. Install it on the AI models page: one click.": "Ollama nie je nainštalovaná. Nainštalujte ju na stránke AI modely: jedno kliknutie.",
   "Start Ollama": "Spustiť Ollamu",
+  "Ollama is not running, so the translation models it keeps cannot be shown as downloaded yet.": "Ollama nebeží, preto sa zatiaľ nedá zistiť, ktoré prekladové modely sú v nej stiahnuté.",
   "starting…": "spúšťa sa…",
   "Fits your Mac": "Sedí vášmu Macu",
   "Only partly fits your Mac": "Vášmu Macu sedí len čiastočne",

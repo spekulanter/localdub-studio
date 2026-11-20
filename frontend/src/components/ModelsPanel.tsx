@@ -385,6 +385,14 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
           {message}
         </p>
       )}
+      {data.ollama_running === false && data.models.some((m) => m.role === "ollama" && m.installed) && (
+        <div className="alert alert-warn flex flex-wrap items-center justify-between gap-3" role="status">
+          <span>{t("Ollama is not running, so the translation models it keeps cannot be shown as downloaded yet.")}</span>
+          <button className="btn-secondary btn-sm" onClick={() => run(() => api.startOllama())}>
+            {t("Start Ollama")}
+          </button>
+        </div>
+      )}
       {missing.length > 0 && (
         <button onClick={() => run(() => api.downloadModels())} disabled={data.busy} className="btn-primary">
           {data.busy ? t("Downloading…") : t("Download the required models ({size})", { size: formatBytes(total) })}

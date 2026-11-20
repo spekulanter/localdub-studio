@@ -51,8 +51,13 @@ export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = fals
           {job.attempts > 1 && active && <span className="ml-2 text-xs text-warn">{t("resumed (attempt {n})", { n: job.attempts })}</span>}
         </h3>
         {active ? (
-          <button onClick={onCancel} disabled={busy} className="btn-secondary btn-sm">
-            {t("Cancel")}
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="btn-secondary btn-sm"
+            title={t("Stops the dub. Resume continues after the last finished step; the step that was running starts again.")}
+          >
+            {t("Pause")}
           </button>
         ) : (
           (job.status === "failed" || job.status === "cancelled") && (

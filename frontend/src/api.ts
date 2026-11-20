@@ -196,6 +196,8 @@ export interface ModelsResponse {
   roles?: ModelRole[];
   models: ModelInfo[];
   required_missing: string[];
+  /** False while Ollama does not answer: which translation models it holds is then unknown. */
+  ollama_running?: boolean;
   busy: boolean;
   hardware?: HardwareInfo;
   paths?: Record<string, string>;
