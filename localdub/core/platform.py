@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import logging
 import os
 import signal
@@ -125,6 +126,30 @@ def kill_tree(pid: int) -> None:
             os.kill(victim, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
+
+
+ES_CONTINUOUS = 0x80000000
+ES_SYSTEM_REQUIRED = 0x00000001
+
+
+def prevent_sleep() -> bool:
+    """Windows: do not let the PC go to sleep while this process runs (a dub can take hours).
+
+    Only idle sleep is blocked: the screen may still turn off, and closing a laptop's lid or
+    choosing Sleep in the Start menu still works. The request belongs to the calling thread and
+    ends by itself when the process exits (the dub finished, failed or was paused), so it is
+    called from the worker, never from the app window. Other systems: see keep_awake.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        previous = ctypes.windll.kernel32.SetThreadExecutionState(  # type: ignore[attr-defined,unused-ignore]
+            ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+        )
+    except (AttributeError, OSError):
+        log.warning("Could not ask Windows to stay awake", exc_info=True)
+        return False
+    return bool(previous)
 
 
 _activity: object | None = None

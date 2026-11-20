@@ -308,6 +308,24 @@ def test_keep_awake_does_nothing_off_a_mac():
         assert osplatform.keep_awake() is False
 
 
+def test_prevent_sleep_asks_windows_to_stay_awake(monkeypatch):
+    calls = []
+
+    class Kernel32:
+        @staticmethod
+        def SetThreadExecutionState(flags):  # noqa: N802 - the Windows name
+            calls.append(flags)
+            return 0x80000000
+
+    monkeypatch.setattr(osplatform.sys, "platform", "win32")
+    monkeypatch.setattr(osplatform.ctypes, "windll", type("W", (), {"kernel32": Kernel32}), raising=False)
+    assert osplatform.prevent_sleep() is True
+    assert calls == [0x80000001]  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED; never the display
+
+    monkeypatch.setattr(osplatform.sys, "platform", "darwin")
+    assert osplatform.prevent_sleep() is False  # the Mac has keep_awake
+
+
 def test_dialogs_on_a_mac_go_through_osascript(monkeypatch):
     seen = {}
     monkeypatch.setattr(desktop.sys, "platform", "darwin")
