@@ -9,6 +9,7 @@ from typing import Any
 
 import soundfile as sf
 
+from localdub.core import progress
 from localdub.core.asr.base import AsrResult
 from localdub.core.gpu import register_cuda_dlls, release_memory
 from localdub.core.timeline.models import Word
@@ -109,11 +110,13 @@ class FasterWhisperProvider:
                 word_timestamps=True,
                 condition_on_previous_text=False,
             )
-            words = [
-                Word(start=w.start, end=w.end, text=w.word, probability=w.probability)
-                for seg in segments
-                for w in (seg.words or [])
-            ]
+            # segments is a generator: the model works while it is consumed, segment by segment
+            for seg in segments:
+                words += [
+                    Word(start=w.start, end=w.end, text=w.word, probability=w.probability)
+                    for w in (seg.words or [])
+                ]
+                progress.report(seg.end, info.duration)
         except RuntimeError as exc:
             # CUDA kernel errors only surface at inference time; fall back to CPU once.
             if not self.allow_fallback or "cpu" in self.engine:

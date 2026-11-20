@@ -59,6 +59,9 @@ MIGRATIONS = {
     "cookies_browser": "TEXT NOT NULL DEFAULT 'none'",
     "asr_id": "TEXT NOT NULL DEFAULT 'whisper-large-v3'",
 }
+JOB_MIGRATIONS = {
+    "eta_end": "REAL",  # when the running job is expected to finish (Unix time), a guess
+}
 ACTIVE = ("queued", "running")
 TERMINAL = ("done", "failed", "cancelled")
 Row = dict[str, Any]
@@ -76,6 +79,10 @@ class Database:
             for col, ddl in MIGRATIONS.items():
                 if col not in have:
                     c.execute(f"ALTER TABLE projects ADD COLUMN {col} {ddl}")
+            have = {r["name"] for r in c.execute("PRAGMA table_info(jobs)")}
+            for col, ddl in JOB_MIGRATIONS.items():
+                if col not in have:
+                    c.execute(f"ALTER TABLE jobs ADD COLUMN {col} {ddl}")
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:
@@ -184,7 +191,7 @@ class Database:
         """Set a terminal status unless the job already has one (cancel wins over a late exit)."""
         with self.tx() as c:
             cur = c.execute(
-                "UPDATE jobs SET status=?, error=?, finished_at=?, pid=NULL "
+                "UPDATE jobs SET status=?, error=?, finished_at=?, pid=NULL, eta_end=NULL "
                 "WHERE id=? AND status IN ('queued','running')",
                 (status, error, time.time(), job_id),
             )

@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from localdub.core import progress
 from localdub.core.timeline.models import DialogueSegment
 from localdub.core.translation.prompts import (
     TRANSLATION_SCHEMA,
@@ -280,6 +281,7 @@ class OllamaTranslator:
                 raise OllamaError(f"Empty translation for segment {seg.id}: {seg.source_text!r}")
             log.info("[%d/%d] %s -> %s", i + 1, len(segments), seg.source_text, out)
             results.append(out)
+            progress.report(i + 1, len(segments))
         log.info("Translated %d segments in %.1fs", len(segments), time.perf_counter() - t0)
         return results
 

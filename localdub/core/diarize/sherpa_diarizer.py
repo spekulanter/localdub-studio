@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from localdub.core import progress
 from localdub.core.diarize.assign import SpeakerTurn
 from localdub.core.models import RemoteModel, ensure_model
 
@@ -79,7 +80,11 @@ class SherpaDiarizer:
         samples = np.ascontiguousarray(data[:, 0])
         if sr != self._sd.sample_rate:
             raise ValueError(f"Expected {self._sd.sample_rate} Hz audio, got {sr}")
-        result = self._sd.process(samples).sort_by_start_time()
+        def on_chunks(done: int, total: int) -> int:
+            progress.report(done, total)
+            return 0  # non-zero would abort
+
+        result = self._sd.process(samples, callback=on_chunks).sort_by_start_time()
         order: dict[int, int] = {}
         turns: list[SpeakerTurn] = []
         for r in result:

@@ -18,6 +18,7 @@ from pathlib import Path
 
 from localdub.api.db import Database
 from localdub.config import Settings
+from localdub.core.eta import Estimator, Rates, rate_key
 from localdub.core.gpu import register_cuda_dlls
 from localdub.core.platform import (
     disable_power_throttling,
@@ -67,6 +68,17 @@ def progress_fraction(stage: str, state: str, *, has_download: bool = False) -> 
     return min((before + weight * min(max(fraction, 0.0), 1.0)) / total, 1.0)
 
 
+def job_plan(s: Settings, *, has_download: bool) -> list[str]:
+    """The stages that do real work for these settings (the others pass straight through)."""
+    idle = {
+        "download": not has_download,
+        "diarize": not s.diarization_enabled,
+        "separate": s.original_audio != "background",
+        "convert": not s.voice_cloning_enabled,
+    }
+    return [stage for stage in STAGES if not idle.get(stage, False)]
+
+
 def project_settings(base: Settings, project: dict[str, object]) -> Settings:
     s = base.model_copy()
     s.translation_model = str(project["llm_model"])
@@ -108,20 +120,50 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
     threading.Thread(target=_watch, args=(db, job_id, parent_pid), daemon=True).start()
 
     has_download = bool(project["source_url"])
+    settings = project_settings(base, project)
+    plan = job_plan(settings, has_download=has_download)
+    rates = Rates(data_dir / "timings.json")
+    keys = {
+        "asr": rate_key("asr", asr_id=settings.asr_id),
+        "translate": rate_key("translate", llm_model=settings.translation_model),
+    }
+    duration = float(project["duration"] or 0)
+    # The estimate needs the length of the video: a linked video has it only once downloaded.
+    est: list[Estimator | None] = [Estimator(plan, duration, rates, keys) if duration > 0 else None]
     best = [0.0]  # progress never goes back: a text status ("Merging...") carries no number
 
-    def best_progress(stage: str, state: str) -> float:
-        best[0] = max(best[0], progress_fraction(stage, state, has_download=has_download))
-        return best[0]
+    def estimator(stage: str) -> Estimator | None:
+        if est[0] is None and stage not in ("download", "probe"):
+            try:
+                est[0] = Estimator(plan, pipe.info().duration, rates, keys)
+            except Exception:  # noqa: BLE001 - no estimate is better than a failed dub
+                log.debug("No duration for the time estimate yet", exc_info=True)
+        return est[0]
 
     def on_progress(stage: str, state: str) -> None:
+        e = estimator(stage)
+        eta_end: float | None = None
+        if e is not None:
+            e.update(stage, state)
+            fraction = e.progress()
+            eta_end = round(time.time() + e.remaining(), 1)
+        else:
+            fraction = progress_fraction(stage, state, has_download=has_download)
+        best[0] = max(best[0], fraction)
         db.update_job(
             job_id,
             stage=stage,
             message=state if state != "running" else "",
-            progress=round(best_progress(stage, state), 4),
+            progress=round(best[0], 4),
+            eta_end=eta_end,
             heartbeat=time.time(),
         )
+
+    def learn_speeds() -> None:
+        """A first, whole run of each stage teaches this computer's speed (not a re-render or a
+        resumed job: those reuse work and would look faster than they are)."""
+        if est[0] is not None and job["from_stage"] is None and int(job["attempts"]) <= 1:
+            est[0].learn()
 
     disable_power_throttling()
     keep_awake()
@@ -131,7 +173,7 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
     pipe = Pipeline(
         project_dir / project["input_rel"],
         project_dir / "work",
-        project_settings(base, project),
+        settings,
         source_lang=None if project["source_lang"] == "auto" else str(project["source_lang"]),
         voice=str(project["voice"]),
         on_progress=on_progress,
@@ -140,17 +182,19 @@ def run_job(data_dir: Path, job_id: int, parent_pid: int, base: Settings | None 
     try:
         pipe.run(from_stage=job["from_stage"])
     except PipelineError as exc:
+        learn_speeds()  # the stages before the failure still ran normally
         db.finish_job(job_id, "failed", str(exc))
         return 1
     except Exception as exc:  # noqa: BLE001 - report anything to the user instead of dying silently
         log.error("Unexpected failure:\n%s", traceback.format_exc())
         db.finish_job(job_id, "failed", f"{type(exc).__name__}: {exc}")
         return 1
+    learn_speeds()
     try:  # the length of a downloaded video is only known exactly now
         db.update_project(project["id"], duration=pipe.info().duration)
     except Exception:  # noqa: BLE001 - cosmetic; the job itself succeeded
         log.debug("Could not update the project duration", exc_info=True)
-    db.update_job(job_id, stage="export", progress=1.0, message="")
+    db.update_job(job_id, stage="export", progress=1.0, message="", eta_end=None)
     db.finish_job(job_id, "done")
     return 0
 

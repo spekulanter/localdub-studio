@@ -336,3 +336,21 @@ transcript:
 Only English was tested. Parakeet's other languages are the maker's claim.
 Model management flows (download, update check, delete) were exercised against the real Ollama registry and
 Hugging Face with small models (all-minilm, faster-whisper tiny.en).
+
+## Remaining-time estimate (2026-11-20, laptop RTX 5060 8 GB)
+The 5.7-minute sample (`samples/long_5min_test.mp4`, 342.7 s, 68 lines, TranslateGemma 4B) was dubbed
+twice through the API with the real worker, and what the window would show was recorded every 2 s.
+Run 1 started from the built-in numbers (measured on this laptop), run 2 from what run 1 taught
+(`data/timings.json`). Both runs took 161-163 s.
+
+| | Mean error of "time left" | Worst moment |
+|---|---|---|
+| Run 1, built-in numbers | 6.7 s | 25 s too short, early in voice generation |
+| Run 2, learned numbers | 3.5 s | 18 s too short, early in voice generation |
+
+(Replayed with the final settings from the recorded progress messages.) Speech recognition,
+translation and speaker detection now report how far they are, so the bar no longer stands still
+for about 40 % of the time. **Not measured:** long videos, a first run on a much slower computer
+(no NVIDIA card) and stages not used in this sample (speaker detection, separation, voice cloning);
+for those the estimate relies on each stage's own pace once it has done 20 % (50 % for a speed
+already learned on this computer).

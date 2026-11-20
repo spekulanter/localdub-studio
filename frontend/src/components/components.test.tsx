@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Health, Job, ModelInfo, Options, SegmentRow, SegmentsResponse } from "../api";
 import { mkModel, mkResponse } from "../testing/models";
@@ -7,7 +7,7 @@ import { InstallNotice } from "./InstallNotice";
 
 const INTRO = (size: string) => `This needs an extra download of about ${size} (PyTorch).`;
 import { NewProject } from "./NewProject";
-import { ProgressPanel } from "./ProgressPanel";
+import { ProgressPanel, remainingText } from "./ProgressPanel";
 import { DialogueEditor } from "./DialogueEditor";
 
 afterEach(cleanup);
@@ -103,6 +103,31 @@ describe("ProgressPanel", () => {
     expect(screen.getByRole("heading", { name: /Generating Slovak voice/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("shows the remaining time, rounded, and counts it down", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(1_000_000_000));
+    const now = Date.now() / 1000;
+    render(<ProgressPanel job={job({ eta_end: now + 25 * 60 + 40 })} onCancel={vi.fn()} onRetry={vi.fn()} busy={false} />);
+    expect(screen.getByText("about 25 min left")).toBeTruthy(); // 5-minute steps above 20 min
+    act(() => vi.advanceTimersByTime(10 * 60 * 1000));
+    expect(screen.getByText("about 16 min left")).toBeTruthy(); // a minute at a time below
+    vi.useRealTimers();
+  });
+
+  it("words long, short and overdue estimates", () => {
+    const t = (s: string, v?: Record<string, string | number>) =>
+      s.replace(/\{(\w+)\}/g, (_, k: string) => String(v?.[k] ?? ""));
+    expect(remainingText(3 * 3600 + 7 * 60, t as never)).toBe("about 3 h 5 min left");
+    expect(remainingText(2 * 3600 + 60, t as never)).toBe("about 2 h left");
+    expect(remainingText(40, t as never)).toBe("less than a minute left");
+    expect(remainingText(-5, t as never)).toBe("taking a little longer than estimated");
+  });
+
+  it("shows no estimate for a job that is not running", () => {
+    render(<ProgressPanel job={job({ status: "queued", eta_end: Date.now() / 1000 + 600 })} onCancel={vi.fn()} onRetry={vi.fn()} busy={false} />);
+    expect(screen.queryByText(/left/)).toBeNull();
   });
 
   it("calls a stopped job paused and offers to resume it", () => {

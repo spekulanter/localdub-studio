@@ -16,6 +16,7 @@ import numpy as np
 import numpy.typing as npt
 import soundfile as sf
 
+from localdub.core import progress
 from localdub.core.asr.base import AsrResult
 from localdub.core.timeline.models import Word
 
@@ -133,6 +134,7 @@ class ParakeetProvider:
             r = stream.result
             detected = detected or str(getattr(r, "lang", "") or "")
             words += tokens_to_words(list(r.tokens), list(r.timestamps), list(r.durations), a / sr)
+            progress.report(b, len(mono))
         duration = len(mono) / sr
         elapsed = time.perf_counter() - t0
         log.info(

@@ -6,6 +6,7 @@ so any stage can be retried independently. See ARCHITECTURE.md for the file layo
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import logging
@@ -20,6 +21,7 @@ import numpy as np
 import soundfile as sf
 
 from localdub.config import Settings
+from localdub.core import progress
 from localdub.core.asr.base import ASRProvider
 from localdub.core.asr.segmentation import group_words
 from localdub.core.audio.assemble import db_to_gain, normalize_rms, trim_silence
@@ -222,8 +224,11 @@ class Pipeline:
             log.info("stage %-9s running", stage)
             self.on_progress(stage, "running")
             t0 = time.perf_counter()
+            # models inside the stage say how far they are (speech recognition, translation...)
+            sink = progress.percent_reporter(functools.partial(self.on_progress, stage))
             try:
-                outputs = fn()
+                with progress.reporting(sink):
+                    outputs = fn()
             except PipelineError:
                 raise
             except Exception as exc:

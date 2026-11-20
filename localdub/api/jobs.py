@@ -143,6 +143,7 @@ class JobManager:
             attempts=attempts,
             started_at=time.time(),
             heartbeat=time.time(),
+            eta_end=None,  # a resumed job must not show the old estimate
         )
         proc = subprocess.Popen(  # noqa: S603
             self.worker_command(job_id),

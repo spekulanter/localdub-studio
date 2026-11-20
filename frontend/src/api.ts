@@ -15,6 +15,8 @@ export interface Job {
   created_at: number;
   started_at: number | null;
   finished_at: number | null;
+  /** When a running job is expected to finish (Unix seconds): a guess, see localdub/core/eta.py. */
+  eta_end?: number | null;
 }
 
 export interface Project {

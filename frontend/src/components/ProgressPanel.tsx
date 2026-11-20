@@ -14,8 +14,33 @@ interface Props {
   busy: boolean;
 }
 
+type T = ReturnType<typeof useT>;
+
+/** "about 25 min left": rounded, because it is a guess (to the minute below 20 min, then 5 min). */
+export function remainingText(seconds: number, t: T): string {
+  if (seconds <= 0) return t("taking a little longer than estimated");
+  if (seconds < 60) return t("less than a minute left");
+  const minutes = seconds < 20 * 60 ? Math.ceil(seconds / 60) : Math.round(seconds / 300) * 5;
+  if (minutes < 60) return t("about {m} min left", { m: minutes });
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? t("about {h} h {m} min left", { h, m }) : t("about {h} h left", { h });
+}
+
+/** Seconds until `end` (Unix time), recounted every second so it moves between updates. */
+function useSecondsUntil(end: number | null | undefined): number | null {
+  const [now, setNow] = useState(() => Date.now() / 1000);
+  useEffect(() => {
+    if (end == null) return;
+    const timer = window.setInterval(() => setNow(Date.now() / 1000), 1000);
+    return () => window.clearInterval(timer);
+  }, [end]);
+  return end == null ? null : end - now;
+}
+
 export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = false }: Props) {
   const t = useT();
+  const left = useSecondsUntil(job.status === "running" ? job.eta_end : null);
   const order = hasDownload ? ORDER : ORDER.filter((s) => s !== "download");
   const active = job.status === "queued" || job.status === "running";
   const pct = Math.round(job.progress * 100);
@@ -80,6 +105,11 @@ export function ProgressPanel({ job, onCancel, onRetry, busy, hasDownload = fals
           style={{ width: `${job.status === "done" ? 100 : pct}%` }}
         />
       </div>
+      {left !== null && (
+        <p className="mt-2 text-xs text-muted" title={t("A guess from this computer's speed; it gets better after each finished dub.")}>
+          {remainingText(left, t)}
+        </p>
+      )}
       <ol className="mt-4 flex flex-wrap gap-1.5 text-xs">
         {order.map((s, i) => {
           const done = job.status === "done" || i < current;
