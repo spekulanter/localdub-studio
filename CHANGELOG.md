@@ -3,6 +3,17 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.11] - 2026-11-20
+
+### Fixed
+- **Speaker detection can be downloaded again.** On 2026-11-19 the sherpa-onnx project replaced one of its two model
+  files (the ERes2Net speaker embedding) on GitHub, so every new download failed its checksum ("checksum
+  mismatch"). Both files now come from Hugging Face at fixed commits, which cannot change; the embedding is the exact
+  file LocalDub has always used, so results and existing installs are unchanged.
+- **A translation model downloaded while the program was open no longer says "not downloaded"** in the new-dub form
+  (seen with TranslateGemma 12B). The form read Ollama's model list only once, at start; it is now read again after
+  every download and whenever another page is opened.
+
 ## [0.5.10] - 2026-11-20
 
 ### Added
