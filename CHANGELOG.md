@@ -3,6 +3,16 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.8] - 2026-11-20
+
+### Fixed
+- **AMD and Intel graphics cards are recognised (Windows).** The AI models page looked only for NVIDIA cards and
+  said "no NVIDIA card found" on a computer with an AMD card. It now reads the graphics cards Windows knows about
+  and shows the one with the most memory, and says what can use it: translation models in Ollama can use a
+  supported AMD Radeon (RX 6000 and newer); speech recognition, dialogue separation and voice cloning use NVIDIA
+  cards only, are marked "Needs an NVIDIA card" and run on the processor. What runs where is unchanged; only the
+  page now tells the truth. Tested with simulated values; not yet on a real AMD card.
+
 ## [0.5.7] - 2026-11-20
 
 ### Fixed
