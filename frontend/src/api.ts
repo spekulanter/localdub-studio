@@ -70,6 +70,8 @@ export interface UpdateInfo {
 
 export interface Health {
   ok: boolean;
+  /** The program's version, e.g. "0.5.9". */
+  version?: string;
   ollama: { reachable: boolean; error: string | null; models: string[]; installed?: boolean };
 }
 

@@ -42,6 +42,9 @@ def test_options_and_health(client: TestClient):
     assert "F1" in opts["voices"] and opts["target_language"] == "sk"
     health = client.get("/api/health").json()
     assert health["ok"] is True and "reachable" in health["ollama"]
+    from localdub.core.updates import current_version
+
+    assert health["version"] == current_version() != "0"  # shown next to the logo
 
 
 def test_upload_creates_project_and_queues_job(

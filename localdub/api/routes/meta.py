@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from localdub.api.common import SOURCE_LANGS, AppContext, SettingsPatch, separation_available
-from localdub.core import usersettings
+from localdub.core import updates, usersettings
 from localdub.core.translation import ollama_setup
 from localdub.core.translation.ollama_provider import cached_tags, forget_tags
 from localdub.core.tts.base import VOICES
@@ -19,6 +19,7 @@ from localdub.pipeline import STAGES
 def build(ctx: AppContext) -> APIRouter:
     router = APIRouter()
     settings = ctx.settings
+    version = updates.current_version()  # shown in the window; asked often, read once
 
     @router.get("/api/ping")
     def ping() -> dict[str, bool]:
@@ -31,6 +32,7 @@ def build(ctx: AppContext) -> APIRouter:
         models = sorted(m["name"] for m in tags or [])
         return {
             "ok": True,
+            "version": version,
             "ollama": {
                 "reachable": error is None,
                 "error": error,

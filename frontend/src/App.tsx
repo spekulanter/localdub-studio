@@ -120,7 +120,14 @@ export default function App() {
           <Logo size={40} />
           <div className="leading-tight">
             <h1 className="font-display text-[22px] font-semibold">LocalDub</h1>
-            <p className="eyebrow">Studio</p>
+            <p className="eyebrow">
+              Studio
+              {health?.version && (
+                <span className="ml-1.5 normal-case tracking-normal" title={t("Program version")}>
+                  v{health.version}
+                </span>
+              )}
+            </p>
           </div>
         </header>
         <p className="-mt-2 text-[13px] leading-snug text-muted">{t("English → Slovak dubbing. Everything runs on this computer.")}</p>
