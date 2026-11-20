@@ -3,6 +3,22 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.6] - 2026-11-20
+
+### Fixed
+- **Long videos no longer run out of memory.** A 6.6-hour video stopped at "separate" trying to allocate 33.6 GB,
+  because dialogue separation and the final mix held the whole soundtrack in memory. Both now work in pieces on
+  disk, so memory use no longer grows with the length of the video:
+  - Dialogue separation (experimental) runs Demucs on 3-minute pieces that overlap by 5 seconds and are crossfaded,
+    with progress shown per piece. On a 40-second test the pieced result differed from the whole-file result no more
+    than two whole-file runs differ from each other (Demucs is slightly random).
+  - The Slovak track and the voice-over mix are built block by block; the peak limit and the loudness cap are applied
+    in a second pass. A synthetic 2-hour stereo project needed about 4 MB for the mix instead of about 9.7 GB, and
+    took about 3 minutes.
+  - Sound files over 4 GB are written as RF64 (the plain WAV format cannot hold them).
+- Not yet tested on a full multi-hour project from start to finish. "Closer to the original voice" (voice cloning)
+  still reads the whole dialogue track at once.
+
 ## [0.5.5] - 2026-11-01
 
 ### Changed
