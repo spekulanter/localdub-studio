@@ -24,6 +24,7 @@ const FIT_CLASS: Record<string, string> = {
   partial: "chip chip-warn",
   too_big: "chip chip-warn",
   no_gpu: "chip chip-warn",
+  needs_nvidia: "chip chip-warn",
 };
 
 /** On an Apple Silicon Mac the GPU has no card of its own: say "Mac" and "memory". */
@@ -40,6 +41,7 @@ const FIT_LABEL: Record<string, string> = {
   partial: "Only partly fits your card",
   too_big: "Too big for your card",
   no_gpu: "No NVIDIA card found",
+  needs_nvidia: "Needs an NVIDIA card",
 };
 
 function Progress({ m }: { m: ModelInfo }) {
@@ -341,6 +343,10 @@ export function ModelsPanel({ data, onChanged, error }: Props) {
                 ? t("{name}, {gb} GB usable by the GPU", { name: hw.gpu.name, gb: hw.gpu.vram_gb })
                 : `${hw.gpu.name}, ${hw.gpu.vram_gb} GB`
               : t("no NVIDIA card found (models run on the processor, slowly)")}
+            {hw.gpu?.vendor === "amd" &&
+              ` (${t("translation in Ollama can use it; speech recognition, separation and voice cloning need NVIDIA and run on the processor")})`}
+            {(hw.gpu?.vendor === "intel" || hw.gpu?.vendor === "other") &&
+              ` (${t("not used: the models run on the processor, slowly")})`}
             {" · "}
             <span className="font-medium">{t("Memory:")}</span> {hw.ram_gb ?? "?"} GB
             {" · "}

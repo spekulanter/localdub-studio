@@ -286,6 +286,16 @@ describe("ModelsPanel", () => {
     expect(screen.getByText(/Model list version 2026\.10\.31/)).toBeTruthy();
   });
 
+  it("names an AMD card and says what can use it", () => {
+    const data = library();
+    data.hardware!.gpu = { name: "AMD Radeon RX 7800 XT", vram_gb: 16, vram_free_gb: 16, driver: "1", vendor: "amd" };
+    data.models[0]!.fits = { level: "needs_nvidia", text: "Uses NVIDIA cards only." };
+    render(<ModelsPanel data={data} onChanged={vi.fn()} />);
+    expect(screen.getByText(/AMD Radeon RX 7800 XT, 16 GB \(translation in Ollama can use it/)).toBeTruthy();
+    expect(screen.getByText("Needs an NVIDIA card")).toBeTruthy();
+    expect(screen.queryByText(/no NVIDIA card found/)).toBeNull();
+  });
+
   it("makes an installed model the default, and asks before deleting it", async () => {
     const calls: string[] = [];
     stubApi(calls);

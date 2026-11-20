@@ -226,7 +226,9 @@ class ModelManager:
                     "installed": installed,
                     "available": packages_ok or not e.requirements.needs_packages,
                     "selected": sel is not None and sel.id == e.id,
-                    "fits": hardware.fits(e.requirements, hw, lang),
+                    "fits": hardware.fits(
+                        e.requirements, hw, lang, ollama=e.source["type"] == "ollama"
+                    ),
                     "download": downloads.get(e.id),
                     "locations": [str(p) for p in locs],
                     "store_note": h.note(e, ctx) if installed else None,
@@ -267,6 +269,7 @@ class ModelManager:
                         "vram_free_gb": round(hw.gpu.vram_free_mb / 1024, 1),
                         "driver": hw.gpu.driver,
                         "unified": hw.gpu.unified,
+                        "vendor": hw.gpu.vendor,
                     }
                     if hw.gpu
                     else None

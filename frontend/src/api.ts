@@ -131,7 +131,7 @@ export interface ModelDownload {
 }
 
 export interface Fit {
-  level: "ok" | "partial" | "too_big" | "cpu" | "no_gpu";
+  level: "ok" | "partial" | "too_big" | "cpu" | "no_gpu" | "needs_nvidia";
   text: string;
 }
 
@@ -184,7 +184,14 @@ export interface ModelRole {
 }
 
 export interface HardwareInfo {
-  gpu: { name: string; vram_gb: number; vram_free_gb: number; driver: string; unified?: boolean } | null;
+  gpu: {
+    name: string;
+    vram_gb: number;
+    vram_free_gb: number;
+    driver: string;
+    unified?: boolean;
+    vendor?: "nvidia" | "apple" | "amd" | "intel" | "other";
+  } | null;
   ram_gb: number | null;
   cpu_threads: number;
   disk_free_bytes: number;

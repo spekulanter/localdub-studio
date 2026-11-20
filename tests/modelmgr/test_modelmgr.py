@@ -88,6 +88,73 @@ def test_fit_levels():
     assert hw.fits(Requirements(None, 1, "cpu"), none)["level"] == "cpu"
 
 
+# What Windows keeps in the registry for each display adapter (values as winreg returns them).
+AMD_RX7800 = {
+    "DriverDesc": "AMD Radeon RX 7800 XT",
+    "MatchingDeviceId": "PCI\\VEN_1002&DEV_747E&REV_C8",
+    "HardwareInformation.qwMemorySize": 17_163_091_968,  # REG_QWORD: 16 GB
+    "HardwareInformation.MemorySize": 4_293_918_720,  # REG_DWORD: stuck at 4 GB
+    "DriverVersion": "32.0.12033.1030",
+}
+INTEL_UHD = {  # integrated graphics: memory written as REG_BINARY, no 64-bit value
+    "DriverDesc": "Intel(R) UHD Graphics",
+    "MatchingDeviceId": "PCI\\VEN_8086&DEV_A788&SUBSYS_3E3A17AA",
+    "HardwareInformation.MemorySize": bytes([0, 240, 255, 127]),
+    "DriverVersion": "32.0.101.7088",
+}
+BASIC = {"DriverDesc": "Microsoft Basic Display Adapter", "MatchingDeviceId": "ROOT\\BasicDisplay"}
+
+
+def test_display_adapters_are_read_from_registry_values():
+    amd = hw.adapter_from_values(AMD_RX7800)
+    assert amd is not None and amd.vendor == "amd" and amd.name == "AMD Radeon RX 7800 XT"
+    assert round(amd.vram_gb) == 16 and not amd.cuda  # the 64-bit value wins over the 4 GB one
+    intel = hw.adapter_from_values(INTEL_UHD)
+    assert intel is not None and intel.vendor == "intel" and round(intel.vram_gb) == 2
+    assert hw.adapter_from_values(BASIC) is None  # no real card behind it
+    assert hw.pick_adapter([intel, amd]) == amd and hw.pick_adapter([]) is None
+
+
+def test_this_windows_machine_lists_its_cards():
+    """Reads the real registry: every card found has a maker and a name (none on other systems)."""
+    for gpu in hw.windows_adapters():
+        assert gpu.name and gpu.vendor in ("nvidia", "amd", "intel", "other")
+
+
+def test_without_nvidia_an_amd_card_is_found(monkeypatch):
+    monkeypatch.setattr(hw, "_gpu_cache", None)
+    monkeypatch.setattr(hw.sys, "platform", "win32")
+    monkeypatch.setattr(hw, "_smi", lambda: None)  # no NVIDIA driver
+    cards = [hw.adapter_from_values(v) for v in (INTEL_UHD, AMD_RX7800)]
+    monkeypatch.setattr(hw, "windows_adapters", lambda: cards)
+    gpu = hw.detect_gpu()
+    assert gpu is not None and gpu.name == "AMD Radeon RX 7800 XT"
+
+
+def test_an_amd_card_counts_for_ollama_only():
+    amd = hw.Hardware(hw.adapter_from_values(AMD_RX7800), 32.0, 16, 10**12, 2 * 10**12)
+    intel = hw.Hardware(hw.adapter_from_values(INTEL_UHD), 16.0, 8, 10**12, 2 * 10**12)
+    whisper, gemma = Requirements(6, 3, "gpu"), Requirements(4, 3.3, "gpu-or-cpu")
+
+    fit = hw.fits(whisper, amd, "sk")
+    assert fit["level"] == "needs_nvidia" and "AMD Radeon RX 7800 XT" in fit["text"]
+    fit = hw.fits(gemma, amd, "sk", ollama=True)
+    assert fit["level"] == "ok" and "Radeon RX 6000" in fit["text"]
+    assert hw.fits(Requirements(19, 17, "gpu-or-cpu"), amd, ollama=True)["level"] == "partial"
+    assert hw.fits(gemma, intel, ollama=True)["level"] == "needs_nvidia"  # Ollama: no Intel
+    assert hw.fits(Requirements(None, 1, "cpu"), amd)["level"] == "cpu"
+
+
+def test_the_models_page_shows_an_amd_card(monkeypatch, tmp_path: Path):
+    amd = hw.Hardware(hw.adapter_from_values(AMD_RX7800), 32.0, 16, 10**12, 2 * 10**12)
+    monkeypatch.setattr(hw, "detect", lambda models_dir: amd)
+    snap = make_manager(tmp_path).snapshot(lang="sk")
+    assert snap["hardware"]["gpu"]["vendor"] == "amd"
+    rows = {m["id"]: m for m in snap["models"]}
+    assert rows["whisper-large-v3"]["fits"]["level"] == "needs_nvidia"
+    assert rows["translategemma-4b"]["fits"]["level"] == "ok"
+
+
 # ----- safe deletion -----------------------------------------------------------------------
 def test_safe_rmtree_removes_inside_the_root_only(tmp_path: Path):
     root = tmp_path / "models"
