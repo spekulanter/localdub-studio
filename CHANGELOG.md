@@ -3,6 +3,14 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.9] - 2026-11-20
+
+### Fixed
+- **The PC no longer goes to sleep in the middle of a dub (Windows).** While a dub runs, LocalDub asks Windows not
+  to sleep when idle; the request ends by itself when the dub finishes, fails or is paused, so an open but idle
+  LocalDub never keeps the PC awake. The screen can still turn off, and closing a laptop's lid or choosing Sleep
+  still puts it to sleep. (The Mac already did this.)
+
 ## [0.5.8] - 2026-11-20
 
 ### Fixed
