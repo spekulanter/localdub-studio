@@ -157,7 +157,7 @@ class FFmpeg:
     def gain_with_limiter(self, src: Path, dst: Path, gain_db: float, limit: float = 0.95) -> None:
         """Apply `gain_db`, then a look-ahead limiter so peaks never exceed `limit` (linear)."""
         flt = f"volume={gain_db:.2f}dB,alimiter=limit={limit}:attack=5:release=60:level=disabled"
-        self.run(["-i", src, "-af", flt, "-c:a", "pcm_s16le", dst])
+        self.run(["-i", src, "-af", flt, "-c:a", "pcm_s16le", "-rf64", "auto", dst])
 
     def measure_lufs(self, path: Path) -> float | None:
         """Integrated loudness (EBU R128, LUFS) of an audio file, or None for silence."""
@@ -212,14 +212,14 @@ class FFmpeg:
     def extract_audio(
         self, src: Path, dst: Path, *, sample_rate: int, channels: int, stream: int = 0
     ) -> None:
-        """Decode one audio stream to 16-bit PCM WAV."""
+        """Decode one audio stream to 16-bit PCM WAV (RF64 once it passes 4 GB: long videos)."""
         dst.parent.mkdir(parents=True, exist_ok=True)
         self.run(
             [
                 "-i", src,
                 "-map", f"0:a:{stream}",
                 "-vn", "-ac", str(channels), "-ar", str(sample_rate),
-                "-c:a", "pcm_s16le",
+                "-c:a", "pcm_s16le", "-rf64", "auto",
                 dst,
             ]
         )  # fmt: skip

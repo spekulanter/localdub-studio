@@ -10,7 +10,6 @@ import hashlib
 import json
 import logging
 import shutil
-import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,8 +22,15 @@ import soundfile as sf
 from localdub.config import Settings
 from localdub.core.asr.base import ASRProvider
 from localdub.core.asr.segmentation import group_words
-from localdub.core.audio.assemble import build_timeline, db_to_gain, normalize_rms, trim_silence
-from localdub.core.audio.mix import voice_over_mix
+from localdub.core.audio.assemble import db_to_gain, normalize_rms, trim_silence
+from localdub.core.audio.stream import (
+    ClipRef,
+    MixSpec,
+    fit_length,
+    mix_peak,
+    write_mix,
+    write_timeline,
+)
 from localdub.core.diarize.base import Diarizer
 from localdub.core.diarize.pitch import load_speaker_genders
 from localdub.core.export.srt import write_srt
@@ -594,21 +600,25 @@ class Pipeline:
             separator = DemucsSeparator(self.s.models_dir)
         except SeparationUnavailable as exc:
             raise PipelineError("separate", str(exc)) from exc
+        # The intermediate WAVs are read and written in blocks (memory does not grow with the
+        # video's length); "-rf64 auto" lets them pass 4 GB on very long videos.
+        src = self.p("separate_in.wav")
+        raw = {name: self.p(f"separate_{name}.wav") for name in ("vocals", "background")}
         try:
-            src = self.p("separate_in.wav")
             self.ff.run(["-i", self.p("audio_orig.wav"), "-ar", str(separator.sample_rate),
-                         "-c:a", "pcm_s16le", src])  # fmt: skip
-            stems = separator.separate(src)
+                         "-c:a", "pcm_s16le", "-rf64", "auto", src])  # fmt: skip
+            separator.separate(
+                src,
+                raw["vocals"],
+                raw["background"],
+                on_progress=lambda done, total: self.on_progress("separate", f"{done}/{total}"),
+            )
         finally:
             separator.close()
-        for name, data, dst in (
-            ("background", stems.background, out_bg),
-            ("vocals", stems.vocals, out_voc),
-        ):
-            raw = self.p(f"separate_{name}.wav")
-            sf.write(raw, data, stems.sample_rate, subtype="FLOAT")
-            self.ff.run(["-i", raw, "-ar", str(self.s.sample_rate), "-c:a", "pcm_s16le", dst])
-            raw.unlink()
+        for name, dst in (("background", out_bg), ("vocals", out_voc)):
+            self.ff.run(["-i", raw[name], "-ar", str(self.s.sample_rate),
+                         "-c:a", "pcm_s16le", "-rf64", "auto", dst])  # fmt: skip
+            raw[name].unlink()
         src.unlink()
         return [out_bg, out_voc]
 
@@ -680,14 +690,11 @@ class Pipeline:
         save_segments(out, segs)
         return [out]
 
-    def _dub_loudness_gain(self, dub: np.ndarray, sr: int) -> float:
+    def _dub_loudness_gain(self, dub_path: Path) -> float:
         """dB to add to the dub so its loudness matches the original audio (0 when disabled)."""
         if not self.s.match_original_loudness:
             return 0.0
-        with tempfile.TemporaryDirectory(prefix="localdub-loud-") as tmp:
-            dub_path = Path(tmp) / "dub.wav"
-            sf.write(dub_path, dub, sr, subtype="PCM_16")
-            dub_lufs = self.ff.measure_lufs(dub_path)
+        dub_lufs = self.ff.measure_lufs(dub_path)
         orig_lufs = self.ff.measure_lufs(self.p("audio_orig.wav"))
         if dub_lufs is None or orig_lufs is None:
             return 0.0
@@ -702,84 +709,89 @@ class Pipeline:
         )  # fmt: skip
         return round(gain, 2)
 
-    def _cap_mix_loudness(self, mix: np.ndarray, sr: int) -> np.ndarray:
-        """Turn the mix down if it is louder than max_mix_lufs (keeps the dub/original balance)."""
-        with tempfile.TemporaryDirectory(prefix="localdub-mix-") as tmp:
-            path = Path(tmp) / "mix.wav"
-            sf.write(path, mix, sr, subtype="PCM_16")
-            lufs = self.ff.measure_lufs(path)
+    def _mix_cap_gain(self, mix_path: Path) -> float:
+        """Linear gain that brings the mix down to max_mix_lufs (1.0 when it is not louder)."""
+        lufs = self.ff.measure_lufs(mix_path)
         if lufs is None or lufs <= self.s.max_mix_lufs:
-            return mix
+            return 1.0
         gain_db = self.s.max_mix_lufs - lufs
         log.info(
             "Mix loudness %.1f LUFS exceeds %.1f: %+.1f dB", lufs, self.s.max_mix_lufs, gain_db
         )
-        return (mix * db_to_gain(gain_db)).astype(np.float32)
+        return db_to_gain(gain_db)
 
     def _assemble(self) -> list[Path]:
+        """Place the clips, then write dub.wav and mix.wav.
+
+        Everything long (the dub track, the original, the mix) is streamed through files in
+        blocks: a six-hour video would otherwise need tens of GB of memory.
+        """
         segs = load_segments(self.p("voiced.json"))
         duration = self.info().duration
         sr = self.s.sample_rate
         voiced = [s for s in segs if s.audio_path]
-        clips = []
-        for seg in voiced:
-            assert seg.audio_path is not None
-            data, clip_sr = sf.read(str(self.wd / seg.audio_path), dtype="float32")
-            if clip_sr != sr:
+        paths = [self.wd / str(s.audio_path) for s in voiced]
+        lengths = []
+        for seg, path in zip(voiced, paths, strict=True):
+            info = sf.info(str(path))
+            if info.samplerate != sr:
                 raise PipelineError(
-                    "assemble", f"Clip {seg.audio_path} has {clip_sr} Hz, expected {sr}"
+                    "assemble", f"Clip {seg.audio_path} has {info.samplerate} Hz, expected {sr}"
                 )
-            clips.append(normalize_rms(data.reshape(-1), self.s.dub_target_dbfs))
+            lengths.append(info.frames)
 
         placements = place(
-            [s.start for s in voiced], [c.size / sr for c in clips], self.s.segment_gap_s
+            [s.start for s in voiced], [k / sr for k in lengths], self.s.segment_gap_s
         )
-        for seg, pl, clip in zip(voiced, placements, clips, strict=True):
+        for seg, pl, k in zip(voiced, placements, lengths, strict=True):
             seg.placed_start = round(pl.start, 3)
-            if pl.start + clip.size / sr > duration + 1e-3:
+            if pl.start + k / sr > duration + 1e-3:
                 seg.fit_status = FitStatus.OVERFLOW
             elif pl.shifted_by > 0.02 and seg.fit_status is not FitStatus.OVERFLOW:
                 seg.fit_status = FitStatus.SHIFTED
 
-        dub = build_timeline(
-            [(pl.start, c) for pl, c in zip(placements, clips, strict=True)], duration, sr
-        )
-        dub_gain_db = self._dub_loudness_gain(dub, sr)
-        if dub_gain_db:
-            n_dub = dub.size
-            with tempfile.TemporaryDirectory(prefix="localdub-gain-") as tmp:
-                before, after = Path(tmp) / "in.wav", Path(tmp) / "out.wav"
-                sf.write(before, dub, sr, subtype="PCM_16")
-                self.ff.gain_with_limiter(before, after, dub_gain_db)  # limiter: no clipping
-                louder = sf.read(str(after), dtype="float32")[0].reshape(-1)
-            dub = np.pad(louder, (0, max(n_dub - louder.size, 0)))[:n_dub].astype(np.float32)
-        background_mode = self.s.original_audio == "background"
-        original, orig_sr = sf.read(
-            str(self.p("background.wav" if background_mode else "audio_orig.wav")),
-            dtype="float32",
-            always_2d=True,
-        )
-        if orig_sr != sr:
-            raise PipelineError("assemble", f"Original audio has {orig_sr} Hz, expected {sr}")
-        n = dub.size
-        original = np.pad(original, ((0, max(n - original.shape[0], 0)), (0, 0)))[:n]
-        regions = [
-            (pl.start, pl.start + c.size / sr) for pl, c in zip(placements, clips, strict=True)
+        def load_clip(path: Path) -> np.ndarray:
+            data = sf.read(str(path), dtype="float32")[0].reshape(-1)
+            return normalize_rms(data, self.s.dub_target_dbfs)
+
+        n = int(round(duration * sr))
+        dub_path, mix_path = self.p("dub.wav"), self.p("mix.wav")
+        raw = self.p("dub_raw.wav")
+        refs = [
+            ClipRef(int(round(pl.start * sr)), k, path)
+            for pl, k, path in zip(placements, lengths, paths, strict=True)
         ]
-        mix = voice_over_mix(
-            original,
-            dub,
-            regions,
-            sr,
-            self.s.background_duck_db if background_mode else self.s.duck_db,
-            self.s.duck_ramp_s,
+        write_timeline(raw, refs, n, sr, load_clip)
+        dub_gain_db = self._dub_loudness_gain(raw)
+        if dub_gain_db:
+            louder = self.p("dub_gain.wav")
+            self.ff.gain_with_limiter(raw, louder, dub_gain_db)  # limiter: no clipping
+            fit_length(louder, dub_path, n)
+            louder.unlink()
+            raw.unlink()
+        else:
+            raw.replace(dub_path)
+
+        background_mode = self.s.original_audio == "background"
+        spec = MixSpec(
+            original=self.p("background.wav" if background_mode else "audio_orig.wav"),
+            dub=dub_path,
+            regions=[
+                (pl.start, pl.start + k / sr) for pl, k in zip(placements, lengths, strict=True)
+            ],
+            duck_db=self.s.background_duck_db if background_mode else self.s.duck_db,
+            ramp_s=self.s.duck_ramp_s,
             mute_original=self.s.original_audio == "mute",
         )
-
-        mix = self._cap_mix_loudness(mix, sr)
-        dub_path, mix_path = self.p("dub.wav"), self.p("mix.wav")
-        sf.write(dub_path, dub, sr, subtype="PCM_16")
-        sf.write(mix_path, mix, sr, subtype="PCM_16")
+        try:
+            peak = mix_peak(spec)
+        except ValueError as exc:  # wrong sample rate
+            raise PipelineError("assemble", str(exc)) from exc
+        gain = 0.99 / peak if peak > 0.99 else 1.0  # no clipping
+        write_mix(spec, mix_path, gain)
+        cap = self._mix_cap_gain(mix_path)
+        if cap != 1.0:
+            write_mix(spec, mix_path, gain * cap)
 
         windows = available_windows(segs, duration, self.s.segment_gap_s)
         flagged = [
