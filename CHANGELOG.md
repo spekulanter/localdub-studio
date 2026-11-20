@@ -3,6 +3,12 @@
 All notable changes to LocalDub Studio. Versions are pre-releases: see docs/QUALITY.md for what has and
 has not been tested before relying on a feature.
 
+## [0.5.10] - 2026-11-20
+
+### Added
+- The program's version is shown under the LocalDub name in the sidebar ("Studio v0.5.10"), not only in the
+  update banner.
+
 ## [0.5.9] - 2026-11-20
 
 ### Fixed
