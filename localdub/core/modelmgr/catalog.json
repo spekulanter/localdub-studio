@@ -673,13 +673,13 @@
         "disk_gb": 0.05,
         "runs_on": "cpu"
       },
-      "size_bytes": 46552205,
+      "size_bytes": 45586674,
       "license": {
         "name": "MIT (pyannote) / Apache-2.0 toolkit (3D-Speaker weights: not stated)",
-        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models"
+        "url": "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0"
       },
       "measured": "10 of 10 lines right on a synthetic three-voice dialogue; not verified on real recordings.",
-      "pinned": "Two files, each pinned to a SHA-256.",
+      "pinned": "Two files from Hugging Face, each pinned to a commit and a SHA-256.",
       "source": {
         "type": "diarization"
       },
@@ -694,7 +694,7 @@
           "Hovorí jedna osoba: nič to nepridá."
         ],
         "measured": "10 z 10 riadkov správne na syntetickom dialógu troch hlasov; na skutočných nahrávkach neoverené.",
-        "pinned": "Dva súbory, každý pripnutý na SHA-256."
+        "pinned": "Dva súbory z Hugging Face, každý pripnutý na commit a SHA-256."
       }
     },
     {

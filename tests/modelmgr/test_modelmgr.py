@@ -88,6 +88,20 @@ def test_fit_levels():
     assert hw.fits(Requirements(None, 1, "cpu"), none)["level"] == "cpu"
 
 
+def test_speaker_models_are_pinned_to_a_commit_that_cannot_change():
+    """Upstream replaced the embedding file in its GitHub release on 2026-11-19 and every new
+    download failed its checksum. A Hugging Face URL with a commit id always serves the same bytes."""
+    import re
+
+    from localdub.core.diarize.sherpa_diarizer import EMBEDDING, SEGMENTATION, SIZES
+
+    for model in (SEGMENTATION, EMBEDDING):
+        assert re.match(r"https://huggingface\.co/[\w.-]+/[\w.-]+/resolve/[0-9a-f]{40}/", model.url)
+        assert re.fullmatch(r"[0-9a-f]{64}", model.sha256) and model.member is None
+    assert EMBEDDING.sha256.startswith("1a331345")  # the file LocalDub has always installed
+    assert load_catalog().entry("diarization").size_bytes == sum(SIZES)  # type: ignore[union-attr]
+
+
 # What Windows keeps in the registry for each display adapter (values as winreg returns them).
 AMD_RX7800 = {
     "DriverDesc": "AMD Radeon RX 7800 XT",

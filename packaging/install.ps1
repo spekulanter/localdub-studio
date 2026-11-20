@@ -98,7 +98,7 @@ try {
     if (-not $SkipModels) {
         Step 'Model files'
         Say 'Speech recognition (faster-whisper large-v3, about 3 GB) and the Slovak voice (Supertonic 3, about 400 MB)'
-        Say 'come from Hugging Face. Optional: speaker detection (46 MB, GitHub, checksum-verified).'
+        Say 'come from Hugging Face. Optional: speaker detection (46 MB, Hugging Face, checksum-verified).'
         if (Ask 'Download the models now? (otherwise the first dubbing job downloads them)') {
             $fetch = @('run', '--no-sync', 'localdub', 'fetch-models')
             if ($WithDiarization) { $fetch += '--diarization' }

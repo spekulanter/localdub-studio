@@ -18,21 +18,26 @@ from localdub.core.models import RemoteModel, ensure_model
 
 log = logging.getLogger(__name__)
 
+# Both files come from sherpa-onnx's Hugging Face repositories at a fixed commit. Upstream replaced
+# the embedding file in its GitHub release (and on Hugging Face `main`) on 2026-11-19, which broke
+# every new download against the pinned checksum; a commit URL can never change under us. They
+# are the same bytes LocalDub has always installed, so existing copies stay valid.
+_HF = "https://huggingface.co/csukuangfj"
 SEGMENTATION = RemoteModel(
     name="pyannote segmentation 3.0 (ONNX, via sherpa-onnx)",
-    url="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/"
-    "sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
-    sha256="24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488",
+    url=f"{_HF}/sherpa-onnx-pyannote-segmentation-3-0/resolve/"
+    "9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx",
+    sha256="220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
     dest="diarization/pyannote-segmentation-3-0.onnx",
-    member="sherpa-onnx-pyannote-segmentation-3-0/model.onnx",
 )
 EMBEDDING = RemoteModel(
     name="3D-Speaker ERes2Net base speaker embedding (ONNX)",
-    url="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/"
+    url=f"{_HF}/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/"
     "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
     sha256="1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b",
     dest="diarization/3dspeaker-eres2net-base.onnx",
 )
+SIZES = (5_992_913, 39_593_761)  # bytes, for download progress
 
 
 class SherpaDiarizer:

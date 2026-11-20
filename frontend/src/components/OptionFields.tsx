@@ -108,7 +108,8 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
   const llmChoices = Array.from(new Set([value.llm_model, ...known.keys(), ...installedInOllama]));
   const llmLabel = (m: string) => {
     const c = known.get(m);
-    const ready = installedInOllama.has(m) || installedInOllama.has(`${m}:latest`);
+    // either answer is enough: the model list (options) and Ollama's own list (health) are loaded separately
+    const ready = c?.installed === true || installedInOllama.has(m) || installedInOllama.has(`${m}:latest`);
     const status = c && c.status !== "available" && c.status !== "custom" ? ` [${t(c.status.replace("_", " "))}]` : "";
     return `${c ? c.title : m}${status}${health && !ready ? ` (${t("not downloaded")})` : ""}`;
   };
@@ -225,7 +226,7 @@ export function OptionFields({ options, health, value, onChange, lockSource, dis
                     />
                   </label>
                   <p className="text-xs text-muted">
-                    {t("Runs on the CPU. The first use downloads two small model files (about 46 MB) from GitHub. Giving the exact speaker count is much more reliable than automatic detection.")}
+                    {t("Runs on the CPU. The first use downloads two small model files (about 46 MB) from Hugging Face. Giving the exact speaker count is much more reliable than automatic detection.")}
                   </p>
                 </div>
               )}

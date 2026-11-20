@@ -64,14 +64,19 @@ export default function App() {
   const downloading = models?.busy ?? false;
   // The pickers in the dub forms list which models are downloaded: reload them when a download ends and
   // whenever another page is opened, so "(not downloaded)" never outlives the download.
+  // The translation picker also reads Ollama's model list from the health answer, so that is reloaded too.
   const wasDownloading = useRef(false);
   useEffect(() => {
-    if (wasDownloading.current && !downloading) refreshOptions();
+    if (wasDownloading.current && !downloading) {
+      refreshOptions();
+      refreshHealth();
+    }
     wasDownloading.current = downloading;
-  }, [downloading, refreshOptions]);
+  }, [downloading, refreshOptions, refreshHealth]);
   useEffect(() => {
     refreshOptions();
-  }, [selected, refreshOptions]);
+    refreshHealth();
+  }, [selected, refreshOptions, refreshHealth]);
   useEffect(() => {
     if (!downloading) return;
     const t = window.setInterval(refreshModels, 1000);

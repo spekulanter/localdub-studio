@@ -172,8 +172,8 @@ The following uses are **prohibited** under the OpenRAIL-M license for the Super
 | Component | Source | Licence | Status |
 |---|---|---|---|
 | sherpa-onnx 2.0.1 (inference library) | PyPI, k2-fsa | Apache-2.0 (PyPI metadata) | verified from package metadata |
-| pyannote segmentation 3.0, ONNX conversion | GitHub release `speaker-segmentation-models` (tarball sha256 `24615ee8…6488`) | MIT, Copyright 2022 CNRS (LICENSE file inside the tarball) | verified |
-| 3D-Speaker ERes2Net-base speaker embedding, ONNX | GitHub release `speaker-recongition-models` (sha256 `1a331345…5e4b`) | The 3D-Speaker toolkit is Apache-2.0; **no source states the licence of these weights explicitly** | **UNVERIFIED**: check the ModelScope card before redistributing |
+| pyannote segmentation 3.0, ONNX conversion | Hugging Face `csukuangfj/sherpa-onnx-pyannote-segmentation-3-0` @ `9403a690` (`model.onnx`, sha256 `220ad67c…1079`) | MIT, Copyright 2022 CNRS (LICENSE file in that repository) | verified |
+| 3D-Speaker ERes2Net-base speaker embedding, ONNX | Hugging Face `csukuangfj/speaker-embedding-models` @ `0743f301` (sha256 `1a331345…5e4b`; upstream replaced this file on 2026-11-19, the pin keeps the original) | The 3D-Speaker toolkit is Apache-2.0; **no source states the licence of these weights explicitly** | **UNVERIFIED**: check the ModelScope card before redistributing |
 
 The two model files (about 46 MB) are downloaded only when a project enables diarization, into
 `models/diarization/`, and refused unless their sha256 matches the values pinned in

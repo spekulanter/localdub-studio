@@ -56,6 +56,17 @@ describe("NewProject", () => {
     expect((submit as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("calls a model downloaded since the window opened ready, even if Ollama's list is older", () => {
+    const fresh: Options = {
+      ...options,
+      translation_choices: options.translation_choices.map((c) => (c.id === "translategemma-12b" ? { ...c, installed: true } : c)),
+    };
+    render(<NewProject options={fresh} health={health} onCreated={vi.fn()} />); // health still lacks 12b
+    const labels = Array.from(document.querySelectorAll("option")).map((o) => o.textContent ?? "");
+    expect(labels).toContain("TranslateGemma 12B");
+    expect(labels.some((l) => l.startsWith("TranslateGemma 12B") && l.includes("not downloaded"))).toBe(false);
+  });
+
   it("warns that muting removes music", () => {
     render(<NewProject options={options} health={health} onCreated={vi.fn()} />);
     expect(screen.queryByText(/removes music/)).toBeNull();

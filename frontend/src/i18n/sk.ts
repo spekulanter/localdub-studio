@@ -249,7 +249,7 @@ export const sk: Record<string, string> = {
   "Muting also removes music and sound effects from the dubbed track.": "Stlmenie odstráni z dabovanej stopy aj hudbu a zvukové efekty.",
   "Detect different speakers and give each its own voice": "Rozpoznať rôznych hovoriacich a každému dať vlastný hlas",
   "Number of speakers (leave empty to detect)": "Počet hovoriacich (nechajte prázdne pre automatické zistenie)",
-  "Runs on the CPU. The first use downloads two small model files (about 46 MB) from GitHub. Giving the exact speaker count is much more reliable than automatic detection.": "Beží na procesore. Pri prvom použití stiahne z GitHubu dva malé súbory modelov (asi 46 MB). Zadanie presného počtu hovoriacich je oveľa spoľahlivejšie než automatické zistenie.",
+  "Runs on the CPU. The first use downloads two small model files (about 46 MB) from Hugging Face. Giving the exact speaker count is much more reliable than automatic detection.": "Beží na procesore. Pri prvom použití stiahne z Hugging Face dva malé súbory modelov (asi 46 MB). Zadanie presného počtu hovoriacich je oveľa spoľahlivejšie než automatické zistenie.",
   "Make the Slovak voice sound like the original speaker": "Slovenský hlas nech znie ako pôvodný hovoriaci",
   "I have the right to imitate the voices in this video (they are my own, or I have the speakers' permission).": "Mám právo napodobniť hlasy v tomto videu (sú moje, alebo mám súhlas hovoriacich).",
   "Runs locally on your GPU. It shifts the timbre of the generated voice towards the speaker; it is not a perfect copy. The finished file is marked as AI-generated.": "Beží lokálne na vašej grafickej karte. Posúva farbu vygenerovaného hlasu k hovoriacemu; nie je to dokonalá kópia. Hotový súbor je označený ako vytvorený AI.",

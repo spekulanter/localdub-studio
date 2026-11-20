@@ -518,7 +518,8 @@ class DiarizationHandler(Handler):
         )
 
     def download(self, e: Entry, ctx: Ctx, progress: Progress) -> None:
-        sizes = [6_958_444, 39_593_761]
+        from localdub.core.diarize.sherpa_diarizer import SIZES as sizes
+
         total = sum(sizes)
         before = 0
         for model, size in zip(self._models(), sizes, strict=True):

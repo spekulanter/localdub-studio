@@ -32,7 +32,7 @@ window (Microsoft Edge WebView2, included in Windows 11), has a Start-menu entry
 | Speech recognition (faster-whisper large-v3), required | Hugging Face | about 3.1 GB |
 | Slovak voice (Supertonic 3), required | Hugging Face | about 0.4 GB |
 | Translation model `translategemma:4b`, required | Ollama registry (Ollama must be running) | about 3.3 GB |
-| Speaker detection, optional | GitHub release, SHA-256 verified | 46 MB |
+| Speaker detection, optional | Hugging Face (pinned commit), SHA-256 verified | 46 MB |
 | Optional packages for speech removal and voice cloning (PyTorch 2.9 with CUDA 12.8, Demucs) | pytorch.org and PyPI; every file is checked against the SHA-256 in `uv.lock` | about 2.9 GB (about 4.5 GB on disk) |
 | Speech removal (htdemucs), optional | Hugging Face | 80 MB |
 | Voice cloning (OpenVoice V2), optional | Hugging Face | 131 MB |
